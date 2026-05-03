@@ -1,4 +1,3 @@
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 
@@ -6,25 +5,18 @@ exports.register = async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
-    // Check if user exists
     const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (userResult.rows.length > 0) {
       return res.status(400).json({ msg: 'User already exists' });
     }
 
-    // Encrypt password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Insert user
     const newUserResult = await pool.query(
-      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, role',
-      [name, email, hashedPassword]
+      'INSERT INTO users (name, email, password, permissions) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, permissions',
+      [name, email, password, JSON.stringify([])]
     );
 
     const user = newUserResult.rows[0];
 
-    // Return JWT
     const payload = {
       user: {
         id: user.id,
@@ -51,7 +43,6 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Check if user exists
     const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (userResult.rows.length === 0) {
       return res.status(400).json({ msg: 'Invalid Credentials' });
@@ -59,13 +50,11 @@ exports.login = async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // Compare password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
+    // Plain text comparison
+    if (password !== user.password) {
       return res.status(400).json({ msg: 'Invalid Credentials' });
     }
 
-    // Return JWT
     const payload = {
       user: {
         id: user.id,
@@ -81,7 +70,13 @@ exports.login = async (req, res) => {
         if (err) throw err;
         res.json({ 
           token, 
-          user: { id: user.id, name: user.name, email: user.email, role: user.role } 
+          user: { 
+            id: user.id, 
+            name: user.name, 
+            email: user.email, 
+            role: user.role,
+            permissions: user.permissions || [] 
+          } 
         });
       }
     );
@@ -93,7 +88,7 @@ exports.login = async (req, res) => {
 
 exports.getUser = async (req, res) => {
   try {
-    const userResult = await pool.query('SELECT id, name, email, role, created_at FROM users WHERE id = $1', [req.user.id]);
+    const userResult = await pool.query('SELECT id, name, email, role, permissions, created_at FROM users WHERE id = $1', [req.user.id]);
     res.json(userResult.rows[0]);
   } catch (err) {
     console.error(err.message);

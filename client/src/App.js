@@ -16,6 +16,9 @@ import Transport from "./Pages/Transport.jsx";
 import Expenses from "./Pages/Expenses.jsx";
 import Salary from "./Pages/Salary.jsx";
 import Profit from "./Pages/Profit.jsx";
+import UsersManager from "./Pages/UsersManager.jsx";
+import Wholesale from "./Pages/Wholesale.jsx";
+import Retail from "./Pages/Retail.jsx";
 
 function App() {
   return (
@@ -25,9 +28,11 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<LoginPage />} />
           <Route path="/forgot" element={<ForgotPassword />} />
-
+          
           {/* Protected Routes inside MainLayout */}
           <Route path="/dashboard" element={<PrivateRoute><MainLayout><Dashboard /></MainLayout></PrivateRoute>} />
+          <Route path="/wholesale" element={<PrivateRoute><MainLayout><Wholesale /></MainLayout></PrivateRoute>} />
+          <Route path="/retail" element={<PrivateRoute><MainLayout><Retail /></MainLayout></PrivateRoute>} />
           <Route path="/products" element={<PrivateRoute><MainLayout><Products /></MainLayout></PrivateRoute>} />
           <Route path="/stock" element={<PrivateRoute><MainLayout><Stock /></MainLayout></PrivateRoute>} />
           <Route path="/billing" element={<PrivateRoute><MainLayout><Billing /></MainLayout></PrivateRoute>} />
@@ -37,6 +42,7 @@ function App() {
           <Route path="/expenses" element={<PrivateRoute><MainLayout><Expenses /></MainLayout></PrivateRoute>} />
           <Route path="/salary" element={<PrivateRoute><MainLayout><Salary /></MainLayout></PrivateRoute>} />
           <Route path="/profit" element={<PrivateRoute><MainLayout><Profit /></MainLayout></PrivateRoute>} />
+          <Route path="/users" element={<PrivateRoute><MainLayout><UsersManager /></MainLayout></PrivateRoute>} />
         </Routes>
       </Router>
     </AuthProvider>

@@ -10,6 +10,7 @@ app.use(cors());
 
 // Define Routes
 app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
 // Placeholder for future routes:
 // app.use('/api/products', require('./routes/productRoutes'));
 
