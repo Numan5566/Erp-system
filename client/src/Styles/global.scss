@@ -1,0 +1,22 @@
+@import "./variables";
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: $light;
+}
+
+input {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+button {
+  padding: 12px;
+  background: black;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
