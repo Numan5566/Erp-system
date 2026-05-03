@@ -1,19 +1,45 @@
-import "./styles/global.scss";
+import "./Styles/global.scss";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import PrivateRoute from "./components/PrivateRoute";
+import MainLayout from "./components/MainLayout";
 
-import LoginPage from "./pages/LoginPage.jsx";
-import ForgotPassword from "./pages/ForgotPassword.jsx";
-import Dashboard from "./pages/Dashboard.jsx";
+import LoginPage from "./Pages/LoginPage.jsx";
+import ForgotPassword from "./Pages/ForgotPassword.jsx";
+import Dashboard from "./Pages/Dashboard.jsx";
+import Products from "./Pages/Products.jsx";
+import Stock from "./Pages/Stock.jsx";
+import Billing from "./Pages/Billing.jsx";
+import Customers from "./Pages/Customers.jsx";
+import Suppliers from "./Pages/Suppliers.jsx";
+import Transport from "./Pages/Transport.jsx";
+import Expenses from "./Pages/Expenses.jsx";
+import Salary from "./Pages/Salary.jsx";
+import Profit from "./Pages/Profit.jsx";
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LoginPage/>} />
-        <Route path="/forgot" element={<ForgotPassword />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<LoginPage />} />
+          <Route path="/forgot" element={<ForgotPassword />} />
+
+          {/* Protected Routes inside MainLayout */}
+          <Route path="/dashboard" element={<PrivateRoute><MainLayout><Dashboard /></MainLayout></PrivateRoute>} />
+          <Route path="/products" element={<PrivateRoute><MainLayout><Products /></MainLayout></PrivateRoute>} />
+          <Route path="/stock" element={<PrivateRoute><MainLayout><Stock /></MainLayout></PrivateRoute>} />
+          <Route path="/billing" element={<PrivateRoute><MainLayout><Billing /></MainLayout></PrivateRoute>} />
+          <Route path="/customers" element={<PrivateRoute><MainLayout><Customers /></MainLayout></PrivateRoute>} />
+          <Route path="/suppliers" element={<PrivateRoute><MainLayout><Suppliers /></MainLayout></PrivateRoute>} />
+          <Route path="/transport" element={<PrivateRoute><MainLayout><Transport /></MainLayout></PrivateRoute>} />
+          <Route path="/expenses" element={<PrivateRoute><MainLayout><Expenses /></MainLayout></PrivateRoute>} />
+          <Route path="/salary" element={<PrivateRoute><MainLayout><Salary /></MainLayout></PrivateRoute>} />
+          <Route path="/profit" element={<PrivateRoute><MainLayout><Profit /></MainLayout></PrivateRoute>} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 

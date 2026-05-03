@@ -1,45 +1,72 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import "../styles/LoginPage.scss";
+import React, { useState, useContext } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import "../Styles/LoginPage.scss";
+import { Building2 } from 'lucide-react';
 
-export default function LoginPage() {
+const LoginPage = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const handleLogin = () => {
-    // TEMP login (baad mein backend lagayenge)
-    if (email && password) {
-      navigate("/dashboard");
-    } else {
-      alert("Please enter email & password");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.response?.data?.msg || 'Login failed. Please check credentials.');
     }
   };
 
   return (
     <div className="login-container">
       <div className="login-box">
-        <h2>ERP Login</h2>
+        <div className="login-header">
+          <div className="logo-icon">
+            <Building2 size={40} color="#2563eb" />
+          </div>
+          <h2>ERP System Login</h2>
+          <p>Welcome back! Please enter your details.</p>
+        </div>
 
-        <input
-          type="text"
-          placeholder="Email"
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        {error && <div className="error-message">{error}</div>}
 
-        <input
-          type="password"
-          placeholder="Password"
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
-        <button onClick={handleLogin}>Login</button>
-
-        <span className="forgot" onClick={() => navigate("/forgot")}>
-          Forgot Password?
-        </span>
+        <form onSubmit={handleSubmit} className="login-form">
+          <div className="form-group">
+            <label>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@erp.com"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+          </div>
+          <div className="form-options">
+            <label className="remember-me">
+              <input type="checkbox" /> Remember me
+            </label>
+            <Link to="/forgot" className="forgot-link">Forgot Password?</Link>
+          </div>
+          <button type="submit" className="login-btn">Sign In</button>
+        </form>
       </div>
     </div>
   );
-}
+};
+
+export default LoginPage;

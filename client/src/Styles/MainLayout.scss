@@ -1,0 +1,47 @@
+.main-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f8fafc;
+
+  .content-area {
+    flex: 1;
+    margin-left: 250px;
+    /* Same as sidebar width */
+    padding: 20px;
+    overflow-y: auto;
+  }
+}
+
+/* Responsiveness for mobile */
+@media (max-width: 768px) {
+  .main-layout {
+    flex-direction: column;
+
+    .sidebar {
+      width: 100%;
+      height: auto;
+      position: relative;
+
+      .sidebar-nav {
+        display: flex;
+        overflow-x: auto;
+        padding: 10px;
+        white-space: nowrap;
+
+        .nav-item {
+          padding: 10px 15px;
+          border-left: none;
+
+          &.active {
+            border-left: none;
+            border-bottom: 4px solid #60a5fa;
+          }
+        }
+      }
+    }
+
+    .content-area {
+      margin-left: 0;
+    }
+  }
+}
