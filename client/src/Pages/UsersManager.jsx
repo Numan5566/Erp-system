@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import '../Styles/UsersManager.scss';
 import { UserPlus, Save, Trash2, Edit } from 'lucide-react';
+import ActionMenu from '../components/ActionMenu';
 
 const availableModules = [
   { id: 'wholesale', label: 'Wholesale' },
@@ -168,14 +169,10 @@ export default function UsersManager() {
                 </td>
                 <td>
                   {u.role !== 'admin' && (
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="btn-icon" style={{ color: '#2563eb' }} onClick={() => handleEditClick(u)}>
-                        <Edit size={18} />
-                      </button>
-                      <button className="btn-icon danger" onClick={() => handleDelete(u.id)}>
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
+                    <ActionMenu 
+                      onEdit={() => handleEditClick(u)} 
+                      onDelete={() => handleDelete(u.id)} 
+                    />
                   )}
                 </td>
               </tr>

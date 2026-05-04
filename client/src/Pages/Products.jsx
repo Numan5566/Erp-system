@@ -8,6 +8,7 @@ import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
+import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -279,12 +280,12 @@ export default function Products({ type }) {
             }} />
             
             {user?.role === 'admin' && (
-              <Column header="Actions" body={(prod) => (
-                <div className="adjust-btns" onClick={(e) => e.stopPropagation()} style={{display: 'flex', gap: '8px'}}>
-                  <button className="btn-adjust plus" onClick={(e) => openEdit(e, prod)} title="Edit"><Pencil size={14}/></button>
-                  <button className="btn-adjust minus" onClick={(e) => handleDelete(e, prod.id)} title="Delete"><Trash2 size={14}/></button>
-                </div>
-              )} style={{width: '120px'}} />
+              <Column header="" body={(prod) => (
+                <ActionMenu 
+                  onEdit={(e) => openEdit(e, prod)} 
+                  onDelete={(e) => handleDelete(e, prod.id)}
+                />
+              )} style={{ width: '60px', textAlign: 'center' }} />
             )}
           </DataTable>
         </div>

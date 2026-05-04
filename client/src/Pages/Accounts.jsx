@@ -4,6 +4,7 @@ import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
+import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -100,10 +101,11 @@ export default function Accounts() {
           <Column field="account_number" header="Account Number" body={(acc) => (
             <div style={{display:'flex', alignItems:'center', gap:'6px'}}><Hash size={14} color="#64748b"/> {acc.account_number || "—"}</div>
           )} sortable />
-          <Column header="Actions" body={(acc) => (
-            <Button icon="pi pi-trash" className="p-button-rounded p-button-danger p-button-text" 
-                    onClick={() => handleDelete(acc.id)} tooltip="Delete" />
-          )} style={{textAlign: 'center', width: '100px'}} />
+          <Column header="" body={(acc) => (
+            <ActionMenu 
+              onDelete={() => handleDelete(acc.id)} 
+            />
+          )} style={{ textAlign: 'center', width: '60px' }} />
         </DataTable>
       </div>
 

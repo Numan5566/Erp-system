@@ -7,6 +7,7 @@ import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
+import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -210,12 +211,12 @@ export default function OtherExpenses({ type }) {
             <div style={{display:'flex', alignItems:'center', gap:'6px', color: '#475569'}}><CreditCard size={14}/> {r.payment_method}</div>
           )} sortable field="payment_method" />
           
-          <Column header="Actions" body={(r) => (
-            <div className="adjust-btns" style={{display:'flex', gap:'8px'}}>
-              <button className="btn-adjust plus" onClick={() => { setForm(r); setEditId(r.id); setShowModal(true); }} title="Edit"><Pencil size={14} /></button>
-              <button className="btn-adjust minus" onClick={() => handleDelete(r.id)} title="Delete"><Trash2 size={14} /></button>
-            </div>
-          )} style={{textAlign: 'center', width: '120px'}} />
+          <Column header="" body={(r) => (
+            <ActionMenu
+              onEdit={() => { setForm(r); setEditId(r.id); setShowModal(true); }}
+              onDelete={() => handleDelete(r.id)}
+            />
+          )} style={{ textAlign: 'center', width: '60px' }} />
         </DataTable>
       </div>
 

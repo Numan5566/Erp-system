@@ -4,6 +4,7 @@ import {
   User, Hash, Phone, CreditCard, Tag
 } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
+import ActionMenu from '../components/ActionMenu';
 import "../Styles/ModulePages.scss";
 
 const API = "http://localhost:5000/api/transport";
@@ -177,10 +178,10 @@ export default function Transport({ type }) {
                 <td>{rec.driver_phone || 'N/A'}</td>
                 <td className="bold text-green">Rs. {parseFloat(rec.total_earnings || 0).toLocaleString()}</td>
                 <td>
-                  <div className="action-btns">
-                    <button className="edit" onClick={() => openEdit(rec)}><Pencil size={16}/></button>
-                    <button className="delete" onClick={() => handleDelete(rec.id)}><Trash2 size={16}/></button>
-                  </div>
+                    <ActionMenu 
+                      onEdit={() => openEdit(rec)} 
+                      onDelete={() => handleDelete(rec.id)} 
+                    />
                 </td>
               </tr>
             )) : (

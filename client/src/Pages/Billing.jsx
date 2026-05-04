@@ -11,6 +11,7 @@ import { Dropdown } from 'primereact/dropdown';
 import { AutoComplete } from 'primereact/autocomplete';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
+import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -249,7 +250,7 @@ export default function Billing({ type }) {
           </div>
         )}
 
-        <div className="module-nav">
+        <div className="module-nav" style={{ display: 'flex', gap: '12px' }}>
           <button className={view === 'POS' ? 'active' : ''} onClick={() => setView('POS')}><Plus size={18}/> New Sale</button>
           <button className={view === 'History' ? 'active' : ''} onClick={() => setView('History')}><History size={18}/> Sales History</button>
         </div>
@@ -417,10 +418,39 @@ export default function Billing({ type }) {
             <Column header="Date" body={(s) => new Date(s.created_at).toLocaleDateString()} sortable field="created_at" />
             <Column header="Bill No" body={(s) => `#SAL-${s.id}`} sortable field="id" />
             <Column header="Customer" field="customer_name" sortable />
+            <Column header="Phone" body={(s) => s.customer_phone || "—"} />
+            <Column header="Address" body={(s) => s.customer_address || "—"} />
             <Column header="Total" body={(s) => <span className="font-bold">Rs.{s.net_amount.toLocaleString()}</span>} sortable field="net_amount" />
             <Column header="Paid" body={(s) => <span className="text-green-600 font-bold">Rs.{s.paid_amount.toLocaleString()}</span>} sortable field="paid_amount" />
             <Column header="Balance" body={(s) => <span className="text-red-600 font-bold">Rs.{s.balance_amount.toLocaleString()}</span>} sortable field="balance_amount" />
             <Column header="Type" body={(s) => <span className={`status-badge ${s.payment_type.toLowerCase()}`} style={{padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700}}>{s.payment_type}</span>} sortable field="payment_type" />
+            <Column header="" body={(s) => (
+              <ActionMenu 
+                extraItems={[
+                  { 
+                    label: 'Print Receipt', 
+                    icon: 'pi pi-print', 
+                    command: () => {
+                      setReceiptData({
+                        saleId: s.id,
+                        date: new Date(s.created_at).toLocaleString(),
+                        customerName: s.customer_name || 'Walking Customer',
+                        customerPhone: s.customer_phone || '',
+                        customerAddress: s.customer_address || '',
+                        items: JSON.parse(s.items),
+                        subtotal: s.total_amount,
+                        discount: s.discount,
+                        delivery: s.delivery_charges,
+                        total: s.net_amount,
+                        paid: s.paid_amount,
+                        balance: s.balance_amount
+                      });
+                      setTimeout(() => window.print(), 500);
+                    } 
+                  }
+                ]}
+              />
+            )} style={{ textAlign: 'center', width: '60px' }} />
           </DataTable>
         </div>
       )}
@@ -462,6 +492,8 @@ export default function Billing({ type }) {
             <div className="info-row"><span>Bill No</span> <span>: {receiptData.saleId}</span></div>
             <div className="info-row"><span>Date</span> <span>: {receiptData.date}</span></div>
             <div className="info-row"><span>Name</span> <span>: {receiptData.customerName}</span></div>
+            {receiptData.customerPhone && <div className="info-row"><span>Phone</span> <span>: {receiptData.customerPhone}</span></div>}
+            {receiptData.customerAddress && <div className="info-row"><span>Address</span> <span>: {receiptData.customerAddress}</span></div>}
           </div>
           
           <div className="dashed-line"></div>

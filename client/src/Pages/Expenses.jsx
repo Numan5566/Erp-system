@@ -5,6 +5,7 @@ import {
   Calendar, Tag, FileText, CircleDollarSign, ChevronLeft
 } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
+import ActionMenu from '../components/ActionMenu';
 import "../Styles/ModulePages.scss";
 
 const API = "http://localhost:5000/api/expenses";
@@ -75,6 +76,17 @@ export default function Expenses({ type }) {
       }
     } catch (err) { console.error(err); }
     setLoading(false);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this expense?")) return;
+    try {
+      const res = await fetch(`${API}/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (res.ok) fetchRecords();
+    } catch (err) { console.error(err); }
   };
 
   const filtered = records.filter(r => {
@@ -172,11 +184,11 @@ export default function Expenses({ type }) {
                   </td>
                   <td className="bold">{r.title}</td>
                   <td className="bold text-red">Rs. {parseFloat(r.amount).toLocaleString()}</td>
-                  <td>
-                    <div className="adjust-btns">
-                      <button className="btn-adjust plus" onClick={() => { setForm(r); setEditId(r.id); setShowModal(true); }}><Pencil size={14}/></button>
-                      <button className="btn-adjust minus"><Trash2 size={14}/></button>
-                    </div>
+                  <td style={{ textAlign: 'center' }}>
+                    <ActionMenu 
+                      onEdit={() => { setForm(r); setEditId(r.id); setShowModal(true); }}
+                      onDelete={() => handleDelete(r.id)}
+                    />
                   </td>
                 </tr>
               ))

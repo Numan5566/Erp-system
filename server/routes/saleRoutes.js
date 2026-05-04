@@ -66,9 +66,9 @@ router.post('/', auth, async (req, res) => {
     // 1. Insert into sales table
     const saleResult = await client.query(
       `INSERT INTO sales 
-      (customer_id, customer_name, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, sale_type, user_id) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-      [finalCustomerId, customer_name, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, finalModule, req.user.id]
+      (customer_id, customer_name, customer_phone, customer_address, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, sale_type, user_id, vehicle_id) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
+      [finalCustomerId, customer_name, customer_phone || '', req.body.customer_address || '', total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, finalModule, req.user.id, vehicle_id]
     );
     const saleId = saleResult.rows[0].id;
 

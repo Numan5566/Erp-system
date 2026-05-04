@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
+import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -296,19 +297,21 @@ export default function Stock({ type }) {
                 );
               }} />
               
-              <Column header="Actions" body={(prod) => (
-                <div className="adjust-btns" style={{justifyContent: 'center'}} onClick={(e) => e.stopPropagation()}>
-                  <button className="btn-primary" style={{padding: '8px 16px', fontSize: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px'}} 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      setSelectedProduct(prod); 
-                      setReceiveForm({...receiveForm, rate: prod.cost_price || ""});
-                      setShowReceiveModal(true); 
-                    }}>
-                    <Truck size={14}/> Receive Stock
-                  </button>
-                </div>
-              )} />
+              <Column header="" body={(prod) => (
+                <ActionMenu 
+                  extraItems={[
+                    { 
+                      label: 'Receive Stock', 
+                      icon: 'pi pi-truck', 
+                      command: () => { 
+                        setSelectedProduct(prod); 
+                        setReceiveForm({...receiveForm, rate: prod.cost_price || ""});
+                        setShowReceiveModal(true); 
+                      } 
+                    }
+                  ]}
+                />
+              )} style={{ textAlign: 'center', width: '60px' }} />
             </DataTable>
           </div>
         </>

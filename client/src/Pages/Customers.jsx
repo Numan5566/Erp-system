@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
+import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -291,14 +292,16 @@ export default function Customers({ type }) {
             </span>
           )} sortable />
           
-          <Column header="Actions" body={(rec) => (
-            <div className="adjust-btns" style={{gap: '8px', flexWrap: 'wrap'}}>
-              <button className="btn-adjust plus" onClick={() => openEdit(rec)} title="Edit" style={{padding: '6px 12px', borderRadius: '8px'}}><Pencil size={14} /></button>
-              <button className="btn-adjust" style={{background:'#e0f2fe', color:'#0284c7', padding: '6px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem'}} onClick={() => openLedger(rec)} title="View Ledger">Ledger</button>
-              <button className="btn-adjust" style={{background:'#dcfce7', color:'#16a34a', padding: '6px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem'}} onClick={() => openPayment(rec)} title="Receive Payment">Receive</button>
-              <button className="btn-adjust minus" onClick={() => handleDelete(rec.id)} title="Delete" style={{padding: '6px 12px', borderRadius: '8px'}}><Trash2 size={14} /></button>
-            </div>
-          )} />
+          <Column header="" body={(rec) => (
+            <ActionMenu 
+              onEdit={() => openEdit(rec)} 
+              onDelete={() => handleDelete(rec.id)}
+              extraItems={[
+                { label: 'View Ledger', icon: 'pi pi-book', command: () => openLedger(rec) },
+                { label: 'Receive Payment', icon: 'pi pi-money-bill', command: () => openPayment(rec) }
+              ]}
+            />
+          )} style={{ textAlign: 'center', width: '80px' }} />
         </DataTable>
       </div>
 

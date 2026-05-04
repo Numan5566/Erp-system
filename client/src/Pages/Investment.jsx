@@ -7,6 +7,8 @@ import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
+import { Menu } from 'primereact/menu';
+import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -207,12 +209,12 @@ export default function Investment({ type }) {
             <span className="type-tag office" style={{fontSize:'0.75rem', padding: '4px 12px', borderRadius: '20px'}}>{r.category}</span>
           )} sortable field="category" />
           
-          <Column header="Actions" body={(r) => (
-            <div className="adjust-btns" style={{display:'flex', gap:'8px'}}>
-              <button className="btn-adjust plus" onClick={() => { setForm(r); setEditId(r.id); setShowModal(true); }} title="Edit"><Pencil size={14} /></button>
-              <button className="btn-adjust minus" onClick={() => handleDelete(r.id)} title="Delete"><Trash2 size={14} /></button>
-            </div>
-          )} style={{textAlign: 'center', width: '120px'}} />
+          <Column header="" body={(r) => (
+            <ActionMenu
+              onEdit={() => { setForm(r); setEditId(r.id); setShowModal(true); }}
+              onDelete={() => handleDelete(r.id)}
+            />
+          )} style={{ textAlign: 'center', width: '60px' }} />
         </DataTable>
       </div>
 

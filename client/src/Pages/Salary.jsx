@@ -3,6 +3,7 @@ import {
   Users, Plus, Pencil, Trash2, X, Search, 
   CreditCard, Calendar, UserCheck, Banknote, Briefcase, Tag, Info, CircleDollarSign
 } from "lucide-react";
+import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -211,11 +212,11 @@ export default function Salary({ type }) {
                   <td className="bold">Rs. {parseFloat(r.amount).toLocaleString()}</td>
                   <td className="text-red">Rs. {parseFloat(r.advance_salary || 0).toLocaleString()}</td>
                   <td><span className={`status-badge ${r.status.toLowerCase()}`}>{r.status}</span></td>
-                  <td>
-                    <div className="adjust-btns">
-                      <button className="btn-adjust plus" onClick={() => openEdit(r)}><Pencil size={14}/></button>
-                      <button className="btn-adjust minus" onClick={() => handleDelete(r.id)}><Trash2 size={14}/></button>
-                    </div>
+                  <td style={{ textAlign: 'center' }}>
+                    <ActionMenu
+                      onEdit={() => openEdit(r)}
+                      onDelete={() => handleDelete(r.id)}
+                    />
                   </td>
                 </tr>
               ))
