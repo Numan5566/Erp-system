@@ -56,7 +56,6 @@ export default function Accounts() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this bank account?")) return;
     try {
       await fetch(`http://localhost:5000/api/banks/${id}`, {
         method: "DELETE",

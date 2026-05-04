@@ -75,40 +75,48 @@ export default function Dashboard() {
     <div className="dashboard-container">
       <header className="dashboard-header">
         <div className="welcome-section">
-          <h1>Welcome back, <span className="user-name">{user?.username || 'User'}</span></h1>
-          <p className="subtitle">Here's what's happening with your business today.</p>
+          <h1>Welcome back, <span className="user-name">{user?.username || 'User'}</span> 👋</h1>
+          <p className="subtitle">Here's a quick overview of your building materials empire today.</p>
+        </div>
+        <div className="current-time">
+          <TrendingUp size={20} color="#10b981" />
+          <span>System Live & Running</span>
         </div>
       </header>
 
       {/* Quick Stats Grid */}
       <div className="stats-grid">
-        <div className="stat-card">
+        <div className="stat-card premium-shadow">
           <div className="stat-icon blue"><Package size={24} /></div>
           <div className="stat-info">
-            <span className="stat-label">Total Products</span>
-            <span className="stat-value">{stats.products}</span>
+            <span className="stat-label">Inventory</span>
+            <span className="stat-value">{stats.products} Items</span>
           </div>
+          <div className="stat-chart mini-line blue"></div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card premium-shadow">
           <div className="stat-icon orange"><AlertTriangle size={24} /></div>
           <div className="stat-info">
-            <span className="stat-label">Low Stock Alerts</span>
-            <span className="stat-value">{stats.lowStock}</span>
+            <span className="stat-label">Low Stock</span>
+            <span className="stat-value">{stats.lowStock} Alerts</span>
           </div>
+          <div className="stat-chart mini-line orange"></div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card premium-shadow">
           <div className="stat-icon green"><UsersIcon size={24} /></div>
           <div className="stat-info">
-            <span className="stat-label">Total Customers</span>
-            <span className="stat-value">{stats.customers}</span>
+            <span className="stat-label">Partners</span>
+            <span className="stat-value">{stats.customers} Contacts</span>
           </div>
+          <div className="stat-chart mini-line green"></div>
         </div>
-        <div className="stat-card">
+        <div className="stat-card premium-shadow">
           <div className="stat-icon red"><Wallet size={24} /></div>
           <div className="stat-info">
-            <span className="stat-label">Total Expenses</span>
+            <span className="stat-label">Expense Flow</span>
             <span className="stat-value">Rs. {stats.monthlyExpenses.toLocaleString()}</span>
           </div>
+          <div className="stat-chart mini-line red"></div>
         </div>
       </div>
 

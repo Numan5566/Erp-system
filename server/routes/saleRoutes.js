@@ -66,9 +66,9 @@ router.post('/', auth, async (req, res) => {
     // 1. Insert into sales table
     const saleResult = await client.query(
       `INSERT INTO sales 
-      (customer_id, customer_name, customer_phone, customer_address, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, sale_type, user_id, vehicle_id) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
-      [finalCustomerId, customer_name, customer_phone || '', req.body.customer_address || '', total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, finalModule, req.user.id, vehicle_id]
+      (customer_id, customer_name, customer_phone, customer_address, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, sale_type, user_id, vehicle_id, items) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`,
+      [finalCustomerId, customer_name, customer_phone || '', req.body.customer_address || '', total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, finalModule, req.user.id, vehicle_id, JSON.stringify(items)]
     );
     const saleId = saleResult.rows[0].id;
 
@@ -128,12 +128,26 @@ router.get('/:id', auth, async (req, res) => {
 // Get customer ledger
 router.get('/ledger/:customerId', auth, async (req, res) => {
   try {
-    const ledger = await pool.query(
-      `SELECT * FROM sales 
-       WHERE customer_id = $1 
-       ORDER BY created_at DESC`, 
-      [req.params.customerId]
-    );
+    const { from, to } = req.query;
+    let query = `
+      SELECT s.*, 
+      (SELECT JSON_AGG(si) FROM (
+        SELECT si.product_name as name, p.brand 
+        FROM sale_items si 
+        LEFT JOIN products p ON si.product_id = p.id 
+        WHERE si.sale_id = s.id
+      ) si) as legacy_items
+      FROM sales s 
+      WHERE s.customer_id = $1`;
+    let params = [req.params.customerId];
+
+    if (from && to) {
+      query += ` AND s.created_at >= $2 AND s.created_at <= $3`;
+      params.push(from + " 00:00:00", to + " 23:59:59");
+    }
+
+    query += ' ORDER BY s.created_at DESC';
+    const ledger = await pool.query(query, params);
     res.json(ledger.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

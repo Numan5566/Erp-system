@@ -78,7 +78,6 @@ export default function UsersManager() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
     try {
       await api.delete(`/users/${id}`);
       fetchUsers();

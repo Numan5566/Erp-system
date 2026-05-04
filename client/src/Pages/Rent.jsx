@@ -80,7 +80,6 @@ export default function Rent({ type }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this rent record?")) return;
     await fetch(`${API}/${id}`, { 
       method: "DELETE",
       headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }

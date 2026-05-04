@@ -419,6 +419,14 @@ export default function Billing({ type }) {
             <Column header="Bill No" body={(s) => `#SAL-${s.id}`} sortable field="id" />
             <Column header="Customer" field="customer_name" sortable />
             <Column header="Phone" body={(s) => s.customer_phone || "—"} />
+            <Column header="Items Sold" body={(s) => {
+              const items = typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []);
+              return (
+                <div style={{fontSize: '0.85rem', color: '#475569', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}} title={items.map(i => `${i.brand} ${i.name}`).join(", ")}>
+                  {items.length > 0 ? items.map(i => `${i.brand} ${i.name}`).join(", ") : "—"}
+                </div>
+              );
+            }} />
             <Column header="Address" body={(s) => s.customer_address || "—"} />
             <Column header="Total" body={(s) => <span className="font-bold">Rs.{s.net_amount.toLocaleString()}</span>} sortable field="net_amount" />
             <Column header="Paid" body={(s) => <span className="text-green-600 font-bold">Rs.{s.paid_amount.toLocaleString()}</span>} sortable field="paid_amount" />
@@ -437,7 +445,7 @@ export default function Billing({ type }) {
                         customerName: s.customer_name || 'Walking Customer',
                         customerPhone: s.customer_phone || '',
                         customerAddress: s.customer_address || '',
-                        items: JSON.parse(s.items),
+                        items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []),
                         subtotal: s.total_amount,
                         discount: s.discount,
                         delivery: s.delivery_charges,

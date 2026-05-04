@@ -83,7 +83,6 @@ export default function Investment({ type }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this investment record?")) return;
     await fetch(`${API}/${id}`, { 
       method: "DELETE",
       headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }

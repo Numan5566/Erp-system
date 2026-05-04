@@ -79,7 +79,6 @@ export default function Transport({ type }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this vehicle?")) return;
     await fetch(`${API}/${id}`, { 
       method: "DELETE",
       headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }

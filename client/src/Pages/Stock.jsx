@@ -260,12 +260,15 @@ export default function Stock({ type }) {
             <DataTable value={filtered} paginator rows={10} rowsPerPageOptions={[5, 10, 25, 50]} 
                        emptyMessage="No stock items found." className="p-datatable-sm" stripedRows responsiveLayout="scroll"
                        onRowClick={(e) => { setSelectedProduct(e.data); setShowDetailModal(true); }} rowHover style={{cursor: 'pointer'}}>
-              <Column header="Product Details" body={(prod) => (
-                <div className="prod-main-info">
-                  <span className="name" style={{fontWeight: 700, fontSize: '1rem', color: '#1e293b'}}>{prod.name}</span>
-                  <span className="v-num" style={{color: '#64748b', fontSize: '0.8rem'}}><Tag size={12}/> {prod.brand || 'N/A'}</span>
-                </div>
-              )} sortable field="name" />
+              <Column field="id" header="ID" body={(prod) => <span style={{fontWeight: 600, color: '#64748b'}}>#{prod.id}</span>} sortable style={{ width: '80px' }} />
+              
+              <Column field="brand" header="Brand" body={(prod) => (
+                <span style={{fontWeight: 600, color: '#475569'}}>{prod.brand || 'N/A'}</span>
+              )} sortable />
+
+              <Column field="name" header="Product Name" body={(prod) => (
+                <span style={{fontWeight: 700, fontSize: '1rem', color: '#1e293b'}}>{prod.name}</span>
+              )} sortable />
               
               <Column header="Min Level" body={(prod) => (
                 <span className="min-tag" style={{background: '#f1f5f9', padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600}}>

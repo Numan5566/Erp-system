@@ -87,7 +87,6 @@ export default function Salary({ type }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this staff record?")) return;
     await fetch(`${API}/${id}`, { 
       method: "DELETE",
       headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }

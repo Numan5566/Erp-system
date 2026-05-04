@@ -40,6 +40,11 @@ export default function Suppliers({ type }) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: "", notes: "Payment via Cash/Bank" });
   const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [selectedBank, setSelectedBank] = useState("");
+  const [ledgerFrom, setLedgerFrom] = useState("");
+  const [ledgerTo, setLedgerTo] = useState("");
+  const [ledgerFilter, setLedgerFilter] = useState("all");
   const [ledgerData, setLedgerData] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -100,21 +105,51 @@ export default function Suppliers({ type }) {
     setShowModal(true);
   };
 
-  const openLedger = async (supplier) => {
+  const openLedger = async (supplier, from = "", to = "", filter = "all") => {
     setSelectedSupplier(supplier);
+    setLedgerFrom(from);
+    setLedgerTo(to);
+    setLedgerFilter(filter);
     setLedgerData([]);
     setShowLedgerModal(true);
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/purchases/supplier/${supplier.id}?type=${activeTab}`, {
+      let url = `http://localhost:5000/api/purchases/supplier/${supplier.id}?type=${activeTab}`;
+      if (from && to) url += `&from=${from}&to=${to}`;
+      const res = await fetch(url, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-      setLedgerData(Array.isArray(data) ? data : []);
+      setLedgerData(data);
     } catch (err) {
       console.error("Failed to fetch ledger", err);
     }
     setLoading(false);
+  };
+
+  const applyLedgerFilter = (filterKey) => {
+    let from = "", to = "";
+    const today = new Date();
+    
+    if (filterKey === 'today') {
+      from = today.toISOString().split('T')[0];
+      to = from;
+    } else if (filterKey === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(today.getDate() - 7);
+      from = weekAgo.toISOString().split('T')[0];
+      to = today.toISOString().split('T')[0];
+    } else if (filterKey === 'month') {
+      from = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+      to = today.toISOString().split('T')[0];
+    }
+
+    if (filterKey === 'custom') {
+      setLedgerFilter('custom');
+      return;
+    }
+
+    openLedger(selectedSupplier, from, to, filterKey);
   };
 
   const openPayment = (supplier) => {
@@ -173,7 +208,6 @@ export default function Suppliers({ type }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this supplier?")) return;
     await fetch(`${API}/${id}`, { 
       method: "DELETE",
       headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
@@ -247,22 +281,28 @@ export default function Suppliers({ type }) {
       <div className="module-table-container" style={{padding: '20px', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}}>
         <DataTable value={filtered} paginator rows={10} rowsPerPageOptions={[5, 10, 25, 50]} 
                    emptyMessage="No suppliers found." className="p-datatable-sm" stripedRows responsiveLayout="scroll">
+          <Column field="id" header="ID" body={(rec) => <span style={{fontWeight: 600, color: '#64748b'}}>#{rec.id}</span>} sortable style={{ width: '80px' }} />
+          
+          <Column field="name" header="Supplier Name" body={(rec) => (
+            <span style={{fontWeight: 700, fontSize: '1rem', color: '#1e293b'}}>{rec.name}</span>
+          )} sortable />
+
           <Column field="company" header="Company / Brand" body={(rec) => (
-            <div className="prod-main-info">
-              <span className="name" style={{fontWeight: 700, fontSize: '1rem', color: '#1e293b'}}>{rec.company || "N/A"}</span>
-              <span className="v-num" style={{color: '#64748b', fontSize: '0.8rem'}}><Package size={12}/> {rec.name}</span>
+            <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+              <Building size={16} color="#64748b"/>
+              <span style={{fontWeight: 600, color: '#475569'}}>{rec.company || "N/A"}</span>
             </div>
           )} sortable />
           
-          <Column header="Contact Person" body={(rec) => (
-            <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
-              <div style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'0.9rem', fontWeight:'600', color: '#334155'}}><Phone size={14}/> {rec.phone || "—"}</div>
-              <div style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'0.85rem', color:'#64748b'}}><Mail size={14}/> {rec.email || "—"}</div>
+          <Column header="Contact Details" body={(rec) => (
+            <div style={{display:'flex', flexDirection:'column', gap:'2px'}}>
+              <div style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'0.85rem', fontWeight:'600', color: '#334155'}}><Phone size={12}/> {rec.phone || "—"}</div>
+              <div style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'0.8rem', color:'#64748b'}}><Mail size={12}/> {rec.email || "—"}</div>
             </div>
           )} />
           
           <Column header="Location" body={(rec) => (
-            <div style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'0.9rem', color: '#475569'}}><MapPin size={14}/> {rec.address || "—"}</div>
+            <div style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'0.85rem', color: '#475569'}}><MapPin size={12}/> {rec.address || "—"}</div>
           )} />
           
           <Column field="balance" header="Ledger Balance" body={(rec) => (
@@ -359,15 +399,106 @@ export default function Suppliers({ type }) {
       {showLedgerModal && selectedSupplier && (
         <div className="modal-overlay" onClick={() => setShowLedgerModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '95%' }}>
-            <div className="modal-header">
+            <div className="modal-header no-print">
               <div className="header-info" style={{display:'flex', alignItems:'center', gap:'12px'}}>
                 <FileText size={24} color="#3b82f6" />
                 <h3>Ledger: {selectedSupplier.company || selectedSupplier.name}</h3>
               </div>
-              <button className="modal-close" onClick={() => setShowLedgerModal(false)}><X size={20} /></button>
+              <div style={{display:'flex', gap:'10px'}}>
+                <button className="btn-secondary" onClick={() => window.print()} style={{padding: '6px 12px', display:'flex', alignItems:'center', gap:'6px'}}>
+                  <ClipboardList size={16} /> Print Report
+                </button>
+                <button className="modal-close" onClick={() => setShowLedgerModal(false)}><X size={20} /></button>
+              </div>
             </div>
-            
-            <div className="detail-body" style={{padding: '24px'}}>
+
+            {/* Print Only Ledger Report */}
+            <div className="ledger-report print-only" style={{padding: '20px', color: 'black'}}>
+              <div style={{textAlign: 'center', marginBottom: '20px', borderBottom: '2px solid #000', paddingBottom: '10px'}}>
+                <h2 style={{margin: 0}}>DATA WALEY CEMENT DEALER</h2>
+                <p style={{margin: '5px 0'}}>Supplier Purchase Ledger Report</p>
+                <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '15px', fontSize: '14px'}}>
+                  <span><strong>Supplier:</strong> {selectedSupplier.name} ({selectedSupplier.company})</span>
+                  <span><strong>Period:</strong> {ledgerFilter === 'all' ? 'All Time' : `${ledgerFrom} to ${ledgerTo}`}</span>
+                  <span><strong>Date:</strong> {new Date().toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              <table style={{width: '100%', borderCollapse: 'collapse', marginTop: '10px'}}>
+                <thead>
+                  <tr style={{background: '#f1f5f9'}}>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Date</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Product/Details</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Total Bill</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Paid</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledgerData.map(row => (
+                    <tr key={row.id}>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.purchase_date).toLocaleDateString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>
+                        {row.product_name ? `${row.product_name} (${row.quantity} ${row.unit})` : row.vehicle_number || 'Payment'}
+                      </td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.total_amount).toLocaleString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.paid_amount).toLocaleString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.balance_amount).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{background: '#f8fafc', fontWeight: 'bold'}}>
+                    <td colSpan="2" style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Final Outstanding Balance:</td>
+                    <td colSpan="3" style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right', color: parseFloat(selectedSupplier.balance) > 0 ? 'red' : 'green'}}>
+                      Rs. {Math.abs(parseFloat(selectedSupplier.balance)).toLocaleString()} ({parseFloat(selectedSupplier.balance) > 0 ? 'Payable' : 'Advance'})
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+              <div style={{marginTop: '40px', display: 'flex', justifyContent: 'space-between'}}>
+                <div style={{borderTop: '1px solid #000', width: '200px', textAlign: 'center', paddingTop: '5px'}}>Supplier Signature</div>
+                <div style={{borderTop: '1px solid #000', width: '200px', textAlign: 'center', paddingTop: '5px'}}>Manager Signature</div>
+              </div>
+            </div>
+
+            <div className="detail-body no-print" style={{padding: '24px'}}>
+              {/* Date Filter Bar */}
+              <div className="profit-filter-bar" style={{marginBottom: '20px', padding: '10px', background: '#f8fafc', borderRadius: '8px'}}>
+                <span className="filter-label" style={{marginRight: '12px', fontWeight: 600, color: '#64748b'}}>📅 Period:</span>
+                {[
+                  { key:'all',   label:'All Time' },
+                  { key:'today', label:'Today' },
+                  { key:'week',  label:'7 Days' },
+                  { key:'month', label:'Month' },
+                  { key:'custom',label:'Custom Range' },
+                ].map(f => (
+                  <button key={f.key} onClick={() => applyLedgerFilter(f.key)}
+                    className={`filter-btn ${ledgerFilter === f.key ? 'active' : ''}`}
+                    style={{
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      marginRight: '8px',
+                      fontSize: '0.85rem',
+                      background: ledgerFilter === f.key ? '#3b82f6' : 'white',
+                      color: ledgerFilter === f.key ? 'white' : '#64748b',
+                      cursor: 'pointer'
+                    }}>
+                    {f.label}
+                  </button>
+                ))}
+
+                {ledgerFilter === 'custom' && (
+                  <div className="custom-date-row" style={{display: 'inline-flex', alignItems: 'center', gap: '8px', marginLeft: '12px'}}>
+                    <input type="date" value={ledgerFrom} onChange={e => setLedgerFrom(e.target.value)} style={{padding: '2px 8px', borderRadius: '4px', border: '1px solid #cbd5e1'}} />
+                    <span className="sep">→</span>
+                    <input type="date" value={ledgerTo} onChange={e => setLedgerTo(e.target.value)} style={{padding: '2px 8px', borderRadius: '4px', border: '1px solid #cbd5e1'}} />
+                    <button className="btn-primary" onClick={() => openLedger(selectedSupplier, ledgerFrom, ledgerTo, 'custom')} style={{padding: '2px 10px', fontSize: '0.8rem'}}>Apply Range</button>
+                  </div>
+                )}
+              </div>
+
               <div className="stats-mini-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
                 <div className="stat-item" style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
                   <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Purchases</div>
@@ -411,7 +542,7 @@ export default function Suppliers({ type }) {
                             <td>
                               {row.product_name ? (
                                 <>
-                                  <strong>{row.product_name}</strong>
+                                  <strong>{row.brand} {row.product_name}</strong>
                                   <br/><small style={{color:'#64748b'}}><Truck size={10}/> {row.vehicle_number || 'N/A'}</small>
                                 </>
                               ) : (

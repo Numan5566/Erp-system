@@ -8,21 +8,27 @@ const isAdmin = (req) => req.user.role === 'admin';
 // Get all purchases for a specific supplier (Ledger)
 router.get('/supplier/:supplierId', auth, async (req, res) => {
   try {
-    const { type } = req.query;
+    const { type, from, to } = req.query;
     let query = `
-      SELECT p.*, pr.name as product_name, pr.unit 
+      SELECT p.*, pr.name as product_name, pr.unit, pr.brand 
       FROM purchases p
       LEFT JOIN products pr ON p.product_id = pr.id
       WHERE p.supplier_id = $1
     `;
     let params = [req.params.supplierId];
 
+    let pIdx = 2;
     if (!isAdmin(req)) {
-      query += ' AND p.module_type = $2';
+      query += ` AND p.module_type = $${pIdx++}`;
       params.push(req.user.module_type || 'Retail 1');
     } else if (type) {
-      query += ' AND p.module_type = $2';
+      query += ` AND p.module_type = $${pIdx++}`;
       params.push(type);
+    }
+
+    if (from && to) {
+      query += ` AND p.purchase_date >= $${pIdx++} AND p.purchase_date <= $${pIdx++}`;
+      params.push(from + " 00:00:00", to + " 23:59:59");
     }
 
     query += ' ORDER BY p.purchase_date DESC';

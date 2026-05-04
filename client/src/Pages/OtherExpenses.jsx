@@ -86,7 +86,6 @@ export default function OtherExpenses({ type }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this expense record?")) return;
     await fetch(`${API}/${id}`, { 
       method: "DELETE",
       headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }

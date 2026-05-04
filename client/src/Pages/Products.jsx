@@ -159,7 +159,6 @@ export default function Products({ type }) {
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure?")) return;
     try {
       await fetch(`${API}/${id}`, {
         method: "DELETE",
@@ -240,12 +239,15 @@ export default function Products({ type }) {
           <DataTable value={filteredProducts} paginator rows={10} rowsPerPageOptions={[5, 10, 25, 50]} 
                      emptyMessage="No products found." className="p-datatable-sm" stripedRows responsiveLayout="scroll"
                      onRowClick={(e) => openDetail(e.data)} rowHover style={{cursor: 'pointer'}}>
-            <Column header="Brand / Product" body={(prod) => (
-              <div className="prod-main-info">
-                <span className="name" style={{fontWeight: 700, fontSize: '1rem', color: '#1e293b'}}>{prod.name}</span>
-                <span className="v-num" style={{color: '#64748b', fontSize: '0.8rem'}}><Tag size={12}/> {prod.brand || 'N/A'}</span>
-              </div>
-            )} sortable field="name" />
+            <Column field="id" header="ID" body={(prod) => <span style={{fontWeight: 600, color: '#64748b'}}>#{prod.id}</span>} sortable style={{ width: '80px' }} />
+            
+            <Column field="brand" header="Brand" body={(prod) => (
+              <span style={{fontWeight: 600, color: '#475569'}}>{prod.brand || 'N/A'}</span>
+            )} sortable />
+
+            <Column field="name" header="Product Name" body={(prod) => (
+              <span style={{fontWeight: 700, fontSize: '1rem', color: '#1e293b'}}>{prod.name}</span>
+            )} sortable />
             
             <Column header="Retail Price" body={(prod) => (
               <span style={{fontWeight: 700}}>Rs. {parseFloat(prod.price).toLocaleString()}</span>
