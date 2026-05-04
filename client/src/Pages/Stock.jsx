@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from "react";
 import { 
   Boxes, Plus, Minus, Search, AlertTriangle, TrendingUp, 
   Database, Info, X, ChevronRight, ChevronLeft, Hash, Truck, User, 
-  CircleDollarSign, ArrowUpCircle, ArrowDownCircle
+  CircleDollarSign, ArrowUpCircle, ArrowDownCircle, Tag
 } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
@@ -12,10 +12,15 @@ const API = "http://localhost:5000/api/products";
 export default function Stock({ type }) {
   const { user } = useContext(AuthContext);
   const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [search, setSearch] = useState("");
   const [filterStock, setFilterStock] = useState("All");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [receiveForm, setReceiveForm] = useState({ 
+    supplier_id: "", quantity: "", vehicle_number: "", rate: "", paid_amount: "0" 
+  });
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [activeTab, setActiveTab] = useState(type || (user?.role === 'admin' ? "" : user?.module_type || "Wholesale"));
@@ -45,11 +50,16 @@ export default function Stock({ type }) {
     if (!activeTab) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API}?type=${activeTab}`, {
-        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
-      });
-      const data = await res.json();
-      setProducts(Array.isArray(data) ? data : []);
+      const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
+      const [prodRes, supRes] = await Promise.all([
+        fetch(`${API}?type=${activeTab}`, { headers }),
+        fetch(`http://localhost:5000/api/suppliers?type=${activeTab}`, { headers })
+      ]);
+      const prodData = await prodRes.json();
+      const supData = await supRes.json();
+      
+      setProducts(Array.isArray(prodData) ? prodData : []);
+      setSuppliers(Array.isArray(supData) ? supData : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -98,12 +108,39 @@ export default function Stock({ type }) {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ ...prod, stock_quantity: newQty }),
+        body: JSON.stringify({ ...prod, stock_quantity: newQty })
       });
       fetchData();
-    } catch (err) {
-      console.error("Failed to update stock", err);
-    }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleReceiveStock = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(`http://localhost:5000/api/purchases`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          supplier_id: receiveForm.supplier_id,
+          product_id: selectedProduct.id,
+          vehicle_number: receiveForm.vehicle_number,
+          quantity: receiveForm.quantity,
+          rate: receiveForm.rate,
+          paid_amount: receiveForm.paid_amount,
+          module_type: activeTab
+        })
+      });
+      if (res.ok) {
+        setShowReceiveModal(false);
+        setReceiveForm({ supplier_id: "", quantity: "", vehicle_number: "", rate: "", paid_amount: "0" });
+        fetchData();
+      }
+    } catch (err) { console.error(err); }
+    setLoading(false);
   };
 
   const filtered = products.filter((p) => {
@@ -224,7 +261,7 @@ export default function Stock({ type }) {
                   <th>Min. Level</th>
                   <th>Current Stock</th>
                   <th>Status</th>
-                  <th style={{textAlign: 'center'}}>Quick Adjust</th>
+                  <th style={{textAlign: 'center'}}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -242,7 +279,7 @@ export default function Stock({ type }) {
                         <td>
                           <div className="prod-main-info">
                             <span className="name">{prod.name}</span>
-                            <span className="v-num"><Truck size={12}/> {prod.brand || 'N/A'}</span>
+                            <span className="v-num"><Tag size={12}/> {prod.brand || 'N/A'}</span>
                           </div>
                         </td>
                         <td><span className="min-tag">{min} {prod.unit}</span></td>
@@ -257,9 +294,16 @@ export default function Stock({ type }) {
                           </span>
                         </td>
                         <td>
-                          <div className="adjust-btns" onClick={(e) => e.stopPropagation()}>
-                            <button className="btn-adjust minus" onClick={(e) => updateStock(e, prod, -1)}><Minus size={14}/></button>
-                            <button className="btn-adjust plus" onClick={(e) => updateStock(e, prod, 1)}><Plus size={14}/></button>
+                          <div className="adjust-btns" style={{justifyContent: 'center'}} onClick={(e) => e.stopPropagation()}>
+                            <button className="btn-primary" style={{padding: '6px 12px', fontSize: '12px'}} 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setSelectedProduct(prod); 
+                                setReceiveForm({...receiveForm, rate: prod.cost_price || ""});
+                                setShowReceiveModal(true); 
+                              }}>
+                              <Truck size={14} style={{marginRight:'4px'}}/> Receive Stock
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -292,10 +336,10 @@ export default function Stock({ type }) {
 
               <div className="detail-grid">
                 <div className="detail-item">
-                  <Truck size={18} />
+                  <Tag size={18} />
                   <div>
-                    <span className="label">Vehicle Number</span>
-                    <span className="value">{selectedProduct.brand || 'No Vehicle Tracked'}</span>
+                    <span className="label">Brand / Company</span>
+                    <span className="value">{selectedProduct.brand || 'N/A'}</span>
                   </div>
                 </div>
                 <div className="detail-item">
@@ -339,6 +383,93 @@ export default function Stock({ type }) {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receive Stock Modal (Purchase Entry) */}
+      {showReceiveModal && selectedProduct && (
+        <div className="modal-overlay" onClick={() => setShowReceiveModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h3>Receive Stock / Purchase Entry</h3>
+              <button className="modal-close" onClick={() => setShowReceiveModal(false)}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleReceiveStock} className="custom-form">
+              <div className="form-grid">
+                <div className="form-group" style={{gridColumn: '1 / -1'}}>
+                  <label>Supplier / Vendor *</label>
+                  <div className="input-wrapper">
+                    <User size={18} />
+                    <select required value={receiveForm.supplier_id} onChange={(e) => setReceiveForm({ ...receiveForm, supplier_id: e.target.value })}>
+                      <option value="">Select a Supplier</option>
+                      {suppliers.map(sup => (
+                        <option key={sup.id} value={sup.id}>{sup.name} {sup.company ? `(${sup.company})` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Quantity Received *</label>
+                  <div className="input-wrapper">
+                    <Database size={18} />
+                    <input type="number" required value={receiveForm.quantity} placeholder={`e.g. 100 ${selectedProduct.unit}`}
+                      onChange={(e) => setReceiveForm({ ...receiveForm, quantity: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Vehicle Number *</label>
+                  <div className="input-wrapper">
+                    <Truck size={18} />
+                    <input type="text" value={receiveForm.vehicle_number} placeholder="e.g. LET-123" required
+                      onChange={(e) => setReceiveForm({ ...receiveForm, vehicle_number: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Cost Rate (per unit) *</label>
+                  <div className="input-wrapper">
+                    <CircleDollarSign size={18} />
+                    <input type="number" step="0.01" required value={receiveForm.rate} placeholder="0.00"
+                      onChange={(e) => setReceiveForm({ ...receiveForm, rate: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Total Bill Amount</label>
+                  <div className="input-wrapper" style={{background: '#f8fafc'}}>
+                    <CircleDollarSign size={18} color="#64748b" />
+                    <input type="text" disabled value={`Rs. ${((parseFloat(receiveForm.quantity) || 0) * (parseFloat(receiveForm.rate) || 0)).toLocaleString()}`} />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Amount Paid Now</label>
+                  <div className="input-wrapper">
+                    <TrendingUp size={18} />
+                    <input type="number" step="0.01" required value={receiveForm.paid_amount} placeholder="0.00"
+                      onChange={(e) => setReceiveForm({ ...receiveForm, paid_amount: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Balance to Pay</label>
+                  <div className="input-wrapper" style={{background: '#fff1f2'}}>
+                    <AlertTriangle size={18} color="#e11d48" />
+                    <input type="text" disabled value={`Rs. ${(((parseFloat(receiveForm.quantity) || 0) * (parseFloat(receiveForm.rate) || 0)) - (parseFloat(receiveForm.paid_amount) || 0)).toLocaleString()}`} style={{color: '#e11d48', fontWeight: 'bold'}} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-actions" style={{display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px'}}>
+                <button type="button" className="btn-secondary" onClick={() => setShowReceiveModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading ? "Processing..." : "Complete Purchase"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

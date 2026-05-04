@@ -256,10 +256,10 @@ export default function Products({ type }) {
                   return (
                     <tr key={prod.id} onClick={() => openDetail(prod)}>
                       <td>
-                        <div className="prod-main-info">
-                          <span className="name">{prod.name}</span>
-                          <span className="v-num"><Truck size={12}/> {prod.brand || 'N/A'}</span>
-                        </div>
+                          <div className="prod-main-info">
+                            <span className="name">{prod.name}</span>
+                            <span className="v-num"><Tag size={12}/> {prod.brand || 'N/A'}</span>
+                          </div>
                       </td>
                       <td><span className="bold">Rs. {parseFloat(prod.price).toLocaleString()}</span></td>
                       <td><span className="text-muted">Rs. {parseFloat(prod.cost_price || 0).toLocaleString()}</span></td>
@@ -309,9 +309,9 @@ export default function Products({ type }) {
 
               <div className="stats-mini-grid">
                 <div className="stat-item">
-                   <Truck size={18}/>
+                   <Tag size={18}/>
                    <div>
-                     <span className="lab">Vehicle No</span>
+                     <span className="lab">Brand/Company</span>
                      <span className="val">{selectedProduct.brand || 'N/A'}</span>
                    </div>
                 </div>
@@ -376,10 +376,10 @@ export default function Products({ type }) {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>Vehicle Number</label>
+                  <label>Brand / Company</label>
                   <div className="input-wrapper">
-                    <Truck size={18} />
-                    <input type="text" value={form.brand} placeholder="e.g. ABC-123"
+                    <Tag size={18} />
+                    <input type="text" value={form.brand} placeholder="e.g. Pioneer, DG"
                       onChange={(e) => setForm({ ...form, brand: e.target.value })} />
                   </div>
                 </div>

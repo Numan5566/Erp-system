@@ -33,19 +33,38 @@ router.post('/', auth, async (req, res) => {
     await client.query('BEGIN');
     
     const { 
-      customer_id, customer_name, total_amount, discount, 
+      customer_name, customer_phone, total_amount, discount, 
       delivery_charges, net_amount, paid_amount, balance_amount, 
-      payment_type, items, sale_type 
+      payment_type, items, sale_type, vehicle_type, vehicle_id 
     } = req.body;
 
     const finalModule = isAdmin(req) ? (sale_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
+
+    // 0. Auto-Create or find Customer
+    let finalCustomerId = null;
+    if (customer_name && customer_name.trim().toLowerCase() !== 'walk-in customer') {
+      let cQuery = 'SELECT id FROM customers WHERE name=$1 AND module_type=$2';
+      let cParams = [customer_name, finalModule];
+      if (customer_phone) { cQuery += ' AND phone=$3'; cParams.push(customer_phone); }
+      
+      let c = await client.query(cQuery, cParams);
+      if (c.rows.length > 0) {
+        finalCustomerId = c.rows[0].id;
+      } else {
+        const newCust = await client.query(
+          'INSERT INTO customers (name, phone, balance, user_id, module_type) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+          [customer_name, customer_phone || '', 0, req.user.id, finalModule]
+        );
+        finalCustomerId = newCust.rows[0].id;
+      }
+    }
 
     // 1. Insert into sales table
     const saleResult = await client.query(
       `INSERT INTO sales 
       (customer_id, customer_name, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, sale_type, user_id) 
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-      [customer_id, customer_name, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, finalModule, req.user.id]
+      [finalCustomerId, customer_name, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, finalModule, req.user.id]
     );
     const saleId = saleResult.rows[0].id;
 
@@ -64,25 +83,20 @@ router.post('/', auth, async (req, res) => {
     }
 
     // 3. Update customer balance if it's a credit sale
-    if (customer_id && balance_amount !== 0) {
+    if (finalCustomerId && balance_amount !== 0) {
       await client.query(
         'UPDATE customers SET balance = balance + $1 WHERE id = $2',
-        [balance_amount, customer_id]
+        [balance_amount, finalCustomerId]
       );
     }
 
-    // 4. Automatic Transport Entry if vehicle is selected
-    if (req.body.vehicle_id && delivery_charges > 0) {
-      const vehicle = await client.query('SELECT * FROM transport WHERE id = $1', [req.body.vehicle_id]);
-      if (vehicle.rows.length > 0) {
-        const v = vehicle.rows[0];
-        await client.query(
-          `INSERT INTO transport 
-          (vehicle_type, vehicle_number, driver_name, customer_name, destination, fare_amount, trips, transport_date, status, user_id) 
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [v.vehicle_type, v.vehicle_number, v.driver_name, customer_name, 'Billing Delivery', delivery_charges, 1, new Date(), 'Pending', req.user.id]
-        );
-      }
+    // 4. Automatic Transport Earnings Update if vehicle is selected
+    if (vehicle_type && vehicle_id) {
+      const fareAmount = parseFloat(delivery_charges) || 0;
+      await client.query(
+        `UPDATE vehicles SET total_earnings = total_earnings + $1 WHERE id = $2`,
+        [fareAmount, vehicle_id]
+      );
     }
 
     await client.query('COMMIT');

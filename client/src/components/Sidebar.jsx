@@ -43,6 +43,7 @@ const Sidebar = () => {
     { id: 'rent', name: 'Rent Tracking', path: '/rent', icon: <Home size={20} /> },
     { id: 'investment', name: 'Investments', path: '/investment', icon: <TrendingUp size={20} /> },
     { id: 'other-expenses', name: 'Other Expenses', path: '/other-expenses', icon: <MoreHorizontal size={20} /> },
+    { id: 'accounts', name: 'Bank Accounts', path: '/accounts', icon: <Wallet size={20} /> },
     { id: 'users', name: 'Admin Control', path: '/users', icon: <ShieldAlert size={20} /> }
   ];
 
@@ -63,7 +64,7 @@ const Sidebar = () => {
     if (item.id === 'retail2' && userModule !== 'Retail 2') return false;
 
     // 2. Hide Admin-only modules
-    if (item.id === 'users' || item.id === 'profit' || item.id === 'investment') return false;
+    if (item.id === 'users' || item.id === 'profit' || item.id === 'investment' || item.id === 'accounts') return false;
 
     // Fallback to permissions array if available
     return user?.permissions?.includes(item.id);

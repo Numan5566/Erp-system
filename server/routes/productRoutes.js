@@ -81,6 +81,40 @@ router.put('/:id', auth, async (req, res) => {
   }
 });
 
+// Receive Stock (Stock Inbound)
+router.post('/:id/stock', auth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { quantity, vehicle_number, module_type } = req.body;
+    
+    // Update product stock
+    const prodRes = await client.query(
+      `UPDATE products SET stock_quantity = stock_quantity + $1 
+       WHERE id=$2 AND (user_id=$3 OR $4) RETURNING *`,
+      [parseFloat(quantity), req.params.id, req.user.id, isAdmin(req)]
+    );
+
+    if (prodRes.rows.length === 0) throw new Error("Product not found or unauthorized");
+
+    // Insert stock log
+    await client.query(
+      `INSERT INTO stock_logs (product_id, vehicle_number, quantity, log_type, module_type, user_id)
+       VALUES ($1, $2, $3, 'IN', $4, $5)`,
+      [req.params.id, vehicle_number, parseFloat(quantity), module_type || prodRes.rows[0].module_type, req.user.id]
+    );
+
+    await client.query('COMMIT');
+    res.json(prodRes.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Stock Receive Error:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 // Delete a product
 router.delete('/:id', auth, async (req, res) => {
   try {

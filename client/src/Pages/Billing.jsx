@@ -29,6 +29,8 @@ export default function Billing({ type }) {
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [sales, setSales] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -37,29 +39,34 @@ export default function Billing({ type }) {
   const [delivery, setDelivery] = useState(0);
   const [paidAmount, setPaidAmount] = useState(0);
   const [paymentType, setPaymentType] = useState("Cash");
+  const [selectedBank, setSelectedBank] = useState("");
+  const [bankDigits, setBankDigits] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [lastSaleId, setLastSaleId] = useState(null);
-  const [vehicles, setVehicles] = useState([]);
-  const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [transportType, setTransportType] = useState('');
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [viewSale, setViewSale] = useState(null);
+  const [receiptData, setReceiptData] = useState(null);
 
   const fetchData = async () => {
     const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
-    const [prodRes, custRes, transRes, salesRes] = await Promise.all([
+    const [prodRes, salesRes, vehiclesRes, banksRes] = await Promise.all([
       fetch(`${PRODUCTS_API}?type=${activeTab}`, { headers }),
-      fetch(`${CUSTOMERS_API}?type=${activeTab}`, { headers }),
-      fetch(TRANSPORT_API, { headers }),
-      fetch(`${SALES_API}?type=${activeTab}`, { headers })
+      fetch(`${SALES_API}?type=${activeTab}`, { headers }),
+      fetch(`${TRANSPORT_API}?type=${activeTab}`, { headers }),
+      fetch(`http://localhost:5000/api/banks`, { headers })
     ]);
     const prods = await prodRes.json();
-    const custs = await custRes.json();
-    const trans = await transRes.json();
     const sls = await salesRes.json();
+    const vehs = await vehiclesRes.json();
+    const banks = await banksRes.json();
     setProducts(Array.isArray(prods) ? prods : []);
-    setCustomers(Array.isArray(custs) ? custs : []);
-    setVehicles(Array.isArray(trans) ? trans : []);
     setSales(Array.isArray(sls) ? sls : []);
+    setVehicles(Array.isArray(vehs) ? vehs : []);
+    setBankAccounts(Array.isArray(banks) ? banks : []);
   };
 
   useEffect(() => { fetchData(); }, [activeTab]);
@@ -91,6 +98,16 @@ export default function Billing({ type }) {
     }));
   };
 
+  const updatePrice = (id, newPrice) => {
+    setCart(cart.map(item => {
+      if (item.id === id) {
+        const p = parseFloat(newPrice) || 0;
+        return { ...item, price: p, subtotal: item.qty * p };
+      }
+      return item;
+    }));
+  };
+
   const removeFromCart = (id) => setCart(cart.filter(item => item.id !== id));
 
   const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
@@ -99,20 +116,28 @@ export default function Billing({ type }) {
 
   const handleCheckout = async () => {
     if (cart.length === 0) return alert("Cart is empty!");
+    
+    let finalPaymentType = paymentType;
+    if (paymentType === 'Bank') {
+      if (!selectedBank) return alert('Please select a Bank');
+      if (bankDigits.length !== 4) return alert('Please enter last 4 digits of account');
+      finalPaymentType = `Bank - ${selectedBank} (****${bankDigits})`;
+    }
+
     setLoading(true);
     try {
       const saleData = {
-        customer_id: selectedCustomer?.id || null,
-        customer_name: selectedCustomer?.name || "Walk-in Customer",
-        vehicle_id: selectedVehicle?.id || null,
-        vehicle_number: selectedVehicle?.vehicle_number || "",
+        customer_name: customerName || "Walk-in Customer",
+        customer_phone: customerPhone,
+        vehicle_type: transportType,
+        vehicle_id: selectedVehicleId,
         total_amount: subtotal,
         discount: parseFloat(discount || 0),
         delivery_charges: parseFloat(delivery || 0),
         net_amount: netTotal,
         paid_amount: parseFloat(paidAmount || 0),
         balance_amount: balance,
-        payment_type: paymentType,
+        payment_type: finalPaymentType,
         sale_type: activeTab,
         items: cart
       };
@@ -129,13 +154,24 @@ export default function Billing({ type }) {
       if (res.ok) {
         const result = await res.json();
         setLastSaleId(result.saleId);
+        setReceiptData({
+          saleId: result.saleId,
+          date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
+          customerName: saleData.customer_name,
+          items: [...cart],
+          totalAmount: netTotal
+        });
         setShowSuccess(true);
         setCart([]);
         setDiscount(0);
         setDelivery(0);
         setPaidAmount(0);
-        setSelectedCustomer(null);
-        setSelectedVehicle(null);
+        setCustomerName('');
+        setCustomerPhone('');
+        setTransportType('');
+        setSelectedVehicleId('');
+        setSelectedBank('');
+        setBankDigits('');
         fetchData();
       }
     } catch (err) {
@@ -214,35 +250,54 @@ export default function Billing({ type }) {
 
             <div className="sidebar-content">
               <div className="input-box">
-                <label><User size={14}/> Select Customer</label>
-                <select value={selectedCustomer?.id || ""} onChange={(e) => setSelectedCustomer(customers.find(c => c.id == e.target.value))}>
-                  <option value="">Walk-in Customer</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>)}
-                </select>
+                <label><User size={14}/> Customer Details</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input type="text" placeholder="Name (e.g. Walk-in)" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+                  <input type="text" placeholder="Phone Number" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                </div>
               </div>
 
               <div className="input-box">
                 <label><Truck size={14}/> Transport Vehicle</label>
-                <select value={selectedVehicle?.id || ""} onChange={(e) => setSelectedVehicle(vehicles.find(v => v.id == e.target.value))}>
-                  <option value="">No Transport</option>
-                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.vehicle_number} ({v.owner_name})</option>)}
-                </select>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <select value={transportType} onChange={(e) => { setTransportType(e.target.value); setSelectedVehicleId(''); }} style={{ flex: 1 }}>
+                    <option value="">No Transport</option>
+                    <option value="Personal">Personal</option>
+                    <option value="Rent">Rent</option>
+                  </select>
+                  {transportType && (
+                    <select value={selectedVehicleId} onChange={(e) => setSelectedVehicleId(e.target.value)} style={{ flex: 1 }}>
+                      <option value="">Select Vehicle</option>
+                      {vehicles.filter(v => v.ownership_type === transportType).map(v => (
+                        <option key={v.id} value={v.id}>{v.vehicle_number} ({v.driver_name})</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               </div>
 
               <div className="cart-list">
                 {cart.map(item => (
                   <div key={item.id} className="cart-item">
-                    <div className="item-info">
+                    <div className="item-top">
                       <span className="name">{item.name}</span>
-                      <span className="price">Rs.{item.price}</span>
+                      <button className="del-btn" onClick={() => removeFromCart(item.id)}><Trash2 size={16}/></button>
                     </div>
-                    <div className="item-controls">
+                    <div className="item-bottom">
+                      <div className="price-input-group">
+                        <span>Rs.</span>
+                        <input 
+                          type="number" 
+                          value={item.price} 
+                          onChange={(e) => updatePrice(item.id, e.target.value)}
+                        />
+                      </div>
                       <div className="qty-ctrl">
                         <button onClick={() => updateQty(item.id, -1)}><Minus size={14}/></button>
-                        <span>{item.qty}</span>
+                        <span className="qty-val">{item.qty}</span>
                         <button onClick={() => updateQty(item.id, 1)}><Plus size={14}/></button>
                       </div>
-                      <button className="del-btn" onClick={() => removeFromCart(item.id)}><Trash2 size={14}/></button>
+                      <div className="item-subtotal">Rs. {(item.price * item.qty).toLocaleString()}</div>
                     </div>
                   </div>
                 ))}
@@ -250,21 +305,58 @@ export default function Billing({ type }) {
             </div>
 
             <div className="sidebar-footer">
-              <div className="summary">
-                <div className="row"><span>Subtotal</span> <span>Rs. {subtotal.toLocaleString()}</span></div>
-                <div className="row"><span>Discount</span> <input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} /></div>
-                <div className="row"><span>Delivery</span> <input type="number" value={delivery} onChange={(e) => setDelivery(e.target.value)} /></div>
-                <div className="grand-total"><span>Total</span> <span>Rs. {netTotal.toLocaleString()}</span></div>
-                
-                <div className="payment-ctrl">
-                  <input type="number" placeholder="Paid Amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />
-                  <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
+            <div className="calc-grid">
+              <div className="calc-row">
+                <span>Subtotal</span>
+                <span>Rs. {subtotal.toLocaleString()}</span>
+              </div>
+              <div className="calc-row">
+                <span>Discount</span>
+                <div className="calc-input-wrapper">
+                  <span>Rs.</span>
+                  <input type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                </div>
+              </div>
+              <div className="calc-row">
+                <span>Delivery</span>
+                <div className="calc-input-wrapper">
+                  <span>Rs.</span>
+                  <input type="number" min="0" value={delivery} onChange={(e) => setDelivery(e.target.value)} />
+                </div>
+              </div>
+              <div className="grand-total">
+                <span>Total</span>
+                <span>Rs. {netTotal.toLocaleString()}</span>
+              </div>
+              <div className="payment-ctrl" style={{flexDirection: 'column', gap: '8px', alignItems: 'stretch'}}>
+                <div style={{display: 'flex', gap: '8px'}}>
+                  <input type="number" min="0" placeholder="Paid Amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} style={{flex: 1}} />
+                  <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)} style={{flex: 1}}>
                     <option value="Cash">Cash</option>
                     <option value="Bank">Bank</option>
                     <option value="Credit">Credit</option>
                   </select>
                 </div>
+                {paymentType === 'Bank' && (
+                  <div style={{display: 'flex', gap: '8px', background: '#f8fafc', padding: '8px', borderRadius: '6px', border: '1px solid #e2e8f0'}}>
+                    <select value={selectedBank} onChange={(e) => setSelectedBank(e.target.value)} style={{flex: 2, padding: '6px'}}>
+                      <option value="">Select Bank</option>
+                      {bankAccounts.map(b => (
+                        <option key={b.id} value={b.bank_name}>{b.bank_name}</option>
+                      ))}
+                    </select>
+                    <input 
+                      type="text" 
+                      placeholder="Last 4 Digits" 
+                      maxLength="4" 
+                      value={bankDigits} 
+                      onChange={(e) => setBankDigits(e.target.value.replace(/\D/g, '').slice(0, 4))} 
+                      style={{flex: 1, padding: '6px'}}
+                    />
+                  </div>
+                )}
               </div>
+            </div>
               <button className="checkout-btn" onClick={handleCheckout} disabled={loading || cart.length === 0}>
                 {loading ? "Processing..." : "Complete Sale"}
               </button>
@@ -303,15 +395,85 @@ export default function Billing({ type }) {
       )}
 
       {showSuccess && (
-        <div className="modal-overlay">
+        <div className="modal-overlay no-print">
           <div className="modal success-modal">
             <CheckCircle size={60} color="#10b981" />
             <h2>Sale Completed!</h2>
             <p>Invoice #SAL-{lastSaleId} has been generated.</p>
             <div className="modal-actions">
               <button className="btn-secondary" onClick={() => setShowSuccess(false)}>Close</button>
-              <button className="btn-primary" onClick={() => { window.print(); setShowSuccess(false); }}>Print Receipt</button>
+              <button className="btn-primary" onClick={() => { window.print(); }}>Print Receipt</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Thermal Receipt Print Section */}
+      {receiptData && (
+        <div className="thermal-receipt print-only">
+          <div className="receipt-header">
+            <h2>DATA WALEY</h2>
+            <h2 style={{ fontSize: '15px', fontWeight: 'normal', margin: '2px 0 8px 0' }}>CEMENT DEALER</h2>
+            <div className="contact-info">
+              <p>Name 1: 0300-0000000</p>
+              <p>Name 2: 0300-0000000</p>
+            </div>
+            <p className="address">
+              12- Kachehri Main Larhoor Jathuwad Road,<br/>
+              Daska - Tehsil & District Sialkot.
+            </p>
+          </div>
+          
+          <div className="dashed-line"></div>
+          <h3 className="bill-title">BILL</h3>
+          
+          <div className="bill-info">
+            <div className="info-row"><span>Bill No</span> <span>: {receiptData.saleId}</span></div>
+            <div className="info-row"><span>Date</span> <span>: {receiptData.date}</span></div>
+            <div className="info-row"><span>Name</span> <span>: {receiptData.customerName}</span></div>
+          </div>
+          
+          <div className="dashed-line"></div>
+          
+          <table className="items-table">
+            <thead>
+              <tr>
+                <th className="qty">QTY</th>
+                <th className="rate">RATE</th>
+                <th className="desc">DESCRIPTION</th>
+                <th className="amt">AMOUNT</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colSpan="4" className="dashed-cell"></td></tr>
+              {receiptData.items.map((item, idx) => (
+                <tr key={idx}>
+                  <td className="qty">{item.qty}</td>
+                  <td className="rate">{item.price}</td>
+                  <td className="desc">{item.name}</td>
+                  <td className="amt">{item.subtotal}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          <div className="dashed-line mt-10"></div>
+          <div className="total-row">
+            <span>TOTAL AMOUNT</span>
+            <span>{receiptData.totalAmount}/-</span>
+          </div>
+          <div className="dashed-line"></div>
+          
+          <h3 className="paid-status">PAID</h3>
+          <div className="dashed-line"></div>
+          
+          <div className="receipt-footer">
+            <p>For Any Query:</p>
+            <p>0327-4938957</p>
+            <div className="dashed-line mt-10"></div>
+            <p className="terms">Check the goods before payment.</p>
+            <p className="terms">No claim will be accepted after payment.</p>
+            <div className="dashed-line"></div>
           </div>
         </div>
       )}

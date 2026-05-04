@@ -1,9 +1,9 @@
+import React from "react";
 import "./Styles/global.scss";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import PrivateRoute from "./components/PrivateRoute";
 import MainLayout from "./components/MainLayout";
-
 import LoginPage from "./Pages/LoginPage.jsx";
 import ForgotPassword from "./Pages/ForgotPassword.jsx";
 import Dashboard from "./Pages/Dashboard.jsx";
@@ -23,11 +23,40 @@ import Retail2 from "./Pages/Retail2.jsx";
 import Rent from "./Pages/Rent.jsx";
 import Investment from "./Pages/Investment.jsx";
 import OtherExpenses from "./Pages/OtherExpenses.jsx";
+import Accounts from "./Pages/Accounts.jsx";
+
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '20px', background: 'white', color: 'red' }}>
+          <h1>React Crashed</h1>
+          <pre>{this.state.error.toString()}</pre>
+          <pre>{this.state.error.stack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+
+
+
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LoginPage />} />
@@ -51,9 +80,11 @@ function App() {
           <Route path="/rent" element={<PrivateRoute><MainLayout><Rent /></MainLayout></PrivateRoute>} />
           <Route path="/investment" element={<PrivateRoute><MainLayout><Investment /></MainLayout></PrivateRoute>} />
           <Route path="/other-expenses" element={<PrivateRoute><MainLayout><OtherExpenses /></MainLayout></PrivateRoute>} />
+          <Route path="/accounts" element={<PrivateRoute><MainLayout><Accounts /></MainLayout></PrivateRoute>} />
         </Routes>
       </Router>
     </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

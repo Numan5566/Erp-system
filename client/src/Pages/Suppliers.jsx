@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { 
   Truck, Plus, Pencil, Trash2, X, Search, Phone, Mail, 
-  MapPin, Building, CreditCard, Banknote, ClipboardList, Package
+  MapPin, Building, CreditCard, Banknote, ClipboardList, Package, FileText
 } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
@@ -33,6 +33,11 @@ export default function Suppliers({ type }) {
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({ amount: "", notes: "Payment via Cash/Bank" });
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
+  const [ledgerData, setLedgerData] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -90,6 +95,56 @@ export default function Suppliers({ type }) {
     });
     setEditId(rec.id);
     setShowModal(true);
+  };
+
+  const openLedger = async (supplier) => {
+    setSelectedSupplier(supplier);
+    setLedgerData([]);
+    setShowLedgerModal(true);
+    setLoading(true);
+    try {
+      const res = await fetch(`http://localhost:5000/api/purchases/supplier/${supplier.id}?type=${activeTab}`, {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      setLedgerData(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch ledger", err);
+    }
+    setLoading(false);
+  };
+
+  const openPayment = (supplier) => {
+    setSelectedSupplier(supplier);
+    setPaymentForm({ amount: "", notes: "Payment via Cash/Bank" });
+    setShowPaymentModal(true);
+  };
+
+  const handlePayment = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(`http://localhost:5000/api/purchases/payment`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          supplier_id: selectedSupplier.id,
+          paid_amount: paymentForm.amount,
+          notes: paymentForm.notes,
+          module_type: activeTab
+        })
+      });
+      if (res.ok) {
+        setShowPaymentModal(false);
+        fetchRecords();
+      }
+    } catch (err) {
+      console.error("Failed to make payment", err);
+    }
+    setLoading(false);
   };
 
   const handleSubmit = async (e) => {
@@ -225,7 +280,13 @@ export default function Suppliers({ type }) {
                     </span>
                   </td>
                   <td>
-                    <div className="adjust-btns">
+                    <div className="adjust-btns" style={{display:'flex', gap:'8px', flexWrap:'wrap', justifyContent:'center'}}>
+                      <button className="btn-primary" style={{padding: '6px 12px', fontSize: '12px'}} onClick={() => openLedger(rec)} title="View Ledger">
+                        <FileText size={14} style={{marginRight:'4px'}}/> Ledger
+                      </button>
+                      <button className="btn-primary" style={{padding: '6px 12px', fontSize: '12px', background: '#10b981', borderColor: '#10b981'}} onClick={() => openPayment(rec)} title="Make Payment">
+                        <Banknote size={14} style={{marginRight:'4px'}}/> Pay
+                      </button>
                       <button className="btn-adjust plus" onClick={() => openEdit(rec)} title="Edit"><Pencil size={14} /></button>
                       <button className="btn-adjust minus" onClick={() => handleDelete(rec.id)} title="Delete"><Trash2 size={14} /></button>
                     </div>
@@ -298,6 +359,139 @@ export default function Suppliers({ type }) {
                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={loading}>
                   {loading ? "Saving..." : editId ? "Update Record" : "Save Supplier"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Supplier Ledger Modal */}
+      {showLedgerModal && selectedSupplier && (
+        <div className="modal-overlay" onClick={() => setShowLedgerModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '95%' }}>
+            <div className="modal-header">
+              <div className="header-info" style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                <FileText size={24} color="#3b82f6" />
+                <h3>Ledger: {selectedSupplier.company || selectedSupplier.name}</h3>
+              </div>
+              <button className="modal-close" onClick={() => setShowLedgerModal(false)}><X size={20} /></button>
+            </div>
+            
+            <div className="detail-body" style={{padding: '24px'}}>
+              <div className="stats-mini-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                <div className="stat-item" style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Purchases</div>
+                  <div style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 700 }}>{ledgerData.length}</div>
+                </div>
+                <div className="stat-item" style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Billed Value</div>
+                  <div style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 700 }}>Rs. {ledgerData.reduce((sum, item) => sum + parseFloat(item.total_amount), 0).toLocaleString()}</div>
+                </div>
+                <div className="stat-item" style={{ background: parseFloat(selectedSupplier.balance) > 0 ? '#fff1f2' : '#f0fdf4', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Current Balance</div>
+                  <div style={{ fontSize: '1.25rem', color: parseFloat(selectedSupplier.balance) > 0 ? '#e11d48' : '#16a34a', fontWeight: 700 }}>
+                    Rs. {Math.abs(parseFloat(selectedSupplier.balance)).toLocaleString()} 
+                    <span style={{fontSize:'0.8rem', marginLeft:'8px'}}>({parseFloat(selectedSupplier.balance) > 0 ? 'Payable' : 'Advance'})</span>
+                  </div>
+                </div>
+              </div>
+
+              {loading ? (
+                <div style={{textAlign: 'center', padding: '40px', color: '#64748b'}}>Loading ledger data...</div>
+              ) : (
+                <div className="module-table-container" style={{maxHeight: '400px', overflowY: 'auto'}}>
+                  <table className="module-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Product & Vehicle</th>
+                        <th>Quantity & Rate</th>
+                        <th>Total Bill</th>
+                        <th>Paid Now</th>
+                        <th>Balance Impact</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ledgerData.length === 0 ? (
+                        <tr><td colSpan="6" className="empty-msg">No purchase history found for this supplier.</td></tr>
+                      ) : (
+                        ledgerData.map((row) => (
+                          <tr key={row.id}>
+                            <td>{new Date(row.purchase_date).toLocaleDateString()}<br/><small style={{color:'#64748b'}}>{new Date(row.purchase_date).toLocaleTimeString()}</small></td>
+                            <td>
+                              {row.product_name ? (
+                                <>
+                                  <strong>{row.product_name}</strong>
+                                  <br/><small style={{color:'#64748b'}}><Truck size={10}/> {row.vehicle_number || 'N/A'}</small>
+                                </>
+                              ) : (
+                                <strong><Banknote size={14} style={{color:'#10b981', marginRight:'4px'}}/> {row.vehicle_number || 'Payment Sent'}</strong>
+                              )}
+                            </td>
+                            <td>
+                              {row.product_name ? (
+                                <>{row.quantity} {row.unit} <br/><small style={{color:'#64748b'}}>@ Rs. {row.rate}</small></>
+                              ) : (
+                                <span style={{color: '#94a3b8'}}>—</span>
+                              )}
+                            </td>
+                            <td className="bold">Rs. {parseFloat(row.total_amount).toLocaleString()}</td>
+                            <td className="text-green">Rs. {parseFloat(row.paid_amount).toLocaleString()}</td>
+                            <td className="text-red">Rs. {parseFloat(row.balance_amount).toLocaleString()}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            
+            <div className="modal-footer" style={{padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end'}}>
+              <button className="btn-secondary" onClick={() => setShowLedgerModal(false)}>Close Ledger</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Make Payment Modal */}
+      {showPaymentModal && selectedSupplier && (
+        <div className="modal-overlay" onClick={() => setShowPaymentModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3>Make Payment to {selectedSupplier.company || selectedSupplier.name}</h3>
+              <button className="modal-close" onClick={() => setShowPaymentModal(false)}><X size={20} /></button>
+            </div>
+            
+            <form onSubmit={handlePayment} className="custom-form">
+              <div style={{background: '#fff1f2', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between'}}>
+                <span style={{fontWeight: 600, color: '#e11d48'}}>Current Balance:</span>
+                <span style={{fontWeight: 700, color: '#e11d48'}}>Rs. {parseFloat(selectedSupplier.balance).toLocaleString()}</span>
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Amount Paid (Rs.) *</label>
+                <div className="input-wrapper">
+                  <Banknote size={18} />
+                  <input type="number" step="0.01" required value={paymentForm.amount} placeholder="e.g. 50000"
+                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+                </div>
+              </div>
+              
+              <div className="form-group" style={{marginBottom: '20px'}}>
+                <label>Payment Notes / Reference</label>
+                <div className="input-wrapper">
+                  <ClipboardList size={18} />
+                  <input type="text" value={paymentForm.notes} placeholder="e.g. Cash, Cheque No, Bank Transfer" required
+                    onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="form-actions" style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                <button type="button" className="btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" style={{background: '#10b981', borderColor: '#10b981'}} disabled={loading}>
+                  {loading ? "Processing..." : "Confirm Payment"}
                 </button>
               </div>
             </form>
