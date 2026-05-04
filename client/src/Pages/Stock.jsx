@@ -4,6 +4,8 @@ import {
   Database, Info, X, ChevronRight, ChevronLeft, Hash, Truck, User, 
   CircleDollarSign, ArrowUpCircle, ArrowDownCircle, Tag
 } from "lucide-react";
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -253,65 +255,61 @@ export default function Stock({ type }) {
             </div>
           </div>
 
-          <div className="module-table-container">
-            <table className="module-table">
-              <thead>
-                <tr>
-                  <th>Product Details</th>
-                  <th>Min. Level</th>
-                  <th>Current Stock</th>
-                  <th>Status</th>
-                  <th style={{textAlign: 'center'}}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr><td colSpan="5" className="empty-msg">No stock records found in {selectedCategory}.</td></tr>
-                ) : (
-                  filtered.map((prod) => {
-                    const qty = parseFloat(prod.stock_quantity || 0);
-                    const min = parseFloat(prod.minimum_stock || 0);
-                    const isLow = qty <= min && qty > 0;
-                    const isOut = qty <= 0;
-
-                    return (
-                      <tr key={prod.id} onClick={() => { setSelectedProduct(prod); setShowDetailModal(true); }}>
-                        <td>
-                          <div className="prod-main-info">
-                            <span className="name">{prod.name}</span>
-                            <span className="v-num"><Tag size={12}/> {prod.brand || 'N/A'}</span>
-                          </div>
-                        </td>
-                        <td><span className="min-tag">{min} {prod.unit}</span></td>
-                        <td className="bold">
-                          <span className={isOut ? 'text-red' : isLow ? 'text-orange' : 'text-green'}>
-                            {qty} {prod.unit}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={`status-badge ${isOut ? 'cancelled' : isLow ? 'pending' : 'paid'}`}>
-                            {isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="adjust-btns" style={{justifyContent: 'center'}} onClick={(e) => e.stopPropagation()}>
-                            <button className="btn-primary" style={{padding: '6px 12px', fontSize: '12px'}} 
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                setSelectedProduct(prod); 
-                                setReceiveForm({...receiveForm, rate: prod.cost_price || ""});
-                                setShowReceiveModal(true); 
-                              }}>
-                              <Truck size={14} style={{marginRight:'4px'}}/> Receive Stock
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+          <div className="module-table-container" style={{padding: '20px', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+            <DataTable value={filtered} paginator rows={10} rowsPerPageOptions={[5, 10, 25, 50]} 
+                       emptyMessage="No stock items found." className="p-datatable-sm" stripedRows responsiveLayout="scroll"
+                       onRowClick={(e) => { setSelectedProduct(e.data); setShowDetailModal(true); }} rowHover style={{cursor: 'pointer'}}>
+              <Column header="Product Details" body={(prod) => (
+                <div className="prod-main-info">
+                  <span className="name" style={{fontWeight: 700, fontSize: '1rem', color: '#1e293b'}}>{prod.name}</span>
+                  <span className="v-num" style={{color: '#64748b', fontSize: '0.8rem'}}><Tag size={12}/> {prod.brand || 'N/A'}</span>
+                </div>
+              )} sortable field="name" />
+              
+              <Column header="Min Level" body={(prod) => (
+                <span className="min-tag" style={{background: '#f1f5f9', padding: '4px 8px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 600}}>
+                  {parseFloat(prod.minimum_stock || 0).toLocaleString()} {prod.unit}
+                </span>
+              )} field="minimum_stock" sortable />
+              
+              <Column header="Current Stock" body={(prod) => {
+                const qty = parseFloat(prod.stock_quantity || 0);
+                const min = parseFloat(prod.minimum_stock || 0);
+                const isOut = qty <= 0;
+                const isLow = qty <= min;
+                return (
+                  <span style={{fontWeight: 800, fontSize: '1rem', color: isOut ? '#e11d48' : isLow ? '#f59e0b' : '#16a34a'}}>
+                    {qty.toLocaleString()} {prod.unit}
+                  </span>
+                );
+              }} sortable field="stock_quantity" />
+              
+              <Column header="Status" body={(prod) => {
+                const qty = parseFloat(prod.stock_quantity || 0);
+                const min = parseFloat(prod.minimum_stock || 0);
+                const isOut = qty <= 0;
+                const isLow = qty <= min;
+                return (
+                  <span className={`status-badge ${isOut ? 'cancelled' : isLow ? 'pending' : 'paid'}`} style={{padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700}}>
+                    {isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
+                  </span>
+                );
+              }} />
+              
+              <Column header="Actions" body={(prod) => (
+                <div className="adjust-btns" style={{justifyContent: 'center'}} onClick={(e) => e.stopPropagation()}>
+                  <button className="btn-primary" style={{padding: '8px 16px', fontSize: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px'}} 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setSelectedProduct(prod); 
+                      setReceiveForm({...receiveForm, rate: prod.cost_price || ""});
+                      setShowReceiveModal(true); 
+                    }}>
+                    <Truck size={14}/> Receive Stock
+                  </button>
+                </div>
+              )} />
+            </DataTable>
           </div>
         </>
       )}

@@ -50,10 +50,14 @@ router.post('/', auth, async (req, res) => {
       let c = await client.query(cQuery, cParams);
       if (c.rows.length > 0) {
         finalCustomerId = c.rows[0].id;
+        // Optionally update address if provided
+        if (req.body.customer_address) {
+          await client.query('UPDATE customers SET address=$1 WHERE id=$2', [req.body.customer_address, finalCustomerId]);
+        }
       } else {
         const newCust = await client.query(
-          'INSERT INTO customers (name, phone, balance, user_id, module_type) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-          [customer_name, customer_phone || '', 0, req.user.id, finalModule]
+          'INSERT INTO customers (name, phone, address, balance, user_id, module_type) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+          [customer_name, customer_phone || '', req.body.customer_address || '', 0, req.user.id, finalModule]
         );
         finalCustomerId = newCust.rows[0].id;
       }
@@ -119,6 +123,54 @@ router.get('/:id', auth, async (req, res) => {
     const items = await pool.query('SELECT * FROM sale_items WHERE sale_id = $1', [req.params.id]);
     res.json({ ...sale.rows[0], items: items.rows });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Get customer ledger
+router.get('/ledger/:customerId', auth, async (req, res) => {
+  try {
+    const ledger = await pool.query(
+      `SELECT * FROM sales 
+       WHERE customer_id = $1 
+       ORDER BY created_at DESC`, 
+      [req.params.customerId]
+    );
+    res.json(ledger.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Receive Payment from Customer
+router.post('/payment', auth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { customer_id, amount, payment_reference, payment_type, module_type } = req.body;
+    
+    // Decrease Customer Balance
+    await client.query(
+      'UPDATE customers SET balance = balance - $1 WHERE id = $2',
+      [amount, customer_id]
+    );
+
+    // Get customer name
+    const cust = await client.query('SELECT name FROM customers WHERE id=$1', [customer_id]);
+    const custName = cust.rows[0]?.name || 'Unknown';
+
+    // Insert Payment Record as a Sale with net_amount=0
+    await client.query(
+      `INSERT INTO sales 
+      (customer_id, customer_name, total_amount, net_amount, paid_amount, balance_amount, payment_type, sale_type, user_id) 
+      VALUES ($1, $2, 0, 0, $3, $4, $5, $6, $7)`,
+      [customer_id, custName, amount, -amount, payment_reference || payment_type || 'Cash', module_type, req.user.id]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
 });
 
 module.exports = router;

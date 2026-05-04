@@ -2,8 +2,15 @@ import React, { useState, useEffect, useContext } from "react";
 import { 
   ShoppingCart, Search, Trash2, User, Plus, Minus, 
   Printer, CreditCard, Banknote, Truck, Tag, X, CheckCircle,
-  History, ArrowLeft, FileText, Download, Filter, Package
+  History, ArrowLeft, FileText, Download, Filter, Package, Phone, MapPin
 } from "lucide-react";
+import { Button } from 'primereact/button';
+import { Dialog } from 'primereact/dialog';
+import { InputText } from 'primereact/inputtext';
+import { Dropdown } from 'primereact/dropdown';
+import { AutoComplete } from 'primereact/autocomplete';
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -46,6 +53,7 @@ export default function Billing({ type }) {
   const [lastSaleId, setLastSaleId] = useState(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const [transportType, setTransportType] = useState('');
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [viewSale, setViewSale] = useState(null);
@@ -53,23 +61,38 @@ export default function Billing({ type }) {
 
   const fetchData = async () => {
     const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
-    const [prodRes, salesRes, vehiclesRes, banksRes] = await Promise.all([
+    const [prodRes, salesRes, vehiclesRes, banksRes, custsRes] = await Promise.all([
       fetch(`${PRODUCTS_API}?type=${activeTab}`, { headers }),
       fetch(`${SALES_API}?type=${activeTab}`, { headers }),
       fetch(`${TRANSPORT_API}?type=${activeTab}`, { headers }),
-      fetch(`http://localhost:5000/api/banks`, { headers })
+      fetch(`http://localhost:5000/api/banks`, { headers }),
+      fetch(`http://localhost:5000/api/customers?type=${activeTab}`, { headers })
     ]);
     const prods = await prodRes.json();
     const sls = await salesRes.json();
     const vehs = await vehiclesRes.json();
     const banks = await banksRes.json();
+    const custs = await custsRes.json();
     setProducts(Array.isArray(prods) ? prods : []);
     setSales(Array.isArray(sls) ? sls : []);
     setVehicles(Array.isArray(vehs) ? vehs : []);
     setBankAccounts(Array.isArray(banks) ? banks : []);
+    setCustomers(Array.isArray(custs) ? custs : []);
   };
 
   useEffect(() => { fetchData(); }, [activeTab]);
+
+  const handleCustomerChange = (val) => {
+    setCustomerName(val);
+    const existing = customers.find(c => c.name.toLowerCase() === val.toLowerCase());
+    if (existing) {
+      setCustomerPhone(existing.phone || '');
+      setCustomerAddress(existing.address || '');
+      setSelectedCustomer(existing);
+    } else {
+      setSelectedCustomer(null);
+    }
+  };
 
   const addToCart = (product) => {
     const existing = cart.find(item => item.id === product.id);
@@ -91,8 +114,21 @@ export default function Billing({ type }) {
   const updateQty = (id, delta) => {
     setCart(cart.map(item => {
       if (item.id === id) {
-        const newQty = Math.max(1, item.qty + delta);
+        const currentQty = parseFloat(item.qty) || 0;
+        const newQty = Math.max(1, currentQty + delta);
         return { ...item, qty: newQty, subtotal: newQty * item.price };
+      }
+      return item;
+    }));
+  };
+
+  const setQtyDirect = (id, value) => {
+    setCart(cart.map(item => {
+      if (item.id === id) {
+        const parsed = parseFloat(value);
+        const newQty = isNaN(parsed) ? '' : Math.max(0, parsed);
+        const subtotalQty = newQty === '' ? 0 : newQty;
+        return { ...item, qty: value, subtotal: subtotalQty * item.price };
       }
       return item;
     }));
@@ -120,8 +156,7 @@ export default function Billing({ type }) {
     let finalPaymentType = paymentType;
     if (paymentType === 'Bank') {
       if (!selectedBank) return alert('Please select a Bank');
-      if (bankDigits.length !== 4) return alert('Please enter last 4 digits of account');
-      finalPaymentType = `Bank - ${selectedBank} (****${bankDigits})`;
+      finalPaymentType = `Bank - ${selectedBank}`;
     }
 
     setLoading(true);
@@ -129,6 +164,7 @@ export default function Billing({ type }) {
       const saleData = {
         customer_name: customerName || "Walk-in Customer",
         customer_phone: customerPhone,
+        customer_address: customerAddress,
         vehicle_type: transportType,
         vehicle_id: selectedVehicleId,
         total_amount: subtotal,
@@ -154,12 +190,19 @@ export default function Billing({ type }) {
       if (res.ok) {
         const result = await res.json();
         setLastSaleId(result.saleId);
+        
+        const prevBal = selectedCustomer ? parseFloat(selectedCustomer.balance) : 0;
+        const finalBal = prevBal + balance;
+        
         setReceiptData({
           saleId: result.saleId,
           date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
           customerName: saleData.customer_name,
           items: [...cart],
-          totalAmount: netTotal
+          totalAmount: netTotal,
+          paidAmount: saleData.paid_amount,
+          previousBalance: prevBal,
+          newBalance: finalBal
         });
         setShowSuccess(true);
         setCart([]);
@@ -168,6 +211,7 @@ export default function Billing({ type }) {
         setPaidAmount(0);
         setCustomerName('');
         setCustomerPhone('');
+        setCustomerAddress('');
         setTransportType('');
         setSelectedVehicleId('');
         setSelectedBank('');
@@ -222,7 +266,7 @@ export default function Billing({ type }) {
 
             <div className="pos-search">
               <Search size={20} />
-              <input type="text" placeholder="Search by name or vehicle number..." value={search} onChange={(e) => setSearch(e.target.value)} />
+              <InputText placeholder="Search by name or vehicle number..." value={search} onChange={(e) => setSearch(e.target.value)} className="p-inputtext-sm w-full" />
             </div>
 
             <div className="pos-grid">
@@ -245,57 +289,71 @@ export default function Billing({ type }) {
           <div className="pos-sidebar">
             <div className="sidebar-header">
               <div className="title"><ShoppingCart size={20}/> <h3>Cart Items</h3></div>
-              <span className="badge">{cart.length}</span>
+              <span className="badge p-badge p-badge-info">{cart.length}</span>
             </div>
 
-            <div className="sidebar-content">
+            <div className="sidebar-content p-fluid">
               <div className="input-box">
                 <label><User size={14}/> Customer Details</label>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <input type="text" placeholder="Name (e.g. Walk-in)" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-                  <input type="text" placeholder="Phone Number" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                <div className="flex flex-column gap-2 mb-3">
+                  <div className="p-inputgroup">
+                    <span className="p-inputgroup-addon"><User size={16} /></span>
+                    <InputText placeholder="Customer Name" value={customerName} onChange={(e) => handleCustomerChange(e.target.value)} list="customers-list" />
+                    <datalist id="customers-list">
+                      {customers.map(c => <option key={c.id} value={c.name}>{c.phone}</option>)}
+                    </datalist>
+                  </div>
+                  <div className="p-inputgroup">
+                    <span className="p-inputgroup-addon"><Phone size={16} /></span>
+                    <InputText placeholder="Phone Number" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                  </div>
+                  <div className="p-inputgroup">
+                    <span className="p-inputgroup-addon"><MapPin size={16} /></span>
+                    <InputText placeholder="Address" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
+                  </div>
                 </div>
+                {selectedCustomer && (
+                  <div className="p-message p-message-info p-2 mt-1" style={{fontSize: '0.75rem'}}>
+                    Previous Balance: Rs. {parseFloat(selectedCustomer.balance).toLocaleString()} {parseFloat(selectedCustomer.balance) > 0 ? '(Pending)' : '(Clear)'}
+                  </div>
+                )}
               </div>
 
-              <div className="input-box">
+              <div className="input-box mt-3">
                 <label><Truck size={14}/> Transport Vehicle</label>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <select value={transportType} onChange={(e) => { setTransportType(e.target.value); setSelectedVehicleId(''); }} style={{ flex: 1 }}>
-                    <option value="">No Transport</option>
-                    <option value="Personal">Personal</option>
-                    <option value="Rent">Rent</option>
-                  </select>
+                <div className="flex gap-2">
+                  <Dropdown value={transportType} options={[
+                    {label: 'No Transport', value: ''},
+                    {label: 'Personal', value: 'Personal'},
+                    {label: 'Rent', value: 'Rent'}
+                  ]} onChange={(e) => { setTransportType(e.value); setSelectedVehicleId(''); }} placeholder="Transport Type" className="flex-1" />
+                  
                   {transportType && (
-                    <select value={selectedVehicleId} onChange={(e) => setSelectedVehicleId(e.target.value)} style={{ flex: 1 }}>
-                      <option value="">Select Vehicle</option>
-                      {vehicles.filter(v => v.ownership_type === transportType).map(v => (
-                        <option key={v.id} value={v.id}>{v.vehicle_number} ({v.driver_name})</option>
-                      ))}
-                    </select>
+                    <Dropdown value={selectedVehicleId} options={vehicles.filter(v => v.ownership_type === transportType).map(v => ({
+                      label: `${v.vehicle_number} (${v.driver_name})`,
+                      value: v.id
+                    }))} onChange={(e) => setSelectedVehicleId(e.value)} placeholder="Select Vehicle" className="flex-1" />
                   )}
                 </div>
               </div>
 
-              <div className="cart-list">
+              <div className="cart-list mt-4">
                 {cart.map(item => (
                   <div key={item.id} className="cart-item">
                     <div className="item-top">
                       <span className="name">{item.name}</span>
-                      <button className="del-btn" onClick={() => removeFromCart(item.id)}><Trash2 size={16}/></button>
+                      <Button icon="pi pi-trash" className="p-button-rounded p-button-danger p-button-text p-button-sm" onClick={() => removeFromCart(item.id)} />
                     </div>
                     <div className="item-bottom">
-                      <div className="price-input-group">
-                        <span>Rs.</span>
-                        <input 
-                          type="number" 
-                          value={item.price} 
-                          onChange={(e) => updatePrice(item.id, e.target.value)}
-                        />
+                      <div className="p-inputgroup" style={{width: '100px'}}>
+                        <span className="p-inputgroup-addon" style={{fontSize: '0.7rem'}}>Rs.</span>
+                        <InputText type="number" value={item.price} onChange={(e) => updatePrice(item.id, e.target.value)} className="p-inputtext-sm" />
                       </div>
                       <div className="qty-ctrl">
-                        <button onClick={() => updateQty(item.id, -1)}><Minus size={14}/></button>
-                        <span className="qty-val">{item.qty}</span>
-                        <button onClick={() => updateQty(item.id, 1)}><Plus size={14}/></button>
+                        <Button icon="pi pi-minus" className="p-button-rounded p-button-secondary p-button-text p-button-sm" onClick={() => updateQty(item.id, -1)} />
+                        <InputText type="number" value={item.qty} onChange={(e) => setQtyDirect(item.id, e.target.value)} 
+                                  className="p-inputtext-sm text-center font-bold" style={{width: '50px', border: 'none', background: 'transparent'}} />
+                        <Button icon="pi pi-plus" className="p-button-rounded p-button-secondary p-button-text p-button-sm" onClick={() => updateQty(item.id, 1)} />
                       </div>
                       <div className="item-subtotal">Rs. {(item.price * item.qty).toLocaleString()}</div>
                     </div>
@@ -305,92 +363,65 @@ export default function Billing({ type }) {
             </div>
 
             <div className="sidebar-footer">
-            <div className="calc-grid">
-              <div className="calc-row">
-                <span>Subtotal</span>
-                <span>Rs. {subtotal.toLocaleString()}</span>
-              </div>
-              <div className="calc-row">
-                <span>Discount</span>
-                <div className="calc-input-wrapper">
-                  <span>Rs.</span>
-                  <input type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+              <div className="calc-grid">
+                <div className="calc-row">
+                  <span>Subtotal</span>
+                  <span>Rs. {subtotal.toLocaleString()}</span>
                 </div>
-              </div>
-              <div className="calc-row">
-                <span>Delivery</span>
-                <div className="calc-input-wrapper">
-                  <span>Rs.</span>
-                  <input type="number" min="0" value={delivery} onChange={(e) => setDelivery(e.target.value)} />
-                </div>
-              </div>
-              <div className="grand-total">
-                <span>Total</span>
-                <span>Rs. {netTotal.toLocaleString()}</span>
-              </div>
-              <div className="payment-ctrl" style={{flexDirection: 'column', gap: '8px', alignItems: 'stretch'}}>
-                <div style={{display: 'flex', gap: '8px'}}>
-                  <input type="number" min="0" placeholder="Paid Amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} style={{flex: 1}} />
-                  <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)} style={{flex: 1}}>
-                    <option value="Cash">Cash</option>
-                    <option value="Bank">Bank</option>
-                    <option value="Credit">Credit</option>
-                  </select>
-                </div>
-                {paymentType === 'Bank' && (
-                  <div style={{display: 'flex', gap: '8px', background: '#f8fafc', padding: '8px', borderRadius: '6px', border: '1px solid #e2e8f0'}}>
-                    <select value={selectedBank} onChange={(e) => setSelectedBank(e.target.value)} style={{flex: 2, padding: '6px'}}>
-                      <option value="">Select Bank</option>
-                      {bankAccounts.map(b => (
-                        <option key={b.id} value={b.bank_name}>{b.bank_name}</option>
-                      ))}
-                    </select>
-                    <input 
-                      type="text" 
-                      placeholder="Last 4 Digits" 
-                      maxLength="4" 
-                      value={bankDigits} 
-                      onChange={(e) => setBankDigits(e.target.value.replace(/\D/g, '').slice(0, 4))} 
-                      style={{flex: 1, padding: '6px'}}
-                    />
+                <div className="calc-row">
+                  <span>Discount</span>
+                  <div className="p-inputgroup p-inputgroup-sm" style={{width: '100px'}}>
+                    <span className="p-inputgroup-addon">Rs.</span>
+                    <InputText type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
                   </div>
-                )}
+                </div>
+                <div className="calc-row">
+                  <span>Delivery</span>
+                  <div className="p-inputgroup p-inputgroup-sm" style={{width: '100px'}}>
+                    <span className="p-inputgroup-addon">Rs.</span>
+                    <InputText type="number" min="0" value={delivery} onChange={(e) => setDelivery(e.target.value)} />
+                  </div>
+                </div>
+                <div className="grand-total">
+                  <span>Total</span>
+                  <span>Rs. {netTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex flex-column gap-2 mt-2">
+                  <div className="flex gap-2">
+                    <InputText type="number" min="0" placeholder="Paid Amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} className="flex-1" />
+                    <Dropdown value={paymentType} options={[
+                      {label: 'Cash', value: 'Cash'},
+                      {label: 'Bank', value: 'Bank'},
+                      {label: 'Credit', value: 'Credit'}
+                    ]} onChange={(e) => setPaymentType(e.value)} className="flex-1" />
+                  </div>
+                  {paymentType === 'Bank' && (
+                    <Dropdown value={selectedBank} options={bankAccounts.map(b => {
+                      const digits = b.account_number ? b.account_number.slice(-4) : '';
+                      return {
+                        label: `${b.bank_name} ${b.account_title ? `- ${b.account_title}` : ''} ${digits ? `(****${digits})` : ''}`,
+                        value: `${b.bank_name} ${digits ? `(****${digits})` : ''}`
+                      };
+                    })} onChange={(e) => setSelectedBank(e.value)} placeholder="Select Receiving Bank" />
+                  )}
+                </div>
               </div>
-            </div>
-              <button className="checkout-btn" onClick={handleCheckout} disabled={loading || cart.length === 0}>
-                {loading ? "Processing..." : "Complete Sale"}
-              </button>
+              <Button label={loading ? "Processing..." : "Complete Sale"} icon="pi pi-check" onClick={handleCheckout} 
+                      disabled={loading || cart.length === 0} className="w-full mt-3 p-button-lg shadow-2" />
             </div>
           </div>
         </div>
       ) : (
-        <div className="history-container">
-          <table className="history-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Bill No</th>
-                <th>Customer</th>
-                <th>Total</th>
-                <th>Paid</th>
-                <th>Balance</th>
-                <th>Type</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sales.map(s => (
-                <tr key={s.id}>
-                  <td>{new Date(s.created_at).toLocaleDateString()}</td>
-                  <td>#SAL-{s.id}</td>
-                  <td>{s.customer_name}</td>
-                  <td className="bold">Rs.{s.net_amount}</td>
-                  <td className="text-green">Rs.{s.paid_amount}</td>
-                  <td className="text-red">Rs.{s.balance_amount}</td>
-                  <td><span className={`status-badge ${s.payment_type.toLowerCase()}`}>{s.payment_type}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="history-container" style={{padding: '20px', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+          <DataTable value={sales} paginator rows={10} rowsPerPageOptions={[10, 25, 50]} className="p-datatable-sm" stripedRows responsiveLayout="scroll">
+            <Column header="Date" body={(s) => new Date(s.created_at).toLocaleDateString()} sortable field="created_at" />
+            <Column header="Bill No" body={(s) => `#SAL-${s.id}`} sortable field="id" />
+            <Column header="Customer" field="customer_name" sortable />
+            <Column header="Total" body={(s) => <span className="font-bold">Rs.{s.net_amount.toLocaleString()}</span>} sortable field="net_amount" />
+            <Column header="Paid" body={(s) => <span className="text-green-600 font-bold">Rs.{s.paid_amount.toLocaleString()}</span>} sortable field="paid_amount" />
+            <Column header="Balance" body={(s) => <span className="text-red-600 font-bold">Rs.{s.balance_amount.toLocaleString()}</span>} sortable field="balance_amount" />
+            <Column header="Type" body={(s) => <span className={`status-badge ${s.payment_type.toLowerCase()}`} style={{padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700}}>{s.payment_type}</span>} sortable field="payment_type" />
+          </DataTable>
         </div>
       )}
 
@@ -459,12 +490,28 @@ export default function Billing({ type }) {
           
           <div className="dashed-line mt-10"></div>
           <div className="total-row">
-            <span>TOTAL AMOUNT</span>
+            <span>BILL AMOUNT</span>
             <span>{receiptData.totalAmount}/-</span>
+          </div>
+          <div className="total-row" style={{fontSize: '12px'}}>
+            <span>PAID NOW</span>
+            <span>{receiptData.paidAmount}/-</span>
           </div>
           <div className="dashed-line"></div>
           
-          <h3 className="paid-status">PAID</h3>
+          <div className="total-row" style={{fontSize: '12px'}}>
+            <span>PREVIOUS BAL</span>
+            <span>{receiptData.previousBalance}/-</span>
+          </div>
+          <div className="total-row" style={{fontSize: '14px', fontWeight: 'bold'}}>
+            <span>TOTAL BALANCE</span>
+            <span>{receiptData.newBalance}/-</span>
+          </div>
+          <div className="dashed-line"></div>
+          
+          <h3 className="paid-status" style={{fontSize: '16px'}}>
+            {receiptData.newBalance > 0 ? 'PENDING' : 'CLEAR'}
+          </h3>
           <div className="dashed-line"></div>
           
           <div className="receipt-footer">

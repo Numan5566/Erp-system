@@ -3,6 +3,8 @@ import {
   Truck, Plus, Pencil, Trash2, X, Search, Phone, Mail, 
   MapPin, Building, CreditCard, Banknote, ClipboardList, Package, FileText
 } from "lucide-react";
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -241,61 +243,45 @@ export default function Suppliers({ type }) {
         </div>
       </div>
 
-      <div className="module-table-container">
-        <table className="module-table">
-          <thead>
-            <tr>
-              <th>Company / Brand</th>
-              <th>Contact Person</th>
-              <th>Location</th>
-              <th>Ledger Balance</th>
-              <th style={{textAlign: 'center'}}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan="5" className="empty-msg">No suppliers found in {activeTab}.</td></tr>
-            ) : (
-              filtered.map((rec) => (
-                <tr key={rec.id}>
-                  <td>
-                    <div className="prod-main-info">
-                      <span className="name">{rec.company || "N/A"}</span>
-                      <span className="v-num"><Package size={12}/> {rec.name}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{display:'flex', flexDirection:'column', gap:'2px'}}>
-                      <div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'0.85rem', fontWeight:'600'}}><Phone size={12}/> {rec.phone || "—"}</div>
-                      <div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'0.8rem', color:'#94a3b8'}}><Mail size={12}/> {rec.email || "—"}</div>
-                    </div>
-                  </td>
-                  <td><div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'0.85rem'}}><MapPin size={12}/> {rec.address || "—"}</div></td>
-                  <td className="bold">
-                    <span className={parseFloat(rec.balance) > 0 ? 'text-red' : parseFloat(rec.balance) < 0 ? 'text-green' : ''}>
-                      Rs. {Math.abs(parseFloat(rec.balance)).toLocaleString()}
-                      <small style={{display:'block', fontSize:'0.65rem', fontWeight:'normal'}}>
-                        {parseFloat(rec.balance) > 0 ? 'Payable' : parseFloat(rec.balance) < 0 ? 'Advance' : 'Clear'}
-                      </small>
-                    </span>
-                  </td>
-                  <td>
-                    <div className="adjust-btns" style={{display:'flex', gap:'8px', flexWrap:'wrap', justifyContent:'center'}}>
-                      <button className="btn-primary" style={{padding: '6px 12px', fontSize: '12px'}} onClick={() => openLedger(rec)} title="View Ledger">
-                        <FileText size={14} style={{marginRight:'4px'}}/> Ledger
-                      </button>
-                      <button className="btn-primary" style={{padding: '6px 12px', fontSize: '12px', background: '#10b981', borderColor: '#10b981'}} onClick={() => openPayment(rec)} title="Make Payment">
-                        <Banknote size={14} style={{marginRight:'4px'}}/> Pay
-                      </button>
-                      <button className="btn-adjust plus" onClick={() => openEdit(rec)} title="Edit"><Pencil size={14} /></button>
-                      <button className="btn-adjust minus" onClick={() => handleDelete(rec.id)} title="Delete"><Trash2 size={14} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="module-table-container" style={{padding: '20px', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+        <DataTable value={filtered} paginator rows={10} rowsPerPageOptions={[5, 10, 25, 50]} 
+                   emptyMessage="No suppliers found." className="p-datatable-sm" stripedRows responsiveLayout="scroll">
+          <Column field="company" header="Company / Brand" body={(rec) => (
+            <div className="prod-main-info">
+              <span className="name" style={{fontWeight: 700, fontSize: '1rem', color: '#1e293b'}}>{rec.company || "N/A"}</span>
+              <span className="v-num" style={{color: '#64748b', fontSize: '0.8rem'}}><Package size={12}/> {rec.name}</span>
+            </div>
+          )} sortable />
+          
+          <Column header="Contact Person" body={(rec) => (
+            <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
+              <div style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'0.9rem', fontWeight:'600', color: '#334155'}}><Phone size={14}/> {rec.phone || "—"}</div>
+              <div style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'0.85rem', color:'#64748b'}}><Mail size={14}/> {rec.email || "—"}</div>
+            </div>
+          )} />
+          
+          <Column header="Location" body={(rec) => (
+            <div style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'0.9rem', color: '#475569'}}><MapPin size={14}/> {rec.address || "—"}</div>
+          )} />
+          
+          <Column field="balance" header="Ledger Balance" body={(rec) => (
+            <span style={{fontWeight: 800, fontSize: '1rem', color: parseFloat(rec.balance) > 0 ? '#e11d48' : parseFloat(rec.balance) < 0 ? '#16a34a' : '#64748b'}}>
+              Rs. {Math.abs(parseFloat(rec.balance)).toLocaleString()}
+              <small style={{display:'block', fontSize:'0.75rem', fontWeight:'normal'}}>
+                {parseFloat(rec.balance) > 0 ? 'Payable' : parseFloat(rec.balance) < 0 ? 'Advance' : 'Clear'}
+              </small>
+            </span>
+          )} sortable />
+          
+          <Column header="Actions" body={(rec) => (
+            <div className="adjust-btns" style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
+              <button className="btn-adjust plus" onClick={() => openEdit(rec)} title="Edit" style={{padding: '6px 12px', borderRadius: '8px'}}><Pencil size={14} /></button>
+              <button className="btn-adjust" style={{background:'#e0f2fe', color:'#0284c7', padding: '6px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem'}} onClick={() => openLedger(rec)} title="View Ledger">Ledger</button>
+              <button className="btn-adjust" style={{background:'#fef08a', color:'#ca8a04', padding: '6px 12px', borderRadius: '8px', fontWeight: 700, fontSize: '0.85rem'}} onClick={() => openPayment(rec)} title="Make Payment">Pay</button>
+              <button className="btn-adjust minus" onClick={() => handleDelete(rec.id)} title="Delete" style={{padding: '6px 12px', borderRadius: '8px'}}><Trash2 size={14} /></button>
+            </div>
+          )} />
+        </DataTable>
       </div>
 
       {showModal && (

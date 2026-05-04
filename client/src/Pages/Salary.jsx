@@ -75,7 +75,12 @@ export default function Salary({ type }) {
   };
 
   const openEdit = (rec) => {
-    setForm(rec);
+    setForm({
+      ...rec,
+      salary_amount: rec.salary_amount || rec.amount || "",  // map DB 'amount' → form 'salary_amount'
+      joining_date: rec.joining_date ? rec.joining_date.split('T')[0] : "",
+      payment_date: rec.payment_date ? rec.payment_date.split('T')[0] : new Date().toISOString().split('T')[0],
+    });
     setEditId(rec.id);
     setShowModal(true);
   };

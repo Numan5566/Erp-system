@@ -3,10 +3,14 @@ import {
   TrendingUp, Plus, Pencil, Trash2, X, Activity, CheckCircle, Search,
   CircleDollarSign, Calendar, Tag, Briefcase, BarChart3, Info
 } from "lucide-react";
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+import { Dialog } from 'primereact/dialog';
+import { Button } from 'primereact/button';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "http://localhost:5000/api/investment";
+const API = "http://localhost:5000/api/investments";
 
 const CATEGORIES = ["Real Estate", "Stock Market", "Business", "Gold", "Bonds", "Fixed Deposit", "Other"];
 
@@ -180,40 +184,36 @@ export default function Investment({ type }) {
         </div>
       </div>
 
-      <div className="module-table-container">
-        <table className="module-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Investment / Asset</th>
-              <th>Investor</th>
-              <th>Amount</th>
-              <th>Category</th>
-              <th style={{textAlign: 'center'}}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan="6" className="empty-msg">No investments found for {activeTab}.</td></tr>
-            ) : (
-              filtered.map(r => (
-                <tr key={r.id}>
-                  <td><div className="bold">{new Date(r.date).toLocaleDateString()}</div></td>
-                  <td><span className="bold">{r.title}</span></td>
-                  <td><div style={{display:'flex', alignItems:'center', gap:'4px'}}><Tag size={12}/> {r.investor || '—'}</div></td>
-                  <td className="bold text-green">Rs. {parseFloat(r.amount).toLocaleString()}</td>
-                  <td><span className="type-tag office" style={{fontSize:'0.75rem'}}>{r.category}</span></td>
-                  <td>
-                    <div className="adjust-btns">
-                      <button className="btn-adjust plus" onClick={() => { setForm(r); setEditId(r.id); setShowModal(true); }}><Pencil size={14}/></button>
-                      <button className="btn-adjust minus" onClick={() => handleDelete(r.id)}><Trash2 size={14}/></button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="module-table-container" style={{padding: '20px', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+        <DataTable value={filtered} paginator rows={10} rowsPerPageOptions={[5, 10, 25, 50]} 
+                   emptyMessage="No investments found." className="p-datatable-sm" stripedRows responsiveLayout="scroll">
+          <Column header="Date" body={(r) => (
+            <div style={{fontWeight: 700}}>{new Date(r.date).toLocaleDateString()}</div>
+          )} sortable field="date" />
+          
+          <Column header="Investment / Asset" body={(r) => (
+            <span style={{fontWeight: 700, color: '#1e293b'}}>{r.title}</span>
+          )} sortable field="title" />
+          
+          <Column header="Investor" body={(r) => (
+            <div style={{display:'flex', alignItems:'center', gap:'6px', color: '#475569'}}><Tag size={14}/> {r.investor || '—'}</div>
+          )} sortable field="investor" />
+          
+          <Column header="Amount" body={(r) => (
+            <span style={{fontWeight: 800, color: '#16a34a'}}>Rs. {parseFloat(r.amount).toLocaleString()}</span>
+          )} sortable field="amount" />
+          
+          <Column header="Category" body={(r) => (
+            <span className="type-tag office" style={{fontSize:'0.75rem', padding: '4px 12px', borderRadius: '20px'}}>{r.category}</span>
+          )} sortable field="category" />
+          
+          <Column header="Actions" body={(r) => (
+            <div className="adjust-btns" style={{display:'flex', gap:'8px'}}>
+              <button className="btn-adjust plus" onClick={() => { setForm(r); setEditId(r.id); setShowModal(true); }} title="Edit"><Pencil size={14} /></button>
+              <button className="btn-adjust minus" onClick={() => handleDelete(r.id)} title="Delete"><Trash2 size={14} /></button>
+            </div>
+          )} style={{textAlign: 'center', width: '120px'}} />
+        </DataTable>
       </div>
 
       {showModal && (

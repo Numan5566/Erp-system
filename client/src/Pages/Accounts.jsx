@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Landmark, Plus, Trash2, Search, X, Hash, CreditCard } from "lucide-react";
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+import { Dialog } from 'primereact/dialog';
+import { Button } from 'primereact/button';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -76,9 +80,7 @@ export default function Accounts() {
           </div>
         </div>
         <div className="module-actions">
-          <button className="btn-primary" onClick={() => setShowModal(true)}>
-            <Plus size={18} /> Add Bank Account
-          </button>
+          <Button label="Add Bank Account" icon="pi pi-plus" onClick={() => setShowModal(true)} className="p-button-primary" />
         </div>
       </div>
 
@@ -89,87 +91,60 @@ export default function Accounts() {
         </div>
       </div>
 
-      <div className="module-table-container">
-        <table className="module-table">
-          <thead>
-            <tr>
-              <th>Bank Name</th>
-              <th>Account Title</th>
-              <th>Account Number</th>
-              <th style={{textAlign: 'center'}}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan="4" className="empty-msg">No bank accounts added yet.</td></tr>
-            ) : (
-              filtered.map(acc => (
-                <tr key={acc.id}>
-                  <td>
-                    <div className="prod-main-info">
-                      <span className="name">{acc.bank_name}</span>
-                    </div>
-                  </td>
-                  <td>{acc.account_title || "—"}</td>
-                  <td><div style={{display:'flex', alignItems:'center', gap:'6px'}}><Hash size={14} color="#64748b"/> {acc.account_number || "—"}</div></td>
-                  <td>
-                    <div className="adjust-btns" style={{justifyContent: 'center'}}>
-                      <button className="btn-adjust minus" onClick={() => handleDelete(acc.id)} title="Delete"><Trash2 size={14} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="module-table-container" style={{padding: '20px', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+        <DataTable value={filtered} emptyMessage="No bank accounts added yet." className="p-datatable-sm" stripedRows>
+          <Column field="bank_name" header="Bank Name" body={(acc) => (
+            <div style={{fontWeight: 700, color: '#1e293b'}}>{acc.bank_name}</div>
+          )} sortable />
+          <Column field="account_title" header="Account Title" body={(acc) => acc.account_title || "—"} sortable />
+          <Column field="account_number" header="Account Number" body={(acc) => (
+            <div style={{display:'flex', alignItems:'center', gap:'6px'}}><Hash size={14} color="#64748b"/> {acc.account_number || "—"}</div>
+          )} sortable />
+          <Column header="Actions" body={(acc) => (
+            <Button icon="pi pi-trash" className="p-button-rounded p-button-danger p-button-text" 
+                    onClick={() => handleDelete(acc.id)} tooltip="Delete" />
+          )} style={{textAlign: 'center', width: '100px'}} />
+        </DataTable>
       </div>
 
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <div className="modal-header">
-              <h3>Add New Bank Account</h3>
-              <button className="modal-close" onClick={() => setShowModal(false)}><X size={20} /></button>
+      <Dialog header="Add New Bank Account" visible={showModal} style={{ width: '400px' }} onHide={() => setShowModal(false)}>
+        <form onSubmit={handleSubmit} className="custom-form p-fluid">
+          <div className="field mb-3">
+            <label className="block mb-2 font-bold">Bank Name *</label>
+            <div className="p-inputgroup">
+              <span className="p-inputgroup-addon"><Landmark size={18} /></span>
+              <input type="text" required value={form.bank_name} placeholder="e.g. Meezan Bank"
+                className="p-inputtext p-component"
+                onChange={(e) => setForm({ ...form, bank_name: e.target.value })} />
             </div>
-            
-            <form onSubmit={handleSubmit} className="custom-form">
-              <div className="form-group" style={{marginBottom: '15px'}}>
-                <label>Bank Name (e.g. Meezan, UBL, Easypaisa) *</label>
-                <div className="input-wrapper">
-                  <Landmark size={18} />
-                  <input type="text" required value={form.bank_name} placeholder="e.g. Meezan Bank"
-                    onChange={(e) => setForm({ ...form, bank_name: e.target.value })} />
-                </div>
-              </div>
-
-              <div className="form-group" style={{marginBottom: '15px'}}>
-                <label>Account Title</label>
-                <div className="input-wrapper">
-                  <CreditCard size={18} />
-                  <input type="text" value={form.account_title} placeholder="e.g. Ali Traders"
-                    onChange={(e) => setForm({ ...form, account_title: e.target.value })} />
-                </div>
-              </div>
-
-              <div className="form-group" style={{marginBottom: '20px'}}>
-                <label>Account Number (IBAN/Phone)</label>
-                <div className="input-wrapper">
-                  <Hash size={18} />
-                  <input type="text" value={form.account_number} placeholder="e.g. PK00MEZN..."
-                    onChange={(e) => setForm({ ...form, account_number: e.target.value })} />
-                </div>
-              </div>
-
-              <div className="form-actions" style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
-                <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? "Saving..." : "Add Bank"}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
+
+          <div className="field mb-3">
+            <label className="block mb-2 font-bold">Account Title</label>
+            <div className="p-inputgroup">
+              <span className="p-inputgroup-addon"><CreditCard size={18} /></span>
+              <input type="text" value={form.account_title} placeholder="e.g. Ali Traders"
+                className="p-inputtext p-component"
+                onChange={(e) => setForm({ ...form, account_title: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="field mb-4">
+            <label className="block mb-2 font-bold">Account Number (IBAN/Phone)</label>
+            <div className="p-inputgroup">
+              <span className="p-inputgroup-addon"><Hash size={18} /></span>
+              <input type="text" value={form.account_number} placeholder="e.g. PK00MEZN..."
+                className="p-inputtext p-component"
+                onChange={(e) => setForm({ ...form, account_number: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="flex justify-content-end gap-2">
+            <Button type="button" label="Cancel" icon="pi pi-times" onClick={() => setShowModal(false)} className="p-button-text" />
+            <Button type="submit" label={loading ? "Saving..." : "Add Bank"} icon="pi pi-check" loading={loading} />
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 }

@@ -36,14 +36,18 @@ router.post('/', auth, async (req, res) => {
     
     const finalAmount = salary_amount || amount || 0;
     const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
+    // month is required NOT NULL — derive from payment_date or use current month
+    const month = payment_date 
+      ? new Date(payment_date).toLocaleString('default', { month: 'long', year: 'numeric' }) 
+      : new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
     const result = await pool.query(
       `INSERT INTO salary 
-      (employee_name, designation, cnic, amount, advance_salary, joining_date, payment_date, status, notes, user_id, module_type) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      (employee_name, designation, cnic, amount, advance_salary, joining_date, payment_date, month, status, notes, user_id, module_type) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
       [
         employee_name, designation, cnic, finalAmount, advance_salary || 0, 
-        joining_date, payment_date, status || 'Paid', notes, req.user.id, finalModule
+        joining_date, payment_date, month, status || 'Paid', notes, req.user.id, finalModule
       ]
     );
     res.json(result.rows[0]);
@@ -58,15 +62,18 @@ router.put('/:id', auth, async (req, res) => {
     } = req.body;
 
     const finalAmount = salary_amount || amount || 0;
+    const month = payment_date 
+      ? new Date(payment_date).toLocaleString('default', { month: 'long', year: 'numeric' }) 
+      : new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
     const result = await pool.query(
       `UPDATE salary SET 
         employee_name=$1, designation=$2, cnic=$3, amount=$4, advance_salary=$5, 
-        joining_date=$6, payment_date=$7, status=$8, notes=$9 
-      WHERE id=$10 AND (user_id=$11 OR $12) RETURNING *`,
+        joining_date=$6, payment_date=$7, month=$8, status=$9, notes=$10 
+      WHERE id=$11 AND (user_id=$12 OR $13) RETURNING *`,
       [
         employee_name, designation, cnic, finalAmount, advance_salary, 
-        joining_date, payment_date, status, notes, req.params.id, req.user.id, isAdmin(req)
+        joining_date, payment_date, month, status, notes, req.params.id, req.user.id, isAdmin(req)
       ]
     );
     res.json(result.rows[0]);

@@ -4,6 +4,10 @@ import {
   Layers, Database, Hash, BarChart3, Info, CircleDollarSign, Truck, Tag, Weight,
   ShoppingCart, ShieldCheck, ClipboardList, Eye, ChevronRight
 } from "lucide-react";
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+import { Dialog } from 'primereact/dialog';
+import { Button } from 'primereact/button';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -231,62 +235,58 @@ export default function Products({ type }) {
           })}
         </div>
       ) : (
-        <div className="module-table-container">
-          <table className="module-table">
-            <thead>
-              <tr>
-                <th>Brand / Product</th>
-                <th>Retail Price</th>
-                <th>Cost Price</th>
-                <th>Current Stock</th>
-                <th>Status</th>
-                {user?.role === 'admin' && <th style={{textAlign: 'center'}}>Actions</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.length === 0 ? (
-                <tr><td colSpan="6" className="empty-msg">No products found in {selectedCategory}.</td></tr>
-              ) : (
-                filteredProducts.map((prod) => {
-                  const qty = parseFloat(prod.stock_quantity || 0);
-                  const min = parseFloat(prod.minimum_stock || 0);
-                  const isLow = qty <= min && qty > 0;
-                  const isOut = qty <= 0;
-
-                  return (
-                    <tr key={prod.id} onClick={() => openDetail(prod)}>
-                      <td>
-                          <div className="prod-main-info">
-                            <span className="name">{prod.name}</span>
-                            <span className="v-num"><Tag size={12}/> {prod.brand || 'N/A'}</span>
-                          </div>
-                      </td>
-                      <td><span className="bold">Rs. {parseFloat(prod.price).toLocaleString()}</span></td>
-                      <td><span className="text-muted">Rs. {parseFloat(prod.cost_price || 0).toLocaleString()}</span></td>
-                      <td className="bold">
-                        <span className={isOut ? 'text-red' : isLow ? 'text-orange' : 'text-green'}>
-                          {qty} {prod.unit}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`status-badge ${isOut ? 'cancelled' : isLow ? 'pending' : 'paid'}`}>
-                          {isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
-                        </span>
-                      </td>
-                      {user?.role === 'admin' && (
-                        <td>
-                          <div className="adjust-btns" onClick={(e) => e.stopPropagation()}>
-                            <button className="btn-adjust plus" onClick={(e) => openEdit(e, prod)} title="Edit"><Pencil size={14}/></button>
-                            <button className="btn-adjust minus" onClick={(e) => handleDelete(e, prod.id)} title="Delete"><Trash2 size={14}/></button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+        <div className="module-table-container" style={{padding: '20px', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+          <DataTable value={filteredProducts} paginator rows={10} rowsPerPageOptions={[5, 10, 25, 50]} 
+                     emptyMessage="No products found." className="p-datatable-sm" stripedRows responsiveLayout="scroll"
+                     onRowClick={(e) => openDetail(e.data)} rowHover style={{cursor: 'pointer'}}>
+            <Column header="Brand / Product" body={(prod) => (
+              <div className="prod-main-info">
+                <span className="name" style={{fontWeight: 700, fontSize: '1rem', color: '#1e293b'}}>{prod.name}</span>
+                <span className="v-num" style={{color: '#64748b', fontSize: '0.8rem'}}><Tag size={12}/> {prod.brand || 'N/A'}</span>
+              </div>
+            )} sortable field="name" />
+            
+            <Column header="Retail Price" body={(prod) => (
+              <span style={{fontWeight: 700}}>Rs. {parseFloat(prod.price).toLocaleString()}</span>
+            )} sortable field="price" />
+            
+            <Column header="Cost Price" body={(prod) => (
+              <span style={{color: '#64748b'}}>Rs. {parseFloat(prod.cost_price || 0).toLocaleString()}</span>
+            )} sortable field="cost_price" />
+            
+            <Column header="Stock" body={(prod) => {
+              const qty = parseFloat(prod.stock_quantity || 0);
+              const min = parseFloat(prod.minimum_stock || 0);
+              const isLow = qty <= min && qty > 0;
+              const isOut = qty <= 0;
+              return (
+                <span style={{fontWeight: 800, color: isOut ? '#e11d48' : isLow ? '#f59e0b' : '#16a34a'}}>
+                  {qty} {prod.unit}
+                </span>
+              );
+            }} sortable field="stock_quantity" />
+            
+            <Column header="Status" body={(prod) => {
+              const qty = parseFloat(prod.stock_quantity || 0);
+              const min = parseFloat(prod.minimum_stock || 0);
+              const isLow = qty <= min && qty > 0;
+              const isOut = qty <= 0;
+              return (
+                <span className={`status-badge ${isOut ? 'cancelled' : isLow ? 'pending' : 'paid'}`} style={{padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700}}>
+                  {isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
+                </span>
+              );
+            }} />
+            
+            {user?.role === 'admin' && (
+              <Column header="Actions" body={(prod) => (
+                <div className="adjust-btns" onClick={(e) => e.stopPropagation()} style={{display: 'flex', gap: '8px'}}>
+                  <button className="btn-adjust plus" onClick={(e) => openEdit(e, prod)} title="Edit"><Pencil size={14}/></button>
+                  <button className="btn-adjust minus" onClick={(e) => handleDelete(e, prod.id)} title="Delete"><Trash2 size={14}/></button>
+                </div>
+              )} style={{width: '120px'}} />
+            )}
+          </DataTable>
         </div>
       )}
 

@@ -3,6 +3,10 @@ import {
   Home, Plus, Pencil, Trash2, X, CheckCircle, Clock, Search,
   Calendar, User, Building, CircleDollarSign, Tag, Info
 } from "lucide-react";
+import { DataTable } from 'primereact/datatable';
+import { Column } from 'primereact/column';
+import { Dialog } from 'primereact/dialog';
+import { Button } from 'primereact/button';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -179,40 +183,38 @@ export default function Rent({ type }) {
         </div>
       </div>
 
-      <div className="module-table-container">
-        <table className="module-table">
-          <thead>
-            <tr>
-              <th>Payment Date</th>
-              <th>Property / Unit</th>
-              <th>Landlord</th>
-              <th>Rent Amount</th>
-              <th>Status</th>
-              <th style={{textAlign: 'center'}}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr><td colSpan="6" className="empty-msg">No rent records found for {activeTab}.</td></tr>
-            ) : (
-              filtered.map(r => (
-                <tr key={r.id}>
-                  <td><div className="bold">{new Date(r.rent_date).toLocaleDateString()}</div></td>
-                  <td><span className="bold">{r.property_name}</span></td>
-                  <td><div style={{display:'flex', alignItems:'center', gap:'4px'}}><User size={12}/> {r.landlord_name || '—'}</div></td>
-                  <td className="bold text-red">Rs. {parseFloat(r.amount).toLocaleString()}</td>
-                  <td><span className={`status-badge ${r.status.toLowerCase()}`}>{r.status}</span></td>
-                  <td>
-                    <div className="adjust-btns">
-                      <button className="btn-adjust plus" onClick={() => { setForm(r); setEditId(r.id); setShowModal(true); }}><Pencil size={14}/></button>
-                      <button className="btn-adjust minus" onClick={() => handleDelete(r.id)}><Trash2 size={14}/></button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="module-table-container" style={{padding: '20px', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+        <DataTable value={filtered} paginator rows={10} rowsPerPageOptions={[5, 10, 25, 50]} 
+                   emptyMessage="No rent records found." className="p-datatable-sm" stripedRows responsiveLayout="scroll">
+          <Column header="Payment Date" body={(r) => (
+            <div style={{fontWeight: 700}}>{new Date(r.rent_date).toLocaleDateString()}</div>
+          )} sortable field="rent_date" />
+          
+          <Column header="Property / Unit" body={(r) => (
+            <span style={{fontWeight: 700, color: '#1e293b'}}>{r.property_name}</span>
+          )} sortable field="property_name" />
+          
+          <Column header="Landlord" body={(r) => (
+            <div style={{display:'flex', alignItems:'center', gap:'6px', color: '#475569'}}><User size={14}/> {r.landlord_name || '—'}</div>
+          )} sortable field="landlord_name" />
+          
+          <Column header="Rent Amount" body={(r) => (
+            <span style={{fontWeight: 800, color: '#e11d48'}}>Rs. {parseFloat(r.amount).toLocaleString()}</span>
+          )} sortable field="amount" />
+          
+          <Column header="Status" body={(r) => (
+            <span className={`status-badge ${r.status.toLowerCase()}`} style={{padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700}}>
+              {r.status}
+            </span>
+          )} sortable field="status" />
+          
+          <Column header="Actions" body={(r) => (
+            <div className="adjust-btns" style={{display:'flex', gap:'8px'}}>
+              <button className="btn-adjust plus" onClick={() => { setForm(r); setEditId(r.id); setShowModal(true); }} title="Edit"><Pencil size={14} /></button>
+              <button className="btn-adjust minus" onClick={() => handleDelete(r.id)} title="Delete"><Trash2 size={14} /></button>
+            </div>
+          )} style={{textAlign: 'center', width: '120px'}} />
+        </DataTable>
       </div>
 
       {showModal && (
