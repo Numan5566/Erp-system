@@ -3,86 +3,74 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const pool = require('./config/db');
 
 async function migrate() {
-  console.log('🚀 Running final tables migration...\n');
+  console.log('🚀 Running enhanced ERP migration...\n');
 
   try {
-    const tables = {
-      products: [
-        ['brand', 'VARCHAR(100)'],
-        ['cost_price', 'DECIMAL(12, 2) DEFAULT 0'],
-        ['stock_quantity', 'DECIMAL(12, 2) DEFAULT 0'],
-        ['minimum_stock', 'DECIMAL(12, 2) DEFAULT 0'],
-        ['description', 'TEXT'],
-        ['image_url', 'TEXT'],
-        ['user_id', 'INTEGER']
-      ],
-      customers: [
-        ['phone', 'VARCHAR(20)'],
-        ['email', 'VARCHAR(100)'],
-        ['address', 'TEXT'],
-        ['balance', 'DECIMAL(12, 2) DEFAULT 0'],
-        ['user_id', 'INTEGER']
-      ],
-      suppliers: [
-        ['phone', 'VARCHAR(20)'],
-        ['email', 'VARCHAR(100)'],
-        ['company', 'VARCHAR(255)'],
-        ['address', 'TEXT'],
-        ['balance', 'DECIMAL(12, 2) DEFAULT 0'],
-        ['user_id', 'INTEGER']
-      ],
+    // 1. Sales (Billing System)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS sales (
+        id SERIAL PRIMARY KEY,
+        customer_id INTEGER,
+        customer_name VARCHAR(255),
+        total_amount DECIMAL(12, 2) DEFAULT 0,
+        discount DECIMAL(12, 2) DEFAULT 0,
+        delivery_charges DECIMAL(12, 2) DEFAULT 0,
+        net_amount DECIMAL(12, 2) DEFAULT 0,
+        paid_amount DECIMAL(12, 2) DEFAULT 0,
+        balance_amount DECIMAL(12, 2) DEFAULT 0,
+        payment_type VARCHAR(50) DEFAULT 'Cash',
+        user_id INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS sale_items (
+        id SERIAL PRIMARY KEY,
+        sale_id INTEGER REFERENCES sales(id) ON DELETE CASCADE,
+        product_id INTEGER,
+        product_name VARCHAR(255),
+        qty DECIMAL(12, 2),
+        rate DECIMAL(12, 2),
+        subtotal DECIMAL(12, 2),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Billing tables (sales, sale_items) ready.');
+
+    // 2. Enhance Existing Tables
+    const tableUpdates = {
       salary: [
-        ['designation', 'VARCHAR(100)'],
-        ['amount', 'DECIMAL(12, 2) NOT NULL'],
-        ['payment_date', 'DATE DEFAULT CURRENT_DATE'],
-        ['status', "VARCHAR(50) DEFAULT 'Paid'"],
-        ['notes', 'TEXT'],
-        ['user_id', 'INTEGER']
+        ['cnic', 'VARCHAR(20)'],
+        ['advance_salary', 'DECIMAL(12, 2) DEFAULT 0'],
+        ['joining_date', 'DATE']
       ],
       transport: [
-        ['vehicle_number', 'VARCHAR(50)'],
-        ['driver_name', 'VARCHAR(255)'],
-        ['customer_name', 'VARCHAR(255)'],
-        ['destination', 'TEXT'],
-        ['fare_amount', 'DECIMAL(12, 2) NOT NULL'],
-        ['expense_amount', 'DECIMAL(12, 2) DEFAULT 0'],
-        ['transport_date', 'DATE DEFAULT CURRENT_DATE'],
-        ['status', "VARCHAR(50) DEFAULT 'Pending'"],
-        ['user_id', 'INTEGER']
+        ['vehicle_type', 'VARCHAR(50)'],
+        ['trips', 'INTEGER DEFAULT 1'],
+        ['pending_payment', 'DECIMAL(12, 2) DEFAULT 0'],
+        ['ownership_type', "VARCHAR(50) DEFAULT 'Personal'"]
       ],
       expenses: [
-        ['category', 'VARCHAR(100)'],
-        ['amount', 'DECIMAL(12, 2) NOT NULL'],
-        ['expense_date', 'DATE DEFAULT CURRENT_DATE'],
-        ['notes', 'TEXT'],
-        ['user_id', 'INTEGER']
+        ['expense_type', "VARCHAR(50) DEFAULT 'Office'"]
+      ],
+      products: [
+        ['retail_stock', 'DECIMAL(12, 2) DEFAULT 0'],
+        ['wholesale_stock', 'DECIMAL(12, 2) DEFAULT 0']
+      ],
+      sales: [
+        ['vehicle_id', 'INTEGER'],
+        ['vehicle_number', 'VARCHAR(50)'],
+        ['sale_type', "VARCHAR(50) DEFAULT 'Retail'"]
       ]
     };
 
-    // Create tables if they don't exist
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-      CREATE TABLE IF NOT EXISTS customers (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-      CREATE TABLE IF NOT EXISTS suppliers (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-      CREATE TABLE IF NOT EXISTS salary (id SERIAL PRIMARY KEY, employee_name VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-      CREATE TABLE IF NOT EXISTS transport (id SERIAL PRIMARY KEY, fare_amount DECIMAL(12, 2) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-      CREATE TABLE IF NOT EXISTS expenses (id SERIAL PRIMARY KEY, title VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-    `);
-
-    // Sync columns for each table
-    for (const [tableName, columns] of Object.entries(tables)) {
+    for (const [tableName, columns] of Object.entries(tableUpdates)) {
       for (const [col, type] of columns) {
-        try {
-          await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${col} ${type.includes('NOT NULL') ? type.replace('NOT NULL', '') : type};`);
-          console.log(`✅ Column "${col}" checked/added for table "${tableName}".`);
-        } catch (e) {
-          console.log(`⚠️ Note: Column "${col}" in "${tableName}" might already exist or have a constraint issue.`);
-        }
+        await pool.query(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${col} ${type};`);
       }
-      console.log(`✅ Table "${tableName}" sync complete.\n`);
+      console.log(`✅ Table "${tableName}" enhanced with new fields.`);
     }
 
-    console.log('\n✅ All tables synchronized successfully!');
+    console.log('\n✅ All tables synchronized for advanced features!');
   } catch (err) {
     console.error('❌ Migration failed:', err.message);
   } finally {

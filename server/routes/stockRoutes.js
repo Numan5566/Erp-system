@@ -7,32 +7,35 @@ const isAdmin = (req) => req.user.role === 'admin';
 
 router.get('/', auth, async (req, res) => {
   try {
-    const result = isAdmin(req)
-      ? await pool.query('SELECT * FROM stock ORDER BY created_at DESC')
-      : await pool.query('SELECT * FROM stock WHERE user_id=$1 ORDER BY created_at DESC', [req.user.id]);
+    const { type } = req.query;
+    let query = 'SELECT * FROM stock';
+    let params = [];
+
+    if (isAdmin(req)) {
+      if (type) {
+        query += ' WHERE module_type = $1';
+        params.push(type);
+      }
+    } else {
+      query += ' WHERE module_type = $1';
+      params.push(req.user.module_type || 'Retail 1');
+    }
+
+    query += ' ORDER BY created_at DESC';
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/', auth, async (req, res) => {
   try {
-    const { product_name, supplier_name, quantity_added, remaining_stock, purchase_price, sale_price } = req.body;
-    const result = await pool.query(
-      `INSERT INTO stock (product_name,supplier_name,quantity_added,remaining_stock,purchase_price,sale_price,user_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [product_name, supplier_name, quantity_added, remaining_stock || quantity_added, purchase_price, sale_price, req.user.id]
-    );
-    res.json(result.rows[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+    const { product_name, supplier_name, quantity_added, remaining_stock, purchase_price, sale_price, module_type } = req.body;
+    const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
 
-router.put('/:id', auth, async (req, res) => {
-  try {
-    const { product_name, supplier_name, quantity_added, remaining_stock, purchase_price, sale_price } = req.body;
     const result = await pool.query(
-      `UPDATE stock SET product_name=$1,supplier_name=$2,quantity_added=$3,remaining_stock=$4,purchase_price=$5,sale_price=$6
-       WHERE id=$7 AND (user_id=$8 OR $9) RETURNING *`,
-      [product_name, supplier_name, quantity_added, remaining_stock, purchase_price, sale_price, req.params.id, req.user.id, isAdmin(req)]
+      `INSERT INTO stock (product_name, supplier_name, quantity_added, remaining_stock, purchase_price, sale_price, user_id, module_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [product_name, supplier_name, quantity_added, remaining_stock || quantity_added, purchase_price, sale_price, req.user.id, finalModule]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }

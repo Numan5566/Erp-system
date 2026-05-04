@@ -7,19 +7,34 @@ const isAdmin = (req) => req.user.role === 'admin';
 
 router.get('/', auth, async (req, res) => {
   try {
-    const result = isAdmin(req)
-      ? await pool.query('SELECT * FROM suppliers ORDER BY created_at DESC')
-      : await pool.query('SELECT * FROM suppliers WHERE user_id=$1 ORDER BY created_at DESC', [req.user.id]);
+    const { type } = req.query;
+    let query = 'SELECT * FROM suppliers';
+    let params = [];
+
+    if (isAdmin(req)) {
+      if (type) {
+        query += ' WHERE module_type = $1';
+        params.push(type);
+      }
+    } else {
+      query += ' WHERE module_type = $1';
+      params.push(req.user.module_type || 'Retail 1');
+    }
+
+    query += ' ORDER BY name ASC';
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/', auth, async (req, res) => {
   try {
-    const { name, phone, email, company, address, balance } = req.body;
+    const { name, phone, email, company, address, balance, module_type } = req.body;
+    const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
+
     const result = await pool.query(
-      'INSERT INTO suppliers (name,phone,email,company,address,balance,user_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-      [name, phone, email, company, address, balance || 0, req.user.id]
+      'INSERT INTO suppliers (name,phone,email,company,address,balance,user_id,module_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+      [name, phone, email, company, address, balance || 0, req.user.id, finalModule]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }

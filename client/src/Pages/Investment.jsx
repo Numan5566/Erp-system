@@ -1,276 +1,288 @@
-import React, { useState, useEffect } from "react";
-import { TrendingUp, Plus, Pencil, Trash2, X, Activity, CheckCircle, Search } from "lucide-react";
+import React, { useState, useEffect, useContext } from "react";
+import { 
+  TrendingUp, Plus, Pencil, Trash2, X, Activity, CheckCircle, Search,
+  CircleDollarSign, Calendar, Tag, Briefcase, BarChart3, Info
+} from "lucide-react";
+import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "http://localhost:5000/api/investments";
+const API = "http://localhost:5000/api/investment";
 
 const CATEGORIES = ["Real Estate", "Stock Market", "Business", "Gold", "Bonds", "Fixed Deposit", "Other"];
 
 const emptyForm = {
-  investment_name: "",
+  title: "",
+  investor: "",
   category: "Business",
-  amount_invested: "",
-  expected_return: "",
-  investment_date: new Date().toISOString().split("T")[0],
-  status: "Active",
+  amount: "",
+  date: new Date().toISOString().split("T")[0],
   notes: "",
 };
 
-export default function Investment() {
+export default function Investment({ type }) {
+  const { user } = useContext(AuthContext);
+  const [activeTab, setActiveTab] = useState(type || (user?.role === 'admin' ? "" : user?.module_type || "Wholesale"));
+
+  useEffect(() => {
+    if (type) {
+      setActiveTab(type);
+    } else if (user?.module_type && user.role !== 'admin') {
+      setActiveTab(user.module_type);
+    }
+  }, [type, user?.module_type, user?.role]);
+
   const [records, setRecords] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState("All");
   const [filterCategory, setFilterCategory] = useState("All");
   const [loading, setLoading] = useState(false);
 
   const fetchRecords = async () => {
+    if (!activeTab) return;
     try {
-      const res = await fetch(API);
+      const res = await fetch(`${API}?type=${activeTab}`, {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
       const data = await res.json();
-      setRecords(data);
+      setRecords(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch investments", err);
     }
   };
 
-  useEffect(() => { fetchRecords(); }, []);
-
-  const openAdd = () => { setForm(emptyForm); setEditId(null); setShowModal(true); };
-  const openEdit = (rec) => {
-    setForm({
-      investment_name: rec.investment_name,
-      category: rec.category || "Business",
-      amount_invested: rec.amount_invested,
-      expected_return: rec.expected_return || "",
-      investment_date: rec.investment_date?.split("T")[0] || "",
-      status: rec.status,
-      notes: rec.notes || "",
-    });
-    setEditId(rec.id);
-    setShowModal(true);
-  };
+  useEffect(() => { fetchRecords(); }, [activeTab]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      if (editId) {
-        await fetch(`${API}/${editId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
-      } else {
-        await fetch(API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
+      const method = editId ? "PUT" : "POST";
+      const url = editId ? `${API}/${editId}` : API;
+      const res = await fetch(url, {
+        method,
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ ...form, module_type: activeTab }),
+      });
+      if (res.ok) {
+        setShowModal(false);
+        fetchRecords();
       }
-      setShowModal(false);
-      fetchRecords();
-    } catch (err) {
-      console.error("Failed to save investment", err);
-    }
+    } catch (err) { console.error(err); }
     setLoading(false);
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this investment record?")) return;
-    await fetch(`${API}/${id}`, { method: "DELETE" });
+    await fetch(`${API}/${id}`, { 
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+    });
     fetchRecords();
   };
 
   const filtered = records.filter((r) => {
-    const matchSearch = r.investment_name.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filterStatus === "All" || r.status === filterStatus;
+    const matchSearch = (r.title || "").toLowerCase().includes(search.toLowerCase()) || 
+                        (r.investor || "").toLowerCase().includes(search.toLowerCase());
     const matchCategory = filterCategory === "All" || r.category === filterCategory;
-    return matchSearch && matchStatus && matchCategory;
+    return matchSearch && matchCategory;
   });
 
-  const totalInvested = filtered.reduce((sum, r) => sum + parseFloat(r.amount_invested || 0), 0);
-  const totalExpected = filtered.reduce((sum, r) => sum + parseFloat(r.expected_return || 0), 0);
+  // If Admin and no counter selected, show selection screen
+  if (user?.role === 'admin' && !activeTab && !type) {
+    return (
+      <div className="admin-selection-container">
+        <h2>Select Counter</h2>
+        <p>Choose which counter's investment portfolio you want to manage</p>
+        <div className="selection-grid">
+          <div className="selection-card wholesale" onClick={() => setActiveTab('Wholesale')}>
+            <div className="icon-box">📈</div>
+            <h3>Wholesale</h3>
+            <span>Master Investment</span>
+          </div>
+          <div className="selection-card retail1" onClick={() => setActiveTab('Retail 1')}>
+            <div className="icon-box">💰</div>
+            <h3>Retail 1</h3>
+            <span>Counter A Fund</span>
+          </div>
+          <div className="selection-card retail2" onClick={() => setActiveTab('Retail 2')}>
+            <div className="icon-box">💎</div>
+            <h3>Retail 2</h3>
+            <span>Counter B Fund</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="module-page">
       <div className="module-header">
         <div className="module-title">
-          <div className="module-icon investment-icon"><TrendingUp size={28} /></div>
+          <div className="module-icon investment-icon" style={{background: '#f0fdf4', color: '#10b981'}}><TrendingUp size={28} /></div>
           <div>
-            <h1>Investment Tracker</h1>
-            <p>Monitor your investments, returns, and portfolio status</p>
+            <h1>{activeTab} Investments</h1>
+            <p>Monitor capital growth and asset performance</p>
           </div>
         </div>
-        <button className="btn-primary" onClick={openAdd} id="add-investment-btn">
+
+        {user?.role === 'admin' && !type && (
+          <div className="counter-switcher">
+            <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
+            <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
+            <button className={activeTab === 'Retail 2' ? 'active' : ''} onClick={() => setActiveTab('Retail 2')}>Retail 2</button>
+          </div>
+        )}
+
+        <button className="btn-primary" onClick={() => { setForm(emptyForm); setEditId(null); setShowModal(true); }}>
           <Plus size={18} /> Add Investment
         </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="summary-row">
-        <div className="summary-card">
-          <span className="summary-label">Total Investments</span>
-          <span className="summary-value">{filtered.length}</span>
+      <div className="stats-grid-pos">
+        <div className="pos-stat-card">
+          <div className="icon blue"><Briefcase size={24} /></div>
+          <div className="info">
+            <span className="label">Total Capital</span>
+            <span className="value">Rs. {records.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0).toLocaleString()}</span>
+          </div>
         </div>
-        <div className="summary-card">
-          <span className="summary-label">Total Invested</span>
-          <span className="summary-value accent">Rs. {totalInvested.toLocaleString()}</span>
+        <div className="pos-stat-card">
+          <div className="icon green"><BarChart3 size={24} /></div>
+          <div className="info">
+            <span className="label">Total Assets</span>
+            <span className="value">{records.length} Portfolios</span>
+          </div>
         </div>
-        <div className="summary-card">
-          <span className="summary-label">Expected Returns</span>
-          <span className="summary-value green">Rs. {totalExpected.toLocaleString()}</span>
-        </div>
-        <div className="summary-card">
-          <span className="summary-label">Active</span>
-          <span className="summary-value green">{filtered.filter(r => r.status === "Active").length}</span>
+        <div className="pos-stat-card">
+          <div className="icon orange"><CircleDollarSign size={24} /></div>
+          <div className="info">
+            <span className="label">Avg Investment</span>
+            <span className="value">Rs. {records.length ? (records.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0) / records.length).toLocaleString() : 0}</span>
+          </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="filter-row">
-        <div className="search-box">
-          <Search size={16} />
-          <input
-            type="text"
-            placeholder="Search investment name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            id="investment-search"
-          />
+      <div className="pos-table-actions">
+        <div className="search-bar">
+          <Search size={18} />
+          <input type="text" placeholder="Search investment or investor..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} id="investment-status-filter">
-          <option value="All">All Status</option>
-          <option value="Active">Active</option>
-          <option value="Completed">Completed</option>
-          <option value="Withdrawn">Withdrawn</option>
-        </select>
-        <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} id="investment-category-filter">
-          <option value="All">All Categories</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <div className="filter-group">
+           <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="tab-select">
+             <option value="All">All Categories</option>
+             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+           </select>
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="table-wrapper">
-        <table className="data-table">
+      <div className="module-table-container">
+        <table className="module-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Investment Name</th>
-              <th>Category</th>
-              <th>Amount Invested (Rs.)</th>
-              <th>Expected Return (Rs.)</th>
               <th>Date</th>
-              <th>Status</th>
-              <th>Notes</th>
-              <th>Actions</th>
+              <th>Investment / Asset</th>
+              <th>Investor</th>
+              <th>Amount</th>
+              <th>Category</th>
+              <th style={{textAlign: 'center'}}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan="9" className="empty-row">No investment records found.</td></tr>
+              <tr><td colSpan="6" className="empty-msg">No investments found for {activeTab}.</td></tr>
             ) : (
-              filtered.map((rec, idx) => (
-                <tr key={rec.id}>
-                  <td>{idx + 1}</td>
-                  <td><strong>{rec.investment_name}</strong></td>
-                  <td><span className="tag">{rec.category || "—"}</span></td>
-                  <td className="amount">Rs. {parseFloat(rec.amount_invested).toLocaleString()}</td>
-                  <td className="amount green">Rs. {parseFloat(rec.expected_return || 0).toLocaleString()}</td>
-                  <td>{rec.investment_date?.split("T")[0] || "—"}</td>
+              filtered.map(r => (
+                <tr key={r.id}>
+                  <td><div className="bold">{new Date(r.date).toLocaleDateString()}</div></td>
+                  <td><span className="bold">{r.title}</span></td>
+                  <td><div style={{display:'flex', alignItems:'center', gap:'4px'}}><Tag size={12}/> {r.investor || '—'}</div></td>
+                  <td className="bold text-green">Rs. {parseFloat(r.amount).toLocaleString()}</td>
+                  <td><span className="type-tag office" style={{fontSize:'0.75rem'}}>{r.category}</span></td>
                   <td>
-                    <span className={`badge badge-${rec.status?.toLowerCase()}`}>
-                      {rec.status === "Active" ? <Activity size={12} /> : <CheckCircle size={12} />}
-                      {rec.status}
-                    </span>
-                  </td>
-                  <td className="notes">{rec.notes || "—"}</td>
-                  <td className="actions">
-                    <button className="btn-icon edit" onClick={() => openEdit(rec)} title="Edit"><Pencil size={15} /></button>
-                    <button className="btn-icon delete" onClick={() => handleDelete(rec.id)} title="Delete"><Trash2 size={15} /></button>
+                    <div className="adjust-btns">
+                      <button className="btn-adjust plus" onClick={() => { setForm(r); setEditId(r.id); setShowModal(true); }}><Pencil size={14}/></button>
+                      <button className="btn-adjust minus" onClick={() => handleDelete(r.id)}><Trash2 size={14}/></button>
+                    </div>
                   </td>
                 </tr>
               ))
             )}
           </tbody>
-          {filtered.length > 0 && (
-            <tfoot>
-              <tr>
-                <td colSpan="3"><strong>Totals</strong></td>
-                <td className="amount"><strong>Rs. {totalInvested.toLocaleString()}</strong></td>
-                <td className="amount green"><strong>Rs. {totalExpected.toLocaleString()}</strong></td>
-                <td colSpan="4"></td>
-              </tr>
-            </tfoot>
-          )}
         </table>
       </div>
 
-      {/* Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{editId ? "Edit Investment" : "Add Investment"}</h3>
+              <h3>{editId ? "Edit Investment" : "Record New Investment"}</h3>
               <button className="modal-close" onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
-            <form onSubmit={handleSubmit} className="modal-form">
-              <div className="form-row">
+            <form onSubmit={handleSubmit}>
+              <div className="section-label">Asset Details</div>
+              <div className="form-grid">
                 <div className="form-group">
                   <label>Investment Name *</label>
-                  <input type="text" required value={form.investment_name}
-                    onChange={(e) => setForm({ ...form, investment_name: e.target.value })}
-                    placeholder="e.g. Plot in DHA, Stock Portfolio" />
+                  <div className="input-wrapper">
+                    <TrendingUp size={18} />
+                    <input type="text" required value={form.title} placeholder="e.g. New Warehouse Plot"
+                      onChange={(e) => setForm({...form, title: e.target.value})} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Investor/Owner</label>
+                  <div className="input-wrapper">
+                    <Tag size={18} />
+                    <input type="text" value={form.investor} placeholder="Who invested?"
+                      onChange={(e) => setForm({...form, investor: e.target.value})} />
+                  </div>
                 </div>
                 <div className="form-group">
                   <label>Category</label>
-                  <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <div className="input-wrapper">
+                    <Briefcase size={18} />
+                    <select value={form.category} onChange={(e) => setForm({...form, category: e.target.value})}>
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
                 </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Amount Invested (Rs.) *</label>
-                  <input type="number" required min="0" step="0.01" value={form.amount_invested}
-                    onChange={(e) => setForm({ ...form, amount_invested: e.target.value })}
-                    placeholder="e.g. 500000" />
-                </div>
-                <div className="form-group">
-                  <label>Expected Return (Rs.)</label>
-                  <input type="number" min="0" step="0.01" value={form.expected_return}
-                    onChange={(e) => setForm({ ...form, expected_return: e.target.value })}
-                    placeholder="e.g. 600000" />
-                </div>
-              </div>
-              <div className="form-row">
                 <div className="form-group">
                   <label>Investment Date</label>
-                  <input type="date" value={form.investment_date}
-                    onChange={(e) => setForm({ ...form, investment_date: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Status</label>
-                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                    <option value="Active">Active</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Withdrawn">Withdrawn</option>
-                  </select>
+                  <div className="input-wrapper">
+                    <Calendar size={18} />
+                    <input type="date" value={form.date}
+                      onChange={(e) => setForm({...form, date: e.target.value})} />
+                  </div>
                 </div>
               </div>
+
+              <div className="section-label">Financial Value</div>
+              <div className="form-grid">
+                <div className="form-group full-width">
+                  <label>Amount (Rs.) *</label>
+                  <div className="input-wrapper">
+                    <CircleDollarSign size={18} />
+                    <input type="number" required value={form.amount} placeholder="0.00"
+                      onChange={(e) => setForm({...form, amount: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="section-label">Additional Notes</div>
               <div className="form-group full-width">
-                <label>Notes</label>
-                <input type="text" value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder="Optional notes..." />
+                <textarea rows="2" placeholder="Describe the investment or terms..." value={form.notes}
+                  onChange={(e) => setForm({...form, notes: e.target.value})}></textarea>
               </div>
-              <div className="modal-actions">
+
+              <div className="form-actions">
                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? "Saving..." : editId ? "Update Investment" : "Add Investment"}
+                  {loading ? "Processing..." : "Save Record"}
                 </button>
               </div>
             </form>

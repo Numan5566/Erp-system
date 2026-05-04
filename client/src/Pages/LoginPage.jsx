@@ -29,7 +29,7 @@ const LoginPage = () => {
           <div className="logo-icon">
             <Building2 size={40} color="#2563eb" />
           </div>
-          <h2>ERP System Login</h2>
+          <h2>Data Waley Cement</h2>
           <p>Welcome back! Please enter your details.</p>
         </div>
 

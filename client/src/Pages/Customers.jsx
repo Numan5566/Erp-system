@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { Users as UsersIcon, Plus, Pencil, Trash2, X, Search, Phone, Mail, MapPin } from "lucide-react";
+import React, { useState, useEffect, useContext } from "react";
+import { 
+  Users as UsersIcon, Plus, Pencil, Trash2, X, Search, Phone, Mail, 
+  MapPin, ChevronLeft, CreditCard, Banknote, UserPlus, Info
+} from "lucide-react";
+import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
 const API = "http://localhost:5000/api/customers";
@@ -12,7 +16,18 @@ const emptyForm = {
   balance: "0",
 };
 
-export default function Customers() {
+export default function Customers({ type }) {
+  const { user } = useContext(AuthContext);
+  const [activeTab, setActiveTab] = useState(type || (user?.role === 'admin' ? "" : user?.module_type || "Wholesale"));
+
+  useEffect(() => {
+    if (type) {
+      setActiveTab(type);
+    } else if (user?.module_type && user.role !== 'admin') {
+      setActiveTab(user.module_type);
+    }
+  }, [type, user?.module_type, user?.role]);
+
   const [records, setRecords] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
@@ -21,8 +36,9 @@ export default function Customers() {
   const [loading, setLoading] = useState(false);
 
   const fetchRecords = async () => {
+    if (!activeTab) return;
     try {
-      const res = await fetch(API, {
+      const res = await fetch(`${API}?type=${activeTab}`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -32,7 +48,34 @@ export default function Customers() {
     }
   };
 
-  useEffect(() => { fetchRecords(); }, []);
+  useEffect(() => { fetchRecords(); }, [activeTab]);
+
+  // If Admin and no counter selected, show selection screen
+  if (user?.role === 'admin' && !activeTab && !type) {
+    return (
+      <div className="admin-selection-container">
+        <h2>Select Counter</h2>
+        <p>Choose which counter's customer directory you want to manage</p>
+        <div className="selection-grid">
+          <div className="selection-card wholesale" onClick={() => setActiveTab('Wholesale')}>
+            <div className="icon-box">🏢</div>
+            <h3>Wholesale</h3>
+            <span>Main Warehouse</span>
+          </div>
+          <div className="selection-card retail1" onClick={() => setActiveTab('Retail 1')}>
+            <div className="icon-box">🏪</div>
+            <h3>Retail 1</h3>
+            <span>Counter A</span>
+          </div>
+          <div className="selection-card retail2" onClick={() => setActiveTab('Retail 2')}>
+            <div className="icon-box">🏬</div>
+            <h3>Retail 2</h3>
+            <span>Counter B</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const openAdd = () => { setForm(emptyForm); setEditId(null); setShowModal(true); };
   const openEdit = (rec) => {
@@ -59,7 +102,7 @@ export default function Customers() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, module_type: activeTab }),
       });
       setShowModal(false);
       fetchRecords();
@@ -90,74 +133,97 @@ export default function Customers() {
     <div className="module-page">
       <div className="module-header">
         <div className="module-title">
-          <div className="module-icon investment-icon"><UsersIcon size={28} /></div>
+          <div className="module-icon investment-icon" style={{background: '#eff6ff', color: '#3b82f6'}}><UsersIcon size={28} /></div>
           <div>
-            <h1>Customer CRM</h1>
-            <p>Manage customer contacts and ledger balances</p>
+            <h1>{activeTab} CRM</h1>
+            <p>Manage customer directory and ledger balances</p>
           </div>
         </div>
+
+        {user?.role === 'admin' && !type && (
+          <div className="counter-switcher">
+            <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
+            <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
+            <button className={activeTab === 'Retail 2' ? 'active' : ''} onClick={() => setActiveTab('Retail 2')}>Retail 2</button>
+          </div>
+        )}
+
         <button className="btn-primary" onClick={openAdd}>
           <Plus size={18} /> Add New Customer
         </button>
       </div>
 
-      <div className="summary-row">
-        <div className="summary-card">
-          <span className="summary-label">Total Customers</span>
-          <span className="summary-value">{filtered.length}</span>
+      <div className="stats-grid-pos">
+        <div className="pos-stat-card">
+          <div className="icon blue"><UsersIcon size={24} /></div>
+          <div className="info">
+            <span className="label">Total Customers</span>
+            <span className="value">{filtered.length} Users</span>
+          </div>
         </div>
-        <div className="summary-card">
-          <span className="summary-label">Total Receivable</span>
-          <span className="summary-value green">Rs. {totalReceivable.toLocaleString()}</span>
+        <div className="pos-stat-card">
+          <div className="icon green"><CreditCard size={24} /></div>
+          <div className="info">
+            <span className="label">Receivables</span>
+            <span className="value">Rs. {totalReceivable.toLocaleString()}</span>
+          </div>
         </div>
-        <div className="summary-card">
-          <span className="summary-label">Total Payable</span>
-          <span className="summary-value red">Rs. {totalPayable.toLocaleString()}</span>
-        </div>
-        <div className="summary-card">
-          <span className="summary-label">Active Ledger</span>
-          <span className="summary-value accent">{filtered.filter(r => parseFloat(r.balance) !== 0).length}</span>
+        <div className="pos-stat-card">
+          <div className="icon red"><Banknote size={24} /></div>
+          <div className="info">
+            <span className="label">Payables</span>
+            <span className="value">Rs. {totalPayable.toLocaleString()}</span>
+          </div>
         </div>
       </div>
 
-      <div className="filter-row">
-        <div className="search-box">
-          <Search size={16} />
+      <div className="pos-table-actions">
+        <div className="search-bar">
+          <Search size={18} />
           <input type="text" placeholder="Search by name or phone..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
 
-      <div className="table-wrapper">
-        <table className="data-table">
+      <div className="module-table-container">
+        <table className="module-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Contact</th>
-              <th>Address</th>
-              <th>Balance (Rs.)</th>
-              <th>Actions</th>
+              <th>Customer Profile</th>
+              <th>Contact Details</th>
+              <th>Location</th>
+              <th>Ledger Balance</th>
+              <th style={{textAlign: 'center'}}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan="5" className="empty-row">No customers found.</td></tr>
+              <tr><td colSpan="5" className="empty-msg">No customers found in {activeTab}.</td></tr>
             ) : (
               filtered.map((rec) => (
                 <tr key={rec.id}>
-                  <td><strong>{rec.name}</strong></td>
+                  <td>
+                    <div className="prod-main-info">
+                      <span className="name">{rec.name}</span>
+                      <span className="v-num"><UserPlus size={12}/> ID: #{rec.id}</span>
+                    </div>
+                  </td>
                   <td>
                     <div style={{display:'flex', flexDirection:'column', gap:'2px'}}>
-                      <div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'0.8rem'}}><Phone size={12}/> {rec.phone || "—"}</div>
+                      <div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'0.85rem', fontWeight:'600'}}><Phone size={12}/> {rec.phone || "—"}</div>
                       <div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'0.8rem', color:'#94a3b8'}}><Mail size={12}/> {rec.email || "—"}</div>
                     </div>
                   </td>
-                  <td><div style={{display:'flex', alignItems:'center', gap:'4px'}}><MapPin size={12}/> {rec.address || "—"}</div></td>
-                  <td className={`amount ${parseFloat(rec.balance) > 0 ? 'green' : parseFloat(rec.balance) < 0 ? 'red' : ''}`}>
-                    Rs. {parseFloat(rec.balance).toLocaleString()}
+                  <td><div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'0.85rem'}}><MapPin size={12}/> {rec.address || "—"}</div></td>
+                  <td className="bold">
+                    <span className={parseFloat(rec.balance) > 0 ? 'text-green' : parseFloat(rec.balance) < 0 ? 'text-red' : ''}>
+                      Rs. {parseFloat(rec.balance).toLocaleString()}
+                    </span>
                   </td>
-                  <td className="actions">
-                    <button className="btn-icon edit" onClick={() => openEdit(rec)}><Pencil size={15} /></button>
-                    <button className="btn-icon delete" onClick={() => handleDelete(rec.id)}><Trash2 size={15} /></button>
+                  <td>
+                    <div className="adjust-btns">
+                      <button className="btn-adjust plus" onClick={() => openEdit(rec)} title="Edit"><Pencil size={14} /></button>
+                      <button className="btn-adjust minus" onClick={() => handleDelete(rec.id)} title="Delete"><Trash2 size={14} /></button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -170,42 +236,63 @@ export default function Customers() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{editId ? "Edit Customer" : "Add Customer"}</h3>
+              <h3>{editId ? "Edit Customer Profile" : "Create New Customer"}</h3>
               <button className="modal-close" onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
-            <form onSubmit={handleSubmit} className="modal-form">
-              <div className="form-group full-width">
-                <label>Customer Name *</label>
-                <input type="text" required value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </div>
-              <div className="form-row">
+            <form onSubmit={handleSubmit}>
+              <div className="section-label">Identity & Contact</div>
+              <div className="form-grid">
                 <div className="form-group">
-                  <label>Phone</label>
-                  <input type="text" value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  <label>Full Name *</label>
+                  <div className="input-wrapper">
+                    <UsersIcon size={18} />
+                    <input type="text" required value={form.name} placeholder="e.g. Ali Ahmed"
+                      onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  </div>
                 </div>
                 <div className="form-group">
-                  <label>Email</label>
-                  <input type="email" value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                  <label>Phone Number</label>
+                  <div className="input-wrapper">
+                    <Phone size={18} />
+                    <input type="text" value={form.phone} placeholder="e.g. 0300-1234567"
+                      onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Email Address</label>
+                  <div className="input-wrapper">
+                    <Mail size={18} />
+                    <input type="email" value={form.email} placeholder="e.g. ali@example.com"
+                      onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Home/Office Address</label>
+                  <div className="input-wrapper">
+                    <MapPin size={18} />
+                    <input type="text" value={form.address} placeholder="City, Area, Street"
+                      onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                  </div>
                 </div>
               </div>
-              <div className="form-group full-width">
-                <label>Address</label>
-                <input type="text" value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })} />
+
+              <div className="section-label">Financial Ledger</div>
+              <div className="form-grid">
+                <div className="form-group full-width">
+                  <label>Opening Balance (Rs.)</label>
+                  <div className="input-wrapper">
+                    <Banknote size={18} />
+                    <input type="number" value={form.balance}
+                      onChange={(e) => setForm({ ...form, balance: e.target.value })} 
+                      placeholder="Positive: Receivable | Negative: Payable" />
+                  </div>
+                </div>
               </div>
-              <div className="form-group full-width">
-                <label>Opening Balance (Rs.)</label>
-                <input type="number" value={form.balance}
-                  onChange={(e) => setForm({ ...form, balance: e.target.value })} 
-                  placeholder="Positive for receivable, Negative for payable" />
-              </div>
-              <div className="modal-actions">
+
+              <div className="form-actions">
                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? "Saving..." : editId ? "Update" : "Save"}
+                  {loading ? "Saving..." : editId ? "Update Profile" : "Register Customer"}
                 </button>
               </div>
             </form>

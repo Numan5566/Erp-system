@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { MoreHorizontal, Plus, Pencil, Trash2, X, Search } from "lucide-react";
+import React, { useState, useEffect, useContext } from "react";
+import { 
+  MoreHorizontal, Plus, Pencil, Trash2, X, Search,
+  CircleDollarSign, Calendar, Tag, CreditCard, PieChart, Info
+} from "lucide-react";
+import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
 const API = "http://localhost:5000/api/other-expenses";
@@ -14,269 +18,275 @@ const emptyForm = {
   title: "",
   category: "Miscellaneous",
   amount: "",
-  expense_date: new Date().toISOString().split("T")[0],
+  date: new Date().toISOString().split("T")[0],
   payment_method: "Cash",
   notes: "",
 };
 
-export default function OtherExpenses() {
+export default function OtherExpenses({ type }) {
+  const { user } = useContext(AuthContext);
+  const [activeTab, setActiveTab] = useState(type || (user?.role === 'admin' ? "" : user?.module_type || "Wholesale"));
+
+  useEffect(() => {
+    if (type) {
+      setActiveTab(type);
+    } else if (user?.module_type && user.role !== 'admin') {
+      setActiveTab(user.module_type);
+    }
+  }, [type, user?.module_type, user?.role]);
+
   const [records, setRecords] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
-  const [filterMethod, setFilterMethod] = useState("All");
   const [loading, setLoading] = useState(false);
 
   const fetchRecords = async () => {
+    if (!activeTab) return;
     try {
-      const res = await fetch(API);
+      const res = await fetch(`${API}?type=${activeTab}`, {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
       const data = await res.json();
-      setRecords(data);
+      setRecords(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch other expenses", err);
     }
   };
 
-  useEffect(() => { fetchRecords(); }, []);
-
-  const openAdd = () => { setForm(emptyForm); setEditId(null); setShowModal(true); };
-  const openEdit = (rec) => {
-    setForm({
-      title: rec.title,
-      category: rec.category || "Miscellaneous",
-      amount: rec.amount,
-      expense_date: rec.expense_date?.split("T")[0] || "",
-      payment_method: rec.payment_method || "Cash",
-      notes: rec.notes || "",
-    });
-    setEditId(rec.id);
-    setShowModal(true);
-  };
+  useEffect(() => { fetchRecords(); }, [activeTab]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      if (editId) {
-        await fetch(`${API}/${editId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
-      } else {
-        await fetch(API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        });
+      const method = editId ? "PUT" : "POST";
+      const url = editId ? `${API}/${editId}` : API;
+      const res = await fetch(url, {
+        method,
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ ...form, module_type: activeTab }),
+      });
+      if (res.ok) {
+        setShowModal(false);
+        fetchRecords();
       }
-      setShowModal(false);
-      fetchRecords();
-    } catch (err) {
-      console.error("Failed to save expense", err);
-    }
+    } catch (err) { console.error(err); }
     setLoading(false);
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this expense record?")) return;
-    await fetch(`${API}/${id}`, { method: "DELETE" });
+    await fetch(`${API}/${id}`, { 
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+    });
     fetchRecords();
   };
 
   const filtered = records.filter((r) => {
-    const matchSearch = r.title.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = (r.title || "").toLowerCase().includes(search.toLowerCase());
     const matchCategory = filterCategory === "All" || r.category === filterCategory;
-    const matchMethod = filterMethod === "All" || r.payment_method === filterMethod;
-    return matchSearch && matchCategory && matchMethod;
+    return matchSearch && matchCategory;
   });
 
-  const totalAmount = filtered.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
-
-  // Category breakdown
-  const categoryTotals = CATEGORIES.map(cat => ({
-    name: cat,
-    total: filtered.filter(r => r.category === cat).reduce((s, r) => s + parseFloat(r.amount || 0), 0)
-  })).filter(c => c.total > 0);
+  // If Admin and no counter selected, show selection screen
+  if (user?.role === 'admin' && !activeTab && !type) {
+    return (
+      <div className="admin-selection-container">
+        <h2>Select Counter</h2>
+        <p>Choose which counter's miscellaneous expenses you want to manage</p>
+        <div className="selection-grid">
+          <div className="selection-card wholesale" onClick={() => setActiveTab('Wholesale')}>
+            <div className="icon-box">📊</div>
+            <h3>Wholesale</h3>
+            <span>Business Overheads</span>
+          </div>
+          <div className="selection-card retail1" onClick={() => setActiveTab('Retail 1')}>
+            <div className="icon-box">💸</div>
+            <h3>Retail 1</h3>
+            <span>Misc Expenses</span>
+          </div>
+          <div className="selection-card retail2" onClick={() => setActiveTab('Retail 2')}>
+            <div className="icon-box">🏷️</div>
+            <h3>Retail 2</h3>
+            <span>Misc Expenses</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="module-page">
       <div className="module-header">
         <div className="module-title">
-          <div className="module-icon otherexp-icon"><MoreHorizontal size={28} /></div>
+          <div className="module-icon otherexp-icon" style={{background: '#fef3c7', color: '#d97706'}}><MoreHorizontal size={28} /></div>
           <div>
-            <h1>Other Expenses</h1>
-            <p>Track miscellaneous and additional business expenses</p>
+            <h1>{activeTab} Misc Expenses</h1>
+            <p>Track utilities, maintenance, and other secondary costs</p>
           </div>
         </div>
-        <button className="btn-primary" onClick={openAdd} id="add-otherexp-btn">
-          <Plus size={18} /> Add Expense
+
+        {user?.role === 'admin' && !type && (
+          <div className="counter-switcher">
+            <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
+            <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
+            <button className={activeTab === 'Retail 2' ? 'active' : ''} onClick={() => setActiveTab('Retail 2')}>Retail 2</button>
+          </div>
+        )}
+
+        <button className="btn-primary" onClick={() => { setForm(emptyForm); setEditId(null); setShowModal(true); }}>
+          <Plus size={18} /> Record Expense
         </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="summary-row">
-        <div className="summary-card">
-          <span className="summary-label">Total Records</span>
-          <span className="summary-value">{filtered.length}</span>
+      <div className="stats-grid-pos">
+        <div className="pos-stat-card">
+          <div className="icon blue"><PieChart size={24} /></div>
+          <div className="info">
+            <span className="label">Monthly Spend</span>
+            <span className="value">Rs. {records.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0).toLocaleString()}</span>
+          </div>
         </div>
-        <div className="summary-card">
-          <span className="summary-label">Total Spent</span>
-          <span className="summary-value accent">Rs. {totalAmount.toLocaleString()}</span>
+        <div className="pos-stat-card">
+          <div className="icon orange"><CircleDollarSign size={24} /></div>
+          <div className="info">
+            <span className="label">Total Vouchers</span>
+            <span className="value">{records.length} Records</span>
+          </div>
         </div>
-        <div className="summary-card">
-          <span className="summary-label">Categories</span>
-          <span className="summary-value">{categoryTotals.length}</span>
-        </div>
-        <div className="summary-card">
-          <span className="summary-label">This Month</span>
-          <span className="summary-value orange">
-            Rs. {filtered
-              .filter(r => new Date(r.expense_date).getMonth() === new Date().getMonth())
-              .reduce((s, r) => s + parseFloat(r.amount || 0), 0)
-              .toLocaleString()}
-          </span>
+        <div className="pos-stat-card">
+          <div className="icon green"><CreditCard size={24} /></div>
+          <div className="info">
+            <span className="label">Primary Method</span>
+            <span className="value">Cash</span>
+          </div>
         </div>
       </div>
 
-      {/* Category Breakdown */}
-      {categoryTotals.length > 0 && (
-        <div className="breakdown-row">
-          {categoryTotals.map(c => (
-            <div key={c.name} className="breakdown-chip">
-              <span className="chip-label">{c.name}</span>
-              <span className="chip-value">Rs. {c.total.toLocaleString()}</span>
-            </div>
-          ))}
+      <div className="pos-table-actions">
+        <div className="search-bar">
+          <Search size={18} />
+          <input type="text" placeholder="Search expense title..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-      )}
-
-      {/* Filters */}
-      <div className="filter-row">
-        <div className="search-box">
-          <Search size={16} />
-          <input
-            type="text"
-            placeholder="Search expense title..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            id="otherexp-search"
-          />
+        <div className="filter-group">
+           <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="tab-select">
+             <option value="All">All Categories</option>
+             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+           </select>
         </div>
-        <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} id="otherexp-cat-filter">
-          <option value="All">All Categories</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={filterMethod} onChange={(e) => setFilterMethod(e.target.value)} id="otherexp-method-filter">
-          <option value="All">All Payment Methods</option>
-          {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
       </div>
 
-      {/* Table */}
-      <div className="table-wrapper">
-        <table className="data-table">
+      <div className="module-table-container">
+        <table className="module-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Title</th>
+              <th>Expense Date</th>
+              <th>Title / Description</th>
               <th>Category</th>
-              <th>Amount (Rs.)</th>
-              <th>Date</th>
-              <th>Payment Method</th>
-              <th>Notes</th>
-              <th>Actions</th>
+              <th>Amount</th>
+              <th>Method</th>
+              <th style={{textAlign: 'center'}}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan="8" className="empty-row">No expense records found.</td></tr>
+              <tr><td colSpan="6" className="empty-msg">No misc expenses found for {activeTab}.</td></tr>
             ) : (
-              filtered.map((rec, idx) => (
-                <tr key={rec.id}>
-                  <td>{idx + 1}</td>
-                  <td><strong>{rec.title}</strong></td>
-                  <td><span className="tag">{rec.category || "—"}</span></td>
-                  <td className="amount">Rs. {parseFloat(rec.amount).toLocaleString()}</td>
-                  <td>{rec.expense_date?.split("T")[0] || "—"}</td>
-                  <td><span className="badge badge-paid">{rec.payment_method}</span></td>
-                  <td className="notes">{rec.notes || "—"}</td>
-                  <td className="actions">
-                    <button className="btn-icon edit" onClick={() => openEdit(rec)} title="Edit"><Pencil size={15} /></button>
-                    <button className="btn-icon delete" onClick={() => handleDelete(rec.id)} title="Delete"><Trash2 size={15} /></button>
+              filtered.map(r => (
+                <tr key={r.id}>
+                  <td><div className="bold">{new Date(r.date).toLocaleDateString()}</div></td>
+                  <td><span className="bold">{r.title}</span></td>
+                  <td><span className="type-tag house" style={{fontSize:'0.75rem'}}>{r.category}</span></td>
+                  <td className="bold text-red">Rs. {parseFloat(r.amount).toLocaleString()}</td>
+                  <td><div style={{display:'flex', alignItems:'center', gap:'4px'}}><CreditCard size={12}/> {r.payment_method}</div></td>
+                  <td>
+                    <div className="adjust-btns">
+                      <button className="btn-adjust plus" onClick={() => { setForm(r); setEditId(r.id); setShowModal(true); }}><Pencil size={14}/></button>
+                      <button className="btn-adjust minus" onClick={() => handleDelete(r.id)}><Trash2 size={14}/></button>
+                    </div>
                   </td>
                 </tr>
               ))
             )}
           </tbody>
-          {filtered.length > 0 && (
-            <tfoot>
-              <tr>
-                <td colSpan="3"><strong>Total</strong></td>
-                <td className="amount"><strong>Rs. {totalAmount.toLocaleString()}</strong></td>
-                <td colSpan="4"></td>
-              </tr>
-            </tfoot>
-          )}
         </table>
       </div>
 
-      {/* Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{editId ? "Edit Expense" : "Add Expense"}</h3>
+              <h3>{editId ? "Edit Misc Expense" : "Record New Expense"}</h3>
               <button className="modal-close" onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
-            <form onSubmit={handleSubmit} className="modal-form">
-              <div className="form-row">
+            <form onSubmit={handleSubmit}>
+              <div className="section-label">General Information</div>
+              <div className="form-grid">
                 <div className="form-group">
-                  <label>Title *</label>
-                  <input type="text" required value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                    placeholder="e.g. Generator Repair, AC Maintenance" />
+                  <label>Expense Title *</label>
+                  <div className="input-wrapper">
+                    <Info size={18} />
+                    <input type="text" required value={form.title} placeholder="e.g. AC Maintenance"
+                      onChange={(e) => setForm({...form, title: e.target.value})} />
+                  </div>
                 </div>
                 <div className="form-group">
                   <label>Category</label>
-                  <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Amount (Rs.) *</label>
-                  <input type="number" required min="0" step="0.01" value={form.amount}
-                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                    placeholder="e.g. 5000" />
+                  <div className="input-wrapper">
+                    <Tag size={18} />
+                    <select value={form.category} onChange={(e) => setForm({...form, category: e.target.value})}>
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <div className="form-group">
-                  <label>Expense Date</label>
-                  <input type="date" value={form.expense_date}
-                    onChange={(e) => setForm({ ...form, expense_date: e.target.value })} />
+                  <label>Payment Date</label>
+                  <div className="input-wrapper">
+                    <Calendar size={18} />
+                    <input type="date" value={form.date}
+                      onChange={(e) => setForm({...form, date: e.target.value})} />
+                  </div>
                 </div>
-              </div>
-              <div className="form-row">
                 <div className="form-group">
                   <label>Payment Method</label>
-                  <select value={form.payment_method} onChange={(e) => setForm({ ...form, payment_method: e.target.value })}>
-                    {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Notes</label>
-                  <input type="text" value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    placeholder="Optional notes..." />
+                  <div className="input-wrapper">
+                    <CreditCard size={18} />
+                    <select value={form.payment_method} onChange={(e) => setForm({...form, payment_method: e.target.value})}>
+                      {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div className="modal-actions">
+
+              <div className="section-label">Financial Value</div>
+              <div className="form-grid">
+                <div className="form-group full-width">
+                  <label>Amount (Rs.) *</label>
+                  <div className="input-wrapper">
+                    <CircleDollarSign size={18} />
+                    <input type="number" required value={form.amount} placeholder="0.00"
+                      onChange={(e) => setForm({...form, amount: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="section-label">Additional Notes</div>
+              <div className="form-group full-width">
+                <textarea rows="2" placeholder="Specific details about this expense..." value={form.notes}
+                  onChange={(e) => setForm({...form, notes: e.target.value})}></textarea>
+              </div>
+
+              <div className="form-actions">
                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? "Saving..." : editId ? "Update Expense" : "Add Expense"}
+                  {loading ? "Processing..." : "Save Record"}
                 </button>
               </div>
             </form>

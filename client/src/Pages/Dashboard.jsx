@@ -22,16 +22,18 @@ export default function Dashboard() {
       try {
         const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
         
+        const counterQuery = user?.role === 'admin' ? '' : `?type=${user?.module_type}`;
+        
         // Fetch products for stock stats
-        const prodRes = await fetch("http://localhost:5000/api/products", { headers });
+        const prodRes = await fetch(`http://localhost:5000/api/products${counterQuery}`, { headers });
         const products = await prodRes.json();
         
         // Fetch expenses
-        const expRes = await fetch("http://localhost:5000/api/expenses", { headers });
+        const expRes = await fetch(`http://localhost:5000/api/expenses${counterQuery}`, { headers });
         const expenses = await expRes.json();
         
         // Fetch customers
-        const custRes = await fetch("http://localhost:5000/api/customers", { headers });
+        const custRes = await fetch(`http://localhost:5000/api/customers${counterQuery}`, { headers });
         const customers = await custRes.json();
 
         if (Array.isArray(products) && Array.isArray(expenses) && Array.isArray(customers)) {
@@ -117,21 +119,34 @@ export default function Dashboard() {
             <div className="card-content">
               <Building2 size={40} className="card-icon" />
               <div className="text-content">
-                <h3>Wholesale Business</h3>
-                <p>Bulk orders, stock management & vendor relations</p>
+                <h3>Wholesale</h3>
+                <p>Bulk orders & Stock management</p>
               </div>
               <ArrowRight className="arrow" />
             </div>
           </Link>
         )}
 
-        {hasPermission('retail') && (
-          <Link to="/retail" className="primary-card retail-card">
+        {hasPermission('retail1') && (
+          <Link to="/retail1" className="primary-card retail-card retail1">
             <div className="card-content">
               <Store size={40} className="card-icon" />
               <div className="text-content">
-                <h3>Retail Sales</h3>
-                <p>Quick POS billing & walk-in customer management</p>
+                <h3>Retail 1</h3>
+                <p>Quick POS Billing - Counter 1</p>
+              </div>
+              <ArrowRight className="arrow" />
+            </div>
+          </Link>
+        )}
+
+        {hasPermission('retail2') && (
+          <Link to="/retail2" className="primary-card retail-card retail2">
+            <div className="card-content">
+              <Store size={40} className="card-icon" />
+              <div className="text-content">
+                <h3>Retail 2</h3>
+                <p>Quick POS Billing - Counter 2</p>
               </div>
               <ArrowRight className="arrow" />
             </div>

@@ -18,7 +18,8 @@ import Salary from "./Pages/Salary.jsx";
 import Profit from "./Pages/Profit.jsx";
 import UsersManager from "./Pages/UsersManager.jsx";
 import Wholesale from "./Pages/Wholesale.jsx";
-import Retail from "./Pages/Retail.jsx";
+import Retail1 from "./Pages/Retail1.jsx";
+import Retail2 from "./Pages/Retail2.jsx";
 import Rent from "./Pages/Rent.jsx";
 import Investment from "./Pages/Investment.jsx";
 import OtherExpenses from "./Pages/OtherExpenses.jsx";
@@ -35,7 +36,8 @@ function App() {
           {/* Protected Routes inside MainLayout */}
           <Route path="/dashboard" element={<PrivateRoute><MainLayout><Dashboard /></MainLayout></PrivateRoute>} />
           <Route path="/wholesale" element={<PrivateRoute><MainLayout><Wholesale /></MainLayout></PrivateRoute>} />
-          <Route path="/retail" element={<PrivateRoute><MainLayout><Retail /></MainLayout></PrivateRoute>} />
+          <Route path="/retail1" element={<PrivateRoute><MainLayout><Retail1 /></MainLayout></PrivateRoute>} />
+          <Route path="/retail2" element={<PrivateRoute><MainLayout><Retail2 /></MainLayout></PrivateRoute>} />
           <Route path="/products" element={<PrivateRoute><MainLayout><Products /></MainLayout></PrivateRoute>} />
           <Route path="/stock" element={<PrivateRoute><MainLayout><Stock /></MainLayout></PrivateRoute>} />
           <Route path="/billing" element={<PrivateRoute><MainLayout><Billing /></MainLayout></PrivateRoute>} />

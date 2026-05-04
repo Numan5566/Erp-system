@@ -22,7 +22,7 @@ export default function UsersManager() {
   const [users, setUsers] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'user', permissions: [] });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'user', module_type: '', permissions: [] });
 
   useEffect(() => {
     fetchUsers();
@@ -53,6 +53,7 @@ export default function UsersManager() {
       email: user.email,
       password: user.password || '', // Populate plain text password
       role: user.role,
+      module_type: user.module_type || '',
       permissions: user.permissions || []
     });
     setShowForm(true);
@@ -68,7 +69,7 @@ export default function UsersManager() {
       }
       setShowForm(false);
       setEditingId(null);
-      setFormData({ name: '', email: '', password: '', role: 'user', permissions: [] });
+      setFormData({ name: '', email: '', password: '', role: 'user', module_type: '', permissions: [] });
       fetchUsers();
     } catch (err) {
       alert(err.response?.data?.msg || 'Error saving user');
@@ -93,7 +94,7 @@ export default function UsersManager() {
           setShowForm(!showForm);
           if (editingId) {
             setEditingId(null);
-            setFormData({ name: '', email: '', password: '', role: 'user', permissions: [] });
+            setFormData({ name: '', email: '', password: '', role: 'user', module_type: '', permissions: [] });
           }
         }}>
           <UserPlus size={20} /> {showForm ? 'Cancel' : 'Add User'}
@@ -107,6 +108,20 @@ export default function UsersManager() {
             <input type="text" placeholder="Full Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
             <input type="email" placeholder="Email Address" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
             <input type="text" placeholder={editingId ? "Edit Password" : "Password"} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required />
+          </div>
+          
+          <div className="form-row">
+            <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+            
+            <select value={formData.module_type} onChange={e => setFormData({...formData, module_type: e.target.value})} disabled={formData.role === 'admin'}>
+              <option value="">Select Counter (for Users)</option>
+              <option value="Wholesale">Wholesale</option>
+              <option value="Retail 1">Retail 1</option>
+              <option value="Retail 2">Retail 2</option>
+            </select>
           </div>
 
           <h4>Assign Module Permissions</h4>
@@ -136,6 +151,7 @@ export default function UsersManager() {
               <th>Name</th>
               <th>Email</th>
               <th>Role</th>
+              <th>Counter</th>
               <th>Permissions</th>
               <th>Actions</th>
             </tr>
@@ -146,6 +162,7 @@ export default function UsersManager() {
                 <td>{u.name}</td>
                 <td>{u.email}</td>
                 <td><span className={`badge ${u.role}`}>{u.role}</span></td>
+                <td><span className="badge" style={{background: '#e0e7ff', color: '#3730a3'}}>{u.module_type || 'N/A'}</span></td>
                 <td className="perms-cell">
                   {u.permissions?.length ? u.permissions.join(', ') : 'None'}
                 </td>

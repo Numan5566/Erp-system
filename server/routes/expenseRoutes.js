@@ -7,19 +7,35 @@ const isAdmin = (req) => req.user.role === 'admin';
 
 router.get('/', auth, async (req, res) => {
   try {
-    const result = isAdmin(req)
-      ? await pool.query('SELECT * FROM expenses ORDER BY created_at DESC')
-      : await pool.query('SELECT * FROM expenses WHERE user_id=$1 ORDER BY created_at DESC', [req.user.id]);
+    const { type } = req.query;
+    // Mapping 'description' to 'title' to match frontend expectations
+    let query = 'SELECT id, description as title, expense_type, category, amount, expense_date, notes, user_id, module_type FROM expenses';
+    let params = [];
+
+    if (isAdmin(req)) {
+      if (type) {
+        query += ' WHERE module_type = $1';
+        params.push(type);
+      }
+    } else {
+      query += ' WHERE module_type = $1';
+      params.push(req.user.module_type || 'Retail 1');
+    }
+
+    query += ' ORDER BY expense_date DESC';
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.post('/', auth, async (req, res) => {
   try {
-    const { title, category, amount, expense_date, notes } = req.body;
+    const { title, expense_type, category, amount, expense_date, notes, module_type } = req.body;
+    const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
+
     const result = await pool.query(
-      'INSERT INTO expenses (title, category, amount, expense_date, notes, user_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [title, category, amount || 0, expense_date || new Date().toISOString().split('T')[0], notes, req.user.id]
+      'INSERT INTO expenses (description, expense_type, category, amount, expense_date, notes, user_id, module_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, description as title, expense_type, category, amount, expense_date, notes, user_id, module_type',
+      [title, expense_type || 'Office', category, amount || 0, expense_date || new Date().toISOString().split('T')[0], notes, req.user.id, finalModule]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -27,10 +43,10 @@ router.post('/', auth, async (req, res) => {
 
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { title, category, amount, expense_date, notes } = req.body;
+    const { title, expense_type, category, amount, expense_date, notes } = req.body;
     const result = await pool.query(
-      'UPDATE expenses SET title=$1, category=$2, amount=$3, expense_date=$4, notes=$5 WHERE id=$6 AND (user_id=$7 OR $8) RETURNING *',
-      [title, category, amount, expense_date, notes, req.params.id, req.user.id, isAdmin(req)]
+      'UPDATE expenses SET description=$1, expense_type=$2, category=$3, amount=$4, expense_date=$5, notes=$6 WHERE id=$7 AND (user_id=$8 OR $9) RETURNING id, description as title, expense_type, category, amount, expense_date, notes, user_id, module_type',
+      [title, expense_type, category, amount, expense_date, notes, req.params.id, req.user.id, isAdmin(req)]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }

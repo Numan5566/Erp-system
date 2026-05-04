@@ -18,9 +18,11 @@ app.use('/api/suppliers', require('./routes/supplierRoutes'));
 app.use('/api/transport', require('./routes/transportRoutes'));
 app.use('/api/expenses', require('./routes/expenseRoutes'));
 app.use('/api/salary', require('./routes/salaryRoutes'));
+app.use('/api/sales', require('./routes/saleRoutes'));
 app.use('/api/rent', require('./routes/rentRoutes'));
 app.use('/api/investments', require('./routes/investmentRoutes'));
 app.use('/api/other-expenses', require('./routes/otherExpensesRoutes'));
+app.use('/api/profit', require('./routes/profitRoutes'));
 
 const PORT = process.env.PORT || 5000;
 

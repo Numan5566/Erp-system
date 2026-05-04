@@ -5,12 +5,23 @@ const auth = require('../middleware/auth');
 
 const isAdmin = (req) => req.user.role === 'admin';
 
-// Get all products
+// Get all products (with isolation)
 router.get('/', auth, async (req, res) => {
   try {
-    const result = isAdmin(req)
-      ? await pool.query('SELECT * FROM products ORDER BY created_at DESC')
-      : await pool.query('SELECT * FROM products WHERE user_id=$1 ORDER BY created_at DESC', [req.user.id]);
+    const { type } = req.query; // e.g. ?type=Wholesale
+    let query = 'SELECT * FROM products';
+    let params = [];
+
+    if (!isAdmin(req)) {
+      query += ' WHERE module_type=$1';
+      params.push(req.user.module_type || 'Retail 1');
+    } else if (type) {
+      query += ' WHERE module_type=$1';
+      params.push(type);
+    }
+
+    query += ' ORDER BY created_at DESC';
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) { 
     console.error('Product Route Error:', err);
@@ -23,16 +34,18 @@ router.post('/', auth, async (req, res) => {
   try {
     const { 
       name, brand, category, unit, price, cost_price, 
-      stock_quantity, minimum_stock, description, image_url 
+      stock_quantity, minimum_stock, description, image_url, module_type 
     } = req.body;
+    
+    const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
     
     const result = await pool.query(
       `INSERT INTO products 
-      (name, brand, category, unit, price, cost_price, stock_quantity, minimum_stock, description, image_url, user_id) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+      (name, brand, category, unit, price, cost_price, stock_quantity, minimum_stock, description, image_url, module_type, user_id) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
       [
         name, brand, category, unit, price || 0, cost_price || 0, 
-        stock_quantity || 0, minimum_stock || 0, description, image_url, req.user.id
+        stock_quantity || 0, minimum_stock || 0, description, image_url, finalModule, req.user.id
       ]
     );
     res.json(result.rows[0]);

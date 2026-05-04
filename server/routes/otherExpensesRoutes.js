@@ -1,61 +1,43 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
+const auth = require('../middleware/auth');
 
-// GET all other expenses records
-router.get('/', async (req, res) => {
+const isAdmin = (req) => req.user.role === 'admin';
+
+router.get('/', auth, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM other_expenses ORDER BY created_at DESC');
+    const { type } = req.query;
+    let query = 'SELECT * FROM other_expenses';
+    let params = [];
+
+    if (isAdmin(req)) {
+      if (type) {
+        query += ' WHERE module_type = $1';
+        params.push(type);
+      }
+    } else {
+      query += ' WHERE module_type = $1';
+      params.push(req.user.module_type || 'Retail 1');
+    }
+
+    query += ' ORDER BY created_at DESC';
+    const result = await pool.query(query, params);
     res.json(result.rows);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: 'Server error' });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// POST create other expense record
-router.post('/', async (req, res) => {
+router.post('/', auth, async (req, res) => {
   try {
-    const { title, category, amount, expense_date, payment_method, notes } = req.body;
+    const { title, category, amount, date, notes, module_type } = req.body;
+    const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
+
     const result = await pool.query(
-      `INSERT INTO other_expenses (title, category, amount, expense_date, payment_method, notes)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [title, category, amount, expense_date, payment_method || 'Cash', notes]
+      'INSERT INTO other_expenses (title, category, amount, date, notes, user_id, module_type) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [title, category, amount || 0, date || new Date().toISOString().split('T')[0], notes, req.user.id, finalModule]
     );
     res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// PUT update other expense record
-router.put('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { title, category, amount, expense_date, payment_method, notes } = req.body;
-    const result = await pool.query(
-      `UPDATE other_expenses SET title=$1, category=$2, amount=$3, expense_date=$4, payment_method=$5, notes=$6
-       WHERE id=$7 RETURNING *`,
-      [title, category, amount, expense_date, payment_method, notes, id]
-    );
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// DELETE other expense record
-router.delete('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM other_expenses WHERE id=$1', [id]);
-    res.json({ message: 'Deleted successfully' });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: 'Server error' });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = router;

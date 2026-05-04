@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { UserSquare2, Plus, Pencil, Trash2, X, Search, Phone, Mail, Building } from "lucide-react";
+import React, { useState, useEffect, useContext } from "react";
+import { 
+  Truck, Plus, Pencil, Trash2, X, Search, Phone, Mail, 
+  MapPin, Building, CreditCard, Banknote, ClipboardList, Package
+} from "lucide-react";
+import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
 const API = "http://localhost:5000/api/suppliers";
@@ -13,7 +17,18 @@ const emptyForm = {
   balance: "0",
 };
 
-export default function Suppliers() {
+export default function Suppliers({ type }) {
+  const { user } = useContext(AuthContext);
+  const [activeTab, setActiveTab] = useState(type || (user?.role === 'admin' ? "" : user?.module_type || "Wholesale"));
+
+  useEffect(() => {
+    if (type) {
+      setActiveTab(type);
+    } else if (user?.module_type && user.role !== 'admin') {
+      setActiveTab(user.module_type);
+    }
+  }, [type, user?.module_type, user?.role]);
+
   const [records, setRecords] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
@@ -22,8 +37,9 @@ export default function Suppliers() {
   const [loading, setLoading] = useState(false);
 
   const fetchRecords = async () => {
+    if (!activeTab) return;
     try {
-      const res = await fetch(API, {
+      const res = await fetch(`${API}?type=${activeTab}`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -33,7 +49,34 @@ export default function Suppliers() {
     }
   };
 
-  useEffect(() => { fetchRecords(); }, []);
+  useEffect(() => { fetchRecords(); }, [activeTab]);
+
+  // If Admin and no counter selected, show selection screen
+  if (user?.role === 'admin' && !activeTab && !type) {
+    return (
+      <div className="admin-selection-container">
+        <h2>Select Counter</h2>
+        <p>Choose which counter's supplier directory you want to manage</p>
+        <div className="selection-grid">
+          <div className="selection-card wholesale" onClick={() => setActiveTab('Wholesale')}>
+            <div className="icon-box">🚛</div>
+            <h3>Wholesale</h3>
+            <span>Main Warehouse</span>
+          </div>
+          <div className="selection-card retail1" onClick={() => setActiveTab('Retail 1')}>
+            <div className="icon-box">🏭</div>
+            <h3>Retail 1</h3>
+            <span>Counter A</span>
+          </div>
+          <div className="selection-card retail2" onClick={() => setActiveTab('Retail 2')}>
+            <div className="icon-box">🏗️</div>
+            <h3>Retail 2</h3>
+            <span>Counter B</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const openAdd = () => { setForm(emptyForm); setEditId(null); setShowModal(true); };
   const openEdit = (rec) => {
@@ -61,7 +104,7 @@ export default function Suppliers() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, module_type: activeTab }),
       });
       setShowModal(false);
       fetchRecords();
@@ -85,81 +128,107 @@ export default function Suppliers() {
     (r.company || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalReceivable = filtered.filter(r => parseFloat(r.balance) > 0).reduce((sum, r) => sum + parseFloat(r.balance), 0);
-  const totalPayable = filtered.filter(r => parseFloat(r.balance) < 0).reduce((sum, r) => sum + Math.abs(parseFloat(r.balance)), 0);
+  const totalReceivable = filtered.filter(r => parseFloat(r.balance) < 0).reduce((sum, r) => sum + Math.abs(parseFloat(r.balance)), 0);
+  const totalPayable = filtered.filter(r => parseFloat(r.balance) > 0).reduce((sum, r) => sum + parseFloat(r.balance), 0);
 
   return (
     <div className="module-page">
       <div className="module-header">
         <div className="module-title">
-          <div className="module-icon investment-icon"><UserSquare2 size={28} /></div>
+          <div className="module-icon investment-icon" style={{background: '#fff7ed', color: '#f59e0b'}}><Package size={28} /></div>
           <div>
-            <h1>Supplier Directory</h1>
-            <p>Manage vendors, companies, and ledger balances</p>
+            <h1>{activeTab} Suppliers</h1>
+            <p>Manage vendors, factory contacts and purchase ledgers</p>
           </div>
         </div>
+
+        {user?.role === 'admin' && !type && (
+          <div className="counter-switcher">
+            <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
+            <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
+            <button className={activeTab === 'Retail 2' ? 'active' : ''} onClick={() => setActiveTab('Retail 2')}>Retail 2</button>
+          </div>
+        )}
+
         <button className="btn-primary" onClick={openAdd}>
           <Plus size={18} /> Add New Supplier
         </button>
       </div>
 
-      <div className="summary-row">
-        <div className="summary-card">
-          <span className="summary-label">Total Suppliers</span>
-          <span className="summary-value">{filtered.length}</span>
+      <div className="stats-grid-pos">
+        <div className="pos-stat-card">
+          <div className="icon orange"><Building size={24} /></div>
+          <div className="info">
+            <span className="label">Total Vendors</span>
+            <span className="value">{filtered.length} Companies</span>
+          </div>
         </div>
-        <div className="summary-card">
-          <span className="summary-label">Total Receivable</span>
-          <span className="summary-value green">Rs. {totalReceivable.toLocaleString()}</span>
+        <div className="pos-stat-card">
+          <div className="icon red"><CreditCard size={24} /></div>
+          <div className="info">
+            <span className="label">Pending Payments</span>
+            <span className="value">Rs. {totalPayable.toLocaleString()}</span>
+          </div>
         </div>
-        <div className="summary-card">
-          <span className="summary-label">Total Payable</span>
-          <span className="summary-value red">Rs. {totalPayable.toLocaleString()}</span>
-        </div>
-        <div className="summary-card">
-          <span className="summary-label">Active Vouchers</span>
-          <span className="summary-value accent">{filtered.filter(r => parseFloat(r.balance) !== 0).length}</span>
+        <div className="pos-stat-card">
+          <div className="icon green"><Banknote size={24} /></div>
+          <div className="info">
+            <span className="label">Advance Paid</span>
+            <span className="value">Rs. {totalReceivable.toLocaleString()}</span>
+          </div>
         </div>
       </div>
 
-      <div className="filter-row">
-        <div className="search-box">
-          <Search size={16} />
+      <div className="pos-table-actions">
+        <div className="search-bar">
+          <Search size={18} />
           <input type="text" placeholder="Search by name or company..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
 
-      <div className="table-wrapper">
-        <table className="data-table">
+      <div className="module-table-container">
+        <table className="module-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Company</th>
-              <th>Contact</th>
-              <th>Balance (Rs.)</th>
-              <th>Actions</th>
+              <th>Company / Brand</th>
+              <th>Contact Person</th>
+              <th>Location</th>
+              <th>Ledger Balance</th>
+              <th style={{textAlign: 'center'}}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan="5" className="empty-row">No suppliers found.</td></tr>
+              <tr><td colSpan="5" className="empty-msg">No suppliers found in {activeTab}.</td></tr>
             ) : (
               filtered.map((rec) => (
                 <tr key={rec.id}>
-                  <td><strong>{rec.name}</strong></td>
-                  <td><div style={{display:'flex', alignItems:'center', gap:'4px'}}><Building size={14} color="#64748b"/> {rec.company || "—"}</div></td>
+                  <td>
+                    <div className="prod-main-info">
+                      <span className="name">{rec.company || "N/A"}</span>
+                      <span className="v-num"><Package size={12}/> {rec.name}</span>
+                    </div>
+                  </td>
                   <td>
                     <div style={{display:'flex', flexDirection:'column', gap:'2px'}}>
-                      <div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'0.8rem'}}><Phone size={12}/> {rec.phone || "—"}</div>
+                      <div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'0.85rem', fontWeight:'600'}}><Phone size={12}/> {rec.phone || "—"}</div>
                       <div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'0.8rem', color:'#94a3b8'}}><Mail size={12}/> {rec.email || "—"}</div>
                     </div>
                   </td>
-                  <td className={`amount ${parseFloat(rec.balance) > 0 ? 'green' : parseFloat(rec.balance) < 0 ? 'red' : ''}`}>
-                    Rs. {parseFloat(rec.balance).toLocaleString()}
+                  <td><div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'0.85rem'}}><MapPin size={12}/> {rec.address || "—"}</div></td>
+                  <td className="bold">
+                    <span className={parseFloat(rec.balance) > 0 ? 'text-red' : parseFloat(rec.balance) < 0 ? 'text-green' : ''}>
+                      Rs. {Math.abs(parseFloat(rec.balance)).toLocaleString()}
+                      <small style={{display:'block', fontSize:'0.65rem', fontWeight:'normal'}}>
+                        {parseFloat(rec.balance) > 0 ? 'Payable' : parseFloat(rec.balance) < 0 ? 'Advance' : 'Clear'}
+                      </small>
+                    </span>
                   </td>
-                  <td className="actions">
-                    <button className="btn-icon edit" onClick={() => openEdit(rec)}><Pencil size={15} /></button>
-                    <button className="btn-icon delete" onClick={() => handleDelete(rec.id)}><Trash2 size={15} /></button>
+                  <td>
+                    <div className="adjust-btns">
+                      <button className="btn-adjust plus" onClick={() => openEdit(rec)} title="Edit"><Pencil size={14} /></button>
+                      <button className="btn-adjust minus" onClick={() => handleDelete(rec.id)} title="Delete"><Trash2 size={14} /></button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -172,48 +241,63 @@ export default function Suppliers() {
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{editId ? "Edit Supplier" : "Add Supplier"}</h3>
+              <h3>{editId ? "Edit Supplier Record" : "Add New Factory/Vendor"}</h3>
               <button className="modal-close" onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
-            <form onSubmit={handleSubmit} className="modal-form">
-              <div className="form-group full-width">
-                <label>Supplier Name *</label>
-                <input type="text" required value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </div>
-              <div className="form-row">
+            <form onSubmit={handleSubmit}>
+              <div className="section-label">Company Information</div>
+              <div className="form-grid">
                 <div className="form-group">
-                  <label>Company Name</label>
-                  <input type="text" value={form.company}
-                    onChange={(e) => setForm({ ...form, company: e.target.value })} />
+                  <label>Company Name *</label>
+                  <div className="input-wrapper">
+                    <Building size={18} />
+                    <input type="text" required value={form.company} placeholder="e.g. Lucky Cement"
+                      onChange={(e) => setForm({ ...form, company: e.target.value })} />
+                  </div>
                 </div>
                 <div className="form-group">
-                  <label>Phone</label>
-                  <input type="text" value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Email</label>
-                  <input type="email" value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                  <label>Contact Person</label>
+                  <div className="input-wrapper">
+                    <ClipboardList size={18} />
+                    <input type="text" value={form.name} placeholder="e.g. Mr. Khan"
+                      onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  </div>
                 </div>
                 <div className="form-group">
-                  <label>Opening Balance (Rs.)</label>
-                  <input type="number" value={form.balance}
-                    onChange={(e) => setForm({ ...form, balance: e.target.value })} />
+                  <label>Phone Number</label>
+                  <div className="input-wrapper">
+                    <Phone size={18} />
+                    <input type="text" value={form.phone} placeholder="e.g. 0300-1234567"
+                      onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Factory Address</label>
+                  <div className="input-wrapper">
+                    <MapPin size={18} />
+                    <input type="text" value={form.address} placeholder="City, Factory Area"
+                      onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                  </div>
                 </div>
               </div>
-              <div className="form-group full-width">
-                <label>Address</label>
-                <input type="text" value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })} />
+
+              <div className="section-label">Financial Balance</div>
+              <div className="form-grid">
+                <div className="form-group full-width">
+                  <label>Initial Balance (Rs.)</label>
+                  <div className="input-wrapper">
+                    <Banknote size={18} />
+                    <input type="number" value={form.balance}
+                      onChange={(e) => setForm({ ...form, balance: e.target.value })} 
+                      placeholder="Positive: Payable to vendor | Negative: Advance paid" />
+                  </div>
+                </div>
               </div>
-              <div className="modal-actions">
+
+              <div className="form-actions">
                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? "Saving..." : editId ? "Update" : "Save"}
+                  {loading ? "Saving..." : editId ? "Update Record" : "Save Supplier"}
                 </button>
               </div>
             </form>

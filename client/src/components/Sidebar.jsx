@@ -17,7 +17,8 @@ import {
   LogOut,
   Home,
   TrendingUp,
-  MoreHorizontal
+  MoreHorizontal,
+  ShoppingCart
 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import '../Styles/Sidebar.scss';
@@ -27,44 +28,66 @@ const Sidebar = () => {
 
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
-    { id: 'wholesale', name: 'Wholesale', path: '/wholesale', icon: <Building2 size={20} /> },
-    { id: 'retail', name: 'Retail Sale', path: '/retail', icon: <Store size={20} /> },
-    { id: 'products', name: 'Products', path: '/products', icon: <Package size={20} /> },
-    { id: 'stock', name: 'Stock', path: '/stock', icon: <Boxes size={20} /> },
-    { id: 'billing', name: 'Billing', path: '/billing', icon: <Receipt size={20} /> },
-    { id: 'customers', name: 'Customers', path: '/customers', icon: <UsersIcon size={20} /> },
-    { id: 'suppliers', name: 'Suppliers', path: '/suppliers', icon: <UserSquare2 size={20} /> },
-    { id: 'transport', name: 'Transport', path: '/transport', icon: <Truck size={20} /> },
-    { id: 'expenses', name: 'Expenses', path: '/expenses', icon: <Wallet size={20} /> },
-    { id: 'salary', name: 'Salary', path: '/salary', icon: <Banknote size={20} /> },
-    { id: 'profit', name: 'Profit', path: '/profit', icon: <LineChart size={20} /> },
-    { id: 'rent', name: 'Rent', path: '/rent', icon: <Home size={20} /> },
-    { id: 'investment', name: 'Investment', path: '/investment', icon: <TrendingUp size={20} /> },
+    { id: 'wholesale', name: 'Wholesale Counter', path: '/wholesale', icon: <Building2 size={20} /> },
+    { id: 'retail1', name: 'Retail 1 Counter', path: '/retail1', icon: <Store size={20} /> },
+    { id: 'retail2', name: 'Retail 2 Counter', path: '/retail2', icon: <Store size={20} /> },
+    { id: 'products', name: 'Product Catalog', path: '/products', icon: <Package size={20} /> },
+    { id: 'stock', name: 'Stock Inventory', path: '/stock', icon: <Boxes size={20} /> },
+    { id: 'billing', name: 'Billing POS', path: '/billing', icon: <ShoppingCart size={20} /> },
+    { id: 'customers', name: 'Customers CRM', path: '/customers', icon: <UsersIcon size={20} /> },
+    { id: 'suppliers', name: 'Suppliers/Factory', path: '/suppliers', icon: <UserSquare2 size={20} /> },
+    { id: 'transport', name: 'Transport Logistics', path: '/transport', icon: <Truck size={20} /> },
+    { id: 'expenses', name: 'Daily Expenses', path: '/expenses', icon: <Wallet size={20} /> },
+    { id: 'salary', name: 'Employee Salary', path: '/salary', icon: <Banknote size={20} /> },
+    { id: 'profit', name: 'Profit & Loss', path: '/profit', icon: <LineChart size={20} /> },
+    { id: 'rent', name: 'Rent Tracking', path: '/rent', icon: <Home size={20} /> },
+    { id: 'investment', name: 'Investments', path: '/investment', icon: <TrendingUp size={20} /> },
     { id: 'other-expenses', name: 'Other Expenses', path: '/other-expenses', icon: <MoreHorizontal size={20} /> },
-    { id: 'users', name: 'Users & Permissions', path: '/users', icon: <ShieldAlert size={20} /> }
+    { id: 'users', name: 'Admin Control', path: '/users', icon: <ShieldAlert size={20} /> }
   ];
 
-  // Filter menu items based on permissions
+  // Filter menu items based on Role and Module
   const filteredMenuItems = menuItems.filter(item => {
-    // Dashboard is always visible
-    if (item.id === 'dashboard') return true;
-    
-    // Users module is ONLY for admin, even if permissions list has it, we strictly enforce it
-    if (item.id === 'users' && user?.role !== 'admin') return false;
-
-    // Admin sees everything
+    // Admin sees EVERYTHING
     if (user?.role === 'admin') return true;
 
-    // Normal users see what is in their permissions array
+    // Dashboard is always visible for everyone
+    if (item.id === 'dashboard') return true;
+
+    // For non-admin users, we strictly limit based on their module_type
+    const userModule = user?.module_type; // e.g. 'Wholesale', 'Retail 1', 'Retail 2'
+
+    // 1. Hide other counter modules
+    if (item.id === 'wholesale' && userModule !== 'Wholesale') return false;
+    if (item.id === 'retail1' && userModule !== 'Retail 1') return false;
+    if (item.id === 'retail2' && userModule !== 'Retail 2') return false;
+
+    // 2. Hide Admin-only modules
+    if (item.id === 'users' || item.id === 'profit' || item.id === 'investment') return false;
+
+    // Fallback to permissions array if available
     return user?.permissions?.includes(item.id);
   });
 
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h2>ERP System</h2>
-        {user && <p style={{ fontSize: '0.8rem', color: '#cbd5e1', marginTop: '5px' }}>Logged in as: {user.name}</p>}
+        <div className="brand-logo">
+           <Building2 size={24} />
+           <h2>Data Waley</h2>
+        </div>
+        <p className="brand-sub">Cement ERP</p>
+        
+        {user && (
+          <div className="user-badge">
+            <div className="user-info">
+              <span className="user-name">{user.name}</span>
+              <span className="user-role">{user.role === 'admin' ? 'System Administrator' : `${user.module_type} Operator`}</span>
+            </div>
+          </div>
+        )}
       </div>
+
       <nav className="sidebar-nav">
         {filteredMenuItems.map((item, idx) => (
           <NavLink 
@@ -72,15 +95,16 @@ const Sidebar = () => {
             to={item.path} 
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
           >
-            {item.icon}
+            <div className="nav-icon">{item.icon}</div>
             <span>{item.name}</span>
           </NavLink>
         ))}
       </nav>
+
       <div className="sidebar-footer">
         <button className="logout-btn" onClick={logout}>
           <LogOut size={20} />
-          <span>Logout</span>
+          <span>Exit System</span>
         </button>
       </div>
     </div>

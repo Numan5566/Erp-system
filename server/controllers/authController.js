@@ -20,7 +20,8 @@ exports.register = async (req, res) => {
     const payload = {
       user: {
         id: user.id,
-        role: user.role
+        role: user.role,
+        module_type: user.module_type
       }
     };
 
@@ -58,7 +59,8 @@ exports.login = async (req, res) => {
     const payload = {
       user: {
         id: user.id,
-        role: user.role
+        role: user.role,
+        module_type: user.module_type
       }
     };
 
@@ -75,6 +77,7 @@ exports.login = async (req, res) => {
             name: user.name, 
             email: user.email, 
             role: user.role,
+            module_type: user.module_type,
             permissions: user.permissions || [] 
           } 
         });
@@ -88,7 +91,7 @@ exports.login = async (req, res) => {
 
 exports.getUser = async (req, res) => {
   try {
-    const userResult = await pool.query('SELECT id, name, email, role, permissions, created_at FROM users WHERE id = $1', [req.user.id]);
+    const userResult = await pool.query('SELECT id, name, email, role, module_type, permissions, created_at FROM users WHERE id = $1', [req.user.id]);
     res.json(userResult.rows[0]);
   } catch (err) {
     console.error(err.message);

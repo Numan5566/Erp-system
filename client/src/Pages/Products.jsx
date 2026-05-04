@@ -1,15 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { 
-  Package, Plus, Pencil, Trash2, X, Search, Filter, 
-  Info, AlertTriangle, CheckCircle2, ChevronRight,
-  TrendingDown, TrendingUp, Boxes, LayoutGrid, List as ListIcon
+  Package, Plus, Pencil, Trash2, X, Search, ChevronLeft, 
+  Layers, Database, Hash, BarChart3, Info, CircleDollarSign, Truck, Tag, Weight,
+  ShoppingCart, ShieldCheck, ClipboardList, Eye, ChevronRight
 } from "lucide-react";
+import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
 const API = "http://localhost:5000/api/products";
 
-const CATEGORIES = ["Cement", "Steel", "Bricks", "Paints", "Electrical", "Plumbing", "Sanitary", "Tools", "Other"];
-const UNITS = ["kg", "Bag", "Piece", "Foot", "Square Foot", "Meter", "Litre", "Dozen", "Bundle"];
+const CATEGORIES = [
+  { name: "Cement", icon: "🧱" },
+  { name: "Iron/Steel", icon: "🏗️" },
+  { name: "Bricks", icon: "🧱" },
+  { name: "Sand", icon: "🏖️" },
+  { name: "Crush/Bajri", icon: "🪨" },
+  { name: "Tiles", icon: "🔲" },
+  { name: "Paint", icon: "🎨" },
+  { name: "Sanitary", icon: "🚿" },
+  { name: "Hardware", icon: "🔧" },
+  { name: "Other", icon: "📦" }
+];
 
 const emptyForm = {
   name: "",
@@ -21,24 +32,34 @@ const emptyForm = {
   stock_quantity: "",
   minimum_stock: "",
   description: "",
-  image_url: "",
 };
 
-export default function Products() {
+export default function Products({ type }) {
+  const { user } = useContext(AuthContext);
+  const [activeTab, setActiveTab] = useState(type || (user?.role === 'admin' ? "" : user?.module_type));
   const [products, setProducts] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
   const [search, setSearch] = useState("");
-  const [filterCategory, setFilterCategory] = useState("All");
-  const [viewMode, setViewMode] = useState("grid"); // grid or table
   const [loading, setLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  useEffect(() => {
+    if (type) {
+      setActiveTab(type);
+    } else if (user?.module_type && user.role !== 'admin') {
+      setActiveTab(user.module_type);
+    }
+  }, [type, user?.module_type, user?.role]);
 
   const fetchProducts = async () => {
+    if (!activeTab) return;
     try {
-      const res = await fetch(API, {
+      const url = `${API}?type=${activeTab}`;
+      const res = await fetch(url, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -48,12 +69,39 @@ export default function Products() {
     }
   };
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { fetchProducts(); }, [activeTab]);
 
-  const openAdd = () => { 
-    setForm(emptyForm); 
-    setEditId(null); 
-    setShowModal(true); 
+  // If Admin and no counter selected, show selection screen
+  if (user?.role === 'admin' && !activeTab && !type) {
+    return (
+      <div className="admin-selection-container">
+        <h2>Select Counter</h2>
+        <p>Choose which counter's product catalog you want to manage</p>
+        <div className="selection-grid">
+          <div className="selection-card wholesale" onClick={() => setActiveTab('Wholesale')}>
+            <div className="icon-box">🧱</div>
+            <h3>Wholesale</h3>
+            <span>Main Warehouse</span>
+          </div>
+          <div className="selection-card retail1" onClick={() => setActiveTab('Retail 1')}>
+            <div className="icon-box">🏗️</div>
+            <h3>Retail 1</h3>
+            <span>Counter A</span>
+          </div>
+          <div className="selection-card retail2" onClick={() => setActiveTab('Retail 2')}>
+            <div className="icon-box">🔲</div>
+            <h3>Retail 2</h3>
+            <span>Counter B</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const openAdd = (cat) => {
+    setForm({ ...emptyForm, category: cat || selectedCategory || "Cement" });
+    setEditId(null);
+    setShowModal(true);
   };
 
   const openEdit = (e, prod) => {
@@ -61,14 +109,13 @@ export default function Products() {
     setForm({
       name: prod.name,
       brand: prod.brand || "",
-      category: prod.category || "Cement",
+      category: prod.category,
       unit: prod.unit || "Bag",
       price: prod.price,
       cost_price: prod.cost_price || "",
       stock_quantity: prod.stock_quantity,
       minimum_stock: prod.minimum_stock || "",
       description: prod.description || "",
-      image_url: prod.image_url || "",
     });
     setEditId(prod.id);
     setShowModal(true);
@@ -85,354 +132,333 @@ export default function Products() {
     try {
       const method = editId ? "PUT" : "POST";
       const url = editId ? `${API}/${editId}` : API;
-      
       const res = await fetch(url, {
         method,
         headers: { 
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, module_type: type || activeTab }),
       });
 
       if (res.ok) {
         setShowModal(false);
         fetchProducts();
-      } else {
-        const errorData = await res.json();
-        alert("Error saving product: " + errorData.error);
       }
     } catch (err) {
-      console.error("Failed to save product", err);
-      alert("Network error: Failed to save product");
+      console.error("Submit Error:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this product?")) return;
+    if (!window.confirm("Are you sure?")) return;
     try {
-      await fetch(`${API}/${id}`, { 
+      await fetch(`${API}/${id}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       fetchProducts();
     } catch (err) {
-      console.error("Failed to delete product", err);
+      console.error("Delete Error:", err);
     }
   };
 
-  const filtered = products.filter((p) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
-                        (p.brand || "").toLowerCase().includes(search.toLowerCase());
-    const matchCat = filterCategory === "All" || p.category === filterCategory;
-    return matchSearch && matchCat;
-  });
-
-  const totalStockValue = filtered.reduce((sum, p) => sum + (parseFloat(p.price) * parseFloat(p.stock_quantity || 0)), 0);
-  const lowStockCount = filtered.filter(p => parseFloat(p.stock_quantity || 0) <= parseFloat(p.minimum_stock || 0)).length;
-
-  const getStockStatus = (prod) => {
-    const qty = parseFloat(prod.stock_quantity || 0);
-    const min = parseFloat(prod.minimum_stock || 0);
-    if (qty <= 0) return { label: "Out of Stock", class: "out-of-stock" };
-    if (qty <= min) return { label: "Low Stock", class: "low-stock" };
-    return { label: "In Stock", class: "in-stock" };
-  };
+  const filteredProducts = products.filter(p => 
+    (!selectedCategory || p.category === selectedCategory) &&
+    (p.name.toLowerCase().includes(search.toLowerCase()) || (p.brand || "").toLowerCase().includes(search.toLowerCase()))
+  );
 
   return (
     <div className="module-page">
       <div className="module-header">
         <div className="module-title">
+          {selectedCategory && (
+            <button className="btn-icon back-btn" onClick={() => setSelectedCategory(null)} style={{marginRight:'15px'}}>
+              <ChevronLeft size={20} />
+            </button>
+          )}
           <div className="module-icon investment-icon"><Package size={28} /></div>
           <div>
-            <h1>Product Inventory</h1>
-            <p>Manage your items, brands, and stock levels</p>
+            <h1>{selectedCategory ? `${selectedCategory} Inventory` : "Product Management"}</h1>
+            <p>Managing {activeTab} product catalog and pricing</p>
           </div>
         </div>
-        <div className="header-actions">
-          <div className="view-toggle">
-            <button className={viewMode === 'grid' ? 'active' : ''} onClick={() => setViewMode('grid')}><LayoutGrid size={18} /></button>
-            <button className={viewMode === 'table' ? 'active' : ''} onClick={() => setViewMode('table')}><ListIcon size={18} /></button>
+
+        {user?.role === 'admin' && !type && (
+          <div className="counter-switcher">
+            <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
+            <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
+            <button className={activeTab === 'Retail 2' ? 'active' : ''} onClick={() => setActiveTab('Retail 2')}>Retail 2</button>
           </div>
-          <button className="btn-primary" onClick={openAdd}>
-            <Plus size={18} /> Add New Product
-          </button>
-        </div>
+        )}
+
+        {user?.role === 'admin' && (
+          <button className="btn-primary" onClick={() => openAdd()}><Plus size={18} /> Add New Product</button>
+        )}
       </div>
 
-      {/* Summary Row */}
-      <div className="summary-row">
-        <div className="summary-card">
-          <span className="summary-label">Total Products</span>
-          <span className="summary-value">{filtered.length}</span>
-        </div>
-        <div className="summary-card">
-          <span className="summary-label">Total Stock Value</span>
-          <span className="summary-value accent">Rs. {totalStockValue.toLocaleString()}</span>
-        </div>
-        <div className="summary-card">
-          <span className="summary-label">Low Stock Items</span>
-          <span className="summary-value orange">{lowStockCount}</span>
-        </div>
-        <div className="summary-card">
-          <span className="summary-label">Inventory Items</span>
-          <span className="summary-value green">{filtered.reduce((sum, p) => sum + parseFloat(p.stock_quantity || 0), 0)}</span>
-        </div>
-      </div>
-
-      {/* Filter Row */}
-      <div className="filter-row">
-        <div className="search-box">
-          <Search size={16} />
+      <div className="pos-table-actions">
+        <div className="search-bar">
+          <Search size={18} />
           <input 
             type="text" 
-            placeholder="Search by name or brand..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search products by name or vehicle number..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
           />
         </div>
-        <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-          <option value="All">All Categories</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
       </div>
 
-      {/* Main Content: Grid or Table */}
-      {viewMode === "grid" ? (
-        <div className="product-grid">
-          {filtered.length === 0 ? (
-            <div className="empty-state">No products found. Add some to get started!</div>
-          ) : (
-            filtered.map((prod) => {
-              const status = getStockStatus(prod);
-              return (
-                <div key={prod.id} className="product-card" onClick={() => openDetail(prod)}>
-                  <div className="product-image">
-                    {prod.image_url ? (
-                      <img src={prod.image_url} alt={prod.name} />
-                    ) : (
-                      <div className="placeholder-img"><Package size={48} /></div>
-                    )}
-                    <span className="category-badge">{prod.category}</span>
-                    <div className="product-actions">
-                      <button className="btn-icon edit" onClick={(e) => openEdit(e, prod)}><Pencil size={14} /></button>
-                      <button className="btn-icon delete" onClick={(e) => handleDelete(e, prod.id)}><Trash2 size={14} /></button>
-                    </div>
-                  </div>
-                  <div className="product-info">
-                    <span className="brand-name">{prod.brand || "Generic"}</span>
-                    <h3>{prod.name}</h3>
-                    <div className="price-row">
-                      <span className="price">Rs. {parseFloat(prod.price).toLocaleString()}</span>
-                      <span className="unit">per {prod.unit}</span>
-                    </div>
-                    <div className={`stock-status ${status.class}`}>
-                      <div className="indicator"></div>
-                      {status.label}: {prod.stock_quantity} {prod.unit}s
-                    </div>
-                  </div>
+      {!selectedCategory ? (
+        <div className="category-grid" style={{marginTop: '20px'}}>
+          {CATEGORIES.map((cat) => {
+            const count = products.filter(p => p.category === cat.name).length;
+            const catStock = products.filter(p => p.category === cat.name).reduce((sum, p) => sum + parseFloat(p.stock_quantity || 0), 0);
+            return (
+              <div key={cat.name} className="category-card" onClick={() => setSelectedCategory(cat.name)}>
+                <div className="category-emoji">{cat.icon}</div>
+                <h3>{cat.name}</h3>
+                <p>{count} Brands | {catStock} Total Units</p>
+                <div className="category-footer">
+                  <span>View Details</span>
+                  <ChevronRight size={16} />
                 </div>
-              );
-            })
-          )}
+              </div>
+            );
+          })}
         </div>
       ) : (
-        <div className="table-wrapper">
-          <table className="data-table">
+        <div className="module-table-container">
+          <table className="module-table">
             <thead>
               <tr>
-                <th>Product</th>
-                <th>Brand</th>
-                <th>Category</th>
-                <th>Price</th>
-                <th>Stock</th>
+                <th>Brand / Product</th>
+                <th>Retail Price</th>
+                <th>Cost Price</th>
+                <th>Current Stock</th>
                 <th>Status</th>
-                <th>Actions</th>
+                {user?.role === 'admin' && <th style={{textAlign: 'center'}}>Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((prod) => {
-                const status = getStockStatus(prod);
-                return (
-                  <tr key={prod.id} onClick={() => openDetail(prod)} style={{cursor: 'pointer'}}>
-                    <td><strong>{prod.name}</strong></td>
-                    <td>{prod.brand || "—"}</td>
-                    <td><span className="tag">{prod.category}</span></td>
-                    <td className="amount">Rs. {parseFloat(prod.price).toLocaleString()}</td>
-                    <td>{prod.stock_quantity} {prod.unit}</td>
-                    <td>
-                      <span className={`badge badge-${status.class}`}>
-                        {status.label}
-                      </span>
-                    </td>
-                    <td className="actions">
-                      <button className="btn-icon edit" onClick={(e) => openEdit(e, prod)}><Pencil size={15} /></button>
-                      <button className="btn-icon delete" onClick={(e) => handleDelete(e, prod.id)}><Trash2 size={15} /></button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filteredProducts.length === 0 ? (
+                <tr><td colSpan="6" className="empty-msg">No products found in {selectedCategory}.</td></tr>
+              ) : (
+                filteredProducts.map((prod) => {
+                  const qty = parseFloat(prod.stock_quantity || 0);
+                  const min = parseFloat(prod.minimum_stock || 0);
+                  const isLow = qty <= min && qty > 0;
+                  const isOut = qty <= 0;
+
+                  return (
+                    <tr key={prod.id} onClick={() => openDetail(prod)}>
+                      <td>
+                        <div className="prod-main-info">
+                          <span className="name">{prod.name}</span>
+                          <span className="v-num"><Truck size={12}/> {prod.brand || 'N/A'}</span>
+                        </div>
+                      </td>
+                      <td><span className="bold">Rs. {parseFloat(prod.price).toLocaleString()}</span></td>
+                      <td><span className="text-muted">Rs. {parseFloat(prod.cost_price || 0).toLocaleString()}</span></td>
+                      <td className="bold">
+                        <span className={isOut ? 'text-red' : isLow ? 'text-orange' : 'text-green'}>
+                          {qty} {prod.unit}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`status-badge ${isOut ? 'cancelled' : isLow ? 'pending' : 'paid'}`}>
+                          {isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
+                        </span>
+                      </td>
+                      {user?.role === 'admin' && (
+                        <td>
+                          <div className="adjust-btns" onClick={(e) => e.stopPropagation()}>
+                            <button className="btn-adjust plus" onClick={(e) => openEdit(e, prod)} title="Edit"><Pencil size={14}/></button>
+                            <button className="btn-adjust minus" onClick={(e) => handleDelete(e, prod.id)} title="Delete"><Trash2 size={14}/></button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Add/Edit Modal */}
+      {/* Detail Modal */}
+      {showDetailModal && selectedProduct && (
+        <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
+          <div className="modal detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="header-info">
+                <Package size={24} color="#3b82f6" />
+                <h3>Product Details</h3>
+              </div>
+              <button className="modal-close" onClick={() => setShowDetailModal(false)}><X size={20} /></button>
+            </div>
+            <div className="detail-body">
+              <div className="detail-title-row">
+                <h2>{selectedProduct.name}</h2>
+                <span className="cat-badge">{selectedProduct.category}</span>
+              </div>
+
+              <div className="stats-mini-grid">
+                <div className="stat-item">
+                   <Truck size={18}/>
+                   <div>
+                     <span className="lab">Vehicle No</span>
+                     <span className="val">{selectedProduct.brand || 'N/A'}</span>
+                   </div>
+                </div>
+                <div className="stat-item">
+                   <CircleDollarSign size={18}/>
+                   <div>
+                     <span className="lab">Retail Price</span>
+                     <span className="val">Rs. {parseFloat(selectedProduct.price).toLocaleString()}</span>
+                   </div>
+                </div>
+                <div className="stat-item">
+                   <Database size={18}/>
+                   <div>
+                     <span className="lab">Current Stock</span>
+                     <span className="val">{selectedProduct.stock_quantity} {selectedProduct.unit}</span>
+                   </div>
+                </div>
+                <div className="stat-item">
+                   <Hash size={18}/>
+                   <div>
+                     <span className="lab">Min Stock</span>
+                     <span className="val">{selectedProduct.minimum_stock} {selectedProduct.unit}</span>
+                   </div>
+                </div>
+              </div>
+
+              {selectedProduct.description && (
+                <div className="detail-desc">
+                  <h4>Description / Notes</h4>
+                  <p>{selectedProduct.description}</p>
+                </div>
+              )}
+
+              <div className="detail-footer">
+                <button className="btn-secondary" onClick={() => setShowDetailModal(false)}>Close</button>
+                {user?.role === 'admin' && (
+                  <button className="btn-primary" onClick={(e) => { setShowDetailModal(false); openEdit(e, selectedProduct); }}>Edit Product</button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Form Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '700px'}}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{editId ? "Edit Product" : "Add New Product"}</h3>
               <button className="modal-close" onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
-            <form onSubmit={handleSubmit} className="modal-form">
-              <div className="form-row">
+            <form onSubmit={handleSubmit}>
+              <div className="section-label">Basic Information</div>
+              <div className="form-grid">
                 <div className="form-group">
-                  <label>Product Name *</label>
-                  <input type="text" required value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="e.g. Lucky Cement" />
+                  <label>Product Name</label>
+                  <div className="input-wrapper">
+                    <Package size={18} />
+                    <input type="text" value={form.name} required placeholder="e.g. DJ Cement"
+                      onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  </div>
                 </div>
                 <div className="form-group">
-                  <label>Brand</label>
-                  <input type="text" value={form.brand}
-                    onChange={(e) => setForm({ ...form, brand: e.target.value })}
-                    placeholder="e.g. Lucky, Maple Leaf" />
+                  <label>Vehicle Number</label>
+                  <div className="input-wrapper">
+                    <Truck size={18} />
+                    <input type="text" value={form.brand} placeholder="e.g. ABC-123"
+                      onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+                  </div>
                 </div>
-              </div>
-              <div className="form-row">
                 <div className="form-group">
                   <label>Category</label>
-                  <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <div className="input-wrapper">
+                    <Tag size={18} />
+                    <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                      {CATEGORIES.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <div className="form-group">
                   <label>Unit</label>
-                  <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
+                  <div className="input-wrapper">
+                    <Weight size={18} />
+                    <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
+                      <option value="Bag">Bag</option>
+                      <option value="Kg">Kg</option>
+                      <option value="Ton">Ton</option>
+                      <option value="Liter">Liter</option>
+                      <option value="Pcs">Pcs</option>
+                      <option value="Feet">Feet</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div className="form-row">
+
+              <div className="section-label">Pricing & Inventory</div>
+              <div className="form-grid">
                 <div className="form-group">
-                  <label>Selling Price (Rs.) *</label>
-                  <input type="number" required min="0" step="0.01" value={form.price}
-                    onChange={(e) => setForm({ ...form, price: e.target.value })}
-                    placeholder="e.g. 1250" />
+                  <label>Retail Price (Selling)</label>
+                  <div className="input-wrapper">
+                    <ShoppingCart size={18} />
+                    <input type="number" step="0.01" value={form.price} required placeholder="0.00"
+                      onChange={(e) => setForm({ ...form, price: e.target.value })} />
+                  </div>
                 </div>
                 <div className="form-group">
-                  <label>Cost Price (Rs.)</label>
-                  <input type="number" min="0" step="0.01" value={form.cost_price}
-                    onChange={(e) => setForm({ ...form, cost_price: e.target.value })}
-                    placeholder="e.g. 1100" />
+                  <label>Cost Price (Purchase)</label>
+                  <div className="input-wrapper">
+                    <CircleDollarSign size={18} />
+                    <input type="number" step="0.01" value={form.cost_price} placeholder="0.00"
+                      onChange={(e) => setForm({ ...form, cost_price: e.target.value })} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Initial Stock Qty</label>
+                  <div className="input-wrapper">
+                    <Database size={18} />
+                    <input type="number" step="0.01" value={form.stock_quantity} required placeholder="0.00"
+                      onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Minimum Stock Alert</label>
+                  <div className="input-wrapper">
+                    <ShieldCheck size={18} />
+                    <input type="number" step="0.01" value={form.minimum_stock} placeholder="0"
+                      onChange={(e) => setForm({ ...form, minimum_stock: e.target.value })} />
+                  </div>
                 </div>
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Initial Stock</label>
-                  <input type="number" min="0" value={form.stock_quantity}
-                    onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })}
-                    placeholder="e.g. 100" />
-                </div>
-                <div className="form-group">
-                  <label>Min. Stock Level (Alert)</label>
-                  <input type="number" min="0" value={form.minimum_stock}
-                    onChange={(e) => setForm({ ...form, minimum_stock: e.target.value })}
-                    placeholder="e.g. 10" />
-                </div>
-              </div>
+
+              <div className="section-label">Additional Notes</div>
               <div className="form-group full-width">
-                <label>Description</label>
-                <textarea 
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="Additional product details..."
-                  rows="3"
-                  className="custom-textarea"
-                />
+                <div className="input-wrapper" style={{display:'block'}}>
+                  <textarea value={form.description} placeholder="Add any specific notes about this product..."
+                    onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                </div>
               </div>
-              <div className="form-group full-width">
-                <label>Image URL (Optional)</label>
-                <input type="text" value={form.image_url}
-                  onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-                  placeholder="https://example.com/image.jpg" />
-              </div>
-              <div className="modal-actions">
+
+              <div className="form-actions">
                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={loading}>
                   {loading ? "Saving..." : editId ? "Update Product" : "Save Product"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Detail View Modal */}
-      {showDetailModal && selectedProduct && (
-        <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
-          <div className="modal detail-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Product Details</h3>
-              <button className="modal-close" onClick={() => setShowDetailModal(false)}><X size={20} /></button>
-            </div>
-            <div className="detail-content">
-              <div className="detail-header">
-                <div className="detail-img">
-                  {selectedProduct.image_url ? (
-                    <img src={selectedProduct.image_url} alt={selectedProduct.name} />
-                  ) : (
-                    <Package size={80} color="#cbd5e1" />
-                  )}
-                </div>
-                <div className="detail-title">
-                  <span className="detail-brand">{selectedProduct.brand || "Generic"}</span>
-                  <h2>{selectedProduct.name}</h2>
-                  <span className="tag">{selectedProduct.category}</span>
-                </div>
-              </div>
-              
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <span className="label">Selling Price</span>
-                  <span className="value highlight">Rs. {parseFloat(selectedProduct.price).toLocaleString()}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="label">Cost Price</span>
-                  <span className="value">Rs. {parseFloat(selectedProduct.cost_price || 0).toLocaleString()}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="label">Current Stock</span>
-                  <span className={`value ${getStockStatus(selectedProduct).class}`}>
-                    {selectedProduct.stock_quantity} {selectedProduct.unit}
-                  </span>
-                </div>
-                <div className="detail-item">
-                  <span className="label">Min. Stock Level</span>
-                  <span className="value">{selectedProduct.minimum_stock || 0} {selectedProduct.unit}</span>
-                </div>
-              </div>
-
-              {selectedProduct.description && (
-                <div className="detail-description">
-                  <span className="label">Description</span>
-                  <p>{selectedProduct.description}</p>
-                </div>
-              )}
-
-              <div className="detail-footer">
-                <div className="profit-badge">
-                  <TrendingUp size={16} />
-                  Margin: Rs. {(parseFloat(selectedProduct.price) - parseFloat(selectedProduct.cost_price || 0)).toLocaleString()}
-                </div>
-                <button className="btn-primary" onClick={(e) => { setShowDetailModal(false); openEdit(e, selectedProduct); }}>
-                  <Pencil size={16} /> Edit Product
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
