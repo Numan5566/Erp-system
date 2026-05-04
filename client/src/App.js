@@ -19,6 +19,9 @@ import Profit from "./Pages/Profit.jsx";
 import UsersManager from "./Pages/UsersManager.jsx";
 import Wholesale from "./Pages/Wholesale.jsx";
 import Retail from "./Pages/Retail.jsx";
+import Rent from "./Pages/Rent.jsx";
+import Investment from "./Pages/Investment.jsx";
+import OtherExpenses from "./Pages/OtherExpenses.jsx";
 
 function App() {
   return (
@@ -43,6 +46,9 @@ function App() {
           <Route path="/salary" element={<PrivateRoute><MainLayout><Salary /></MainLayout></PrivateRoute>} />
           <Route path="/profit" element={<PrivateRoute><MainLayout><Profit /></MainLayout></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute><MainLayout><UsersManager /></MainLayout></PrivateRoute>} />
+          <Route path="/rent" element={<PrivateRoute><MainLayout><Rent /></MainLayout></PrivateRoute>} />
+          <Route path="/investment" element={<PrivateRoute><MainLayout><Investment /></MainLayout></PrivateRoute>} />
+          <Route path="/other-expenses" element={<PrivateRoute><MainLayout><OtherExpenses /></MainLayout></PrivateRoute>} />
         </Routes>
       </Router>
     </AuthProvider>

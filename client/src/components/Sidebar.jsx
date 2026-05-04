@@ -14,7 +14,10 @@ import {
   Banknote, 
   LineChart,
   ShieldAlert,
-  LogOut
+  LogOut,
+  Home,
+  TrendingUp,
+  MoreHorizontal
 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import '../Styles/Sidebar.scss';
@@ -35,6 +38,9 @@ const Sidebar = () => {
     { id: 'expenses', name: 'Expenses', path: '/expenses', icon: <Wallet size={20} /> },
     { id: 'salary', name: 'Salary', path: '/salary', icon: <Banknote size={20} /> },
     { id: 'profit', name: 'Profit', path: '/profit', icon: <LineChart size={20} /> },
+    { id: 'rent', name: 'Rent', path: '/rent', icon: <Home size={20} /> },
+    { id: 'investment', name: 'Investment', path: '/investment', icon: <TrendingUp size={20} /> },
+    { id: 'other-expenses', name: 'Other Expenses', path: '/other-expenses', icon: <MoreHorizontal size={20} /> },
     { id: 'users', name: 'Users & Permissions', path: '/users', icon: <ShieldAlert size={20} /> }
   ];
 

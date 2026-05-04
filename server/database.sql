@@ -100,3 +100,40 @@ CREATE TABLE IF NOT EXISTS salary (
     status VARCHAR(50) DEFAULT 'Paid',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 11. Rent Table
+CREATE TABLE IF NOT EXISTS rent (
+    id SERIAL PRIMARY KEY,
+    property_name VARCHAR(255) NOT NULL,
+    landlord_name VARCHAR(255),
+    amount DECIMAL(10, 2) NOT NULL,
+    payment_date DATE DEFAULT CURRENT_DATE,
+    status VARCHAR(50) DEFAULT 'Paid',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 12. Investments Table
+CREATE TABLE IF NOT EXISTS investments (
+    id SERIAL PRIMARY KEY,
+    investment_name VARCHAR(255) NOT NULL,
+    category VARCHAR(100),
+    amount_invested DECIMAL(12, 2) NOT NULL,
+    expected_return DECIMAL(12, 2),
+    investment_date DATE DEFAULT CURRENT_DATE,
+    status VARCHAR(50) DEFAULT 'Active',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 13. Other Expenses Table
+CREATE TABLE IF NOT EXISTS other_expenses (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    category VARCHAR(100),
+    amount DECIMAL(10, 2) NOT NULL,
+    expense_date DATE DEFAULT CURRENT_DATE,
+    payment_method VARCHAR(50) DEFAULT 'Cash',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

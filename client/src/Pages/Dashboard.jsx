@@ -11,7 +11,10 @@ import {
   Wallet, 
   Banknote, 
   LineChart, 
-  UserSquare2
+  UserSquare2,
+  Home,
+  TrendingUp,
+  MoreHorizontal
 } from "lucide-react";
 import { AuthContext } from '../context/AuthContext';
 import "../Styles/Dashboard.scss";
@@ -28,7 +31,10 @@ export default function Dashboard() {
     { id: "transport", name: "Transport", path: "/transport", icon: <Truck size={32} />, desc: "Fleet & Routes" },
     { id: "expenses", name: "Expenses", path: "/expenses", icon: <Wallet size={32} />, desc: "Daily Costs" },
     { id: "salary", name: "Salary", path: "/salary", icon: <Banknote size={32} />, desc: "Payroll" },
-    { id: "profit", name: "Profit", path: "/profit", icon: <LineChart size={32} />, desc: "Analytics" }
+    { id: "profit", name: "Profit", path: "/profit", icon: <LineChart size={32} />, desc: "Analytics" },
+    { id: "rent", name: "Rent", path: "/rent", icon: <Home size={32} />, desc: "Property Rent" },
+    { id: "investment", name: "Investment", path: "/investment", icon: <TrendingUp size={32} />, desc: "Track Returns" },
+    { id: "other-expenses", name: "Other Expenses", path: "/other-expenses", icon: <MoreHorizontal size={32} />, desc: "Misc. Expenses" }
   ];
 
   const hasPermission = (moduleId) => {
