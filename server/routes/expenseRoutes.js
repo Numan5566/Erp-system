@@ -17,8 +17,8 @@ router.get('/', auth, async (req, res) => {
         params.push(type);
       }
     } else {
-      query += ' WHERE module_type = $1';
-      params.push(req.user.module_type || 'Retail 1');
+      query += ' WHERE module_type = $1 AND user_id = $2';
+      params.push(req.user.module_type || 'Retail 1', req.user.id);
     }
 
     query += ' ORDER BY expense_date DESC';

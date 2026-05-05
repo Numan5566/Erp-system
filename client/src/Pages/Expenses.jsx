@@ -37,6 +37,27 @@ export default function Expenses({ type }) {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("All");
   const [loading, setLoading] = useState(false);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [selectedExpForPay, setSelectedExpForPay] = useState(null);
+  const [payForm, setPayForm] = useState({ source: 'Cash', bank: '' });
+  const [liveBalances, setLiveBalances] = useState({});
+
+  useEffect(() => {
+    if (showModal) {
+      const fetchLiveBalances = async () => {
+        try {
+          const res = await fetch('http://localhost:5000/api/banks/balances', {
+            headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setLiveBalances(data);
+          }
+        } catch (e) { console.error(e); }
+      };
+      fetchLiveBalances();
+    }
+  }, [showModal]);
 
   useEffect(() => {
     if (type) {
@@ -79,8 +100,15 @@ export default function Expenses({ type }) {
       const method = editId ? "PUT" : "POST";
       const url = editId ? `${API}/${editId}` : API;
       
-      // Determine final payment type
       const finalPaymentType = form.payment_source === 'Bank' ? `Bank - ${form.bank_name}` : 'Cash';
+      const targetAccountName = form.payment_source === 'Bank' ? form.bank_name : 'Cash';
+      const amt = parseFloat(form.amount || 0);
+      const currentAvailable = liveBalances[targetAccountName] || 0;
+      
+      if (amt > currentAvailable) {
+        setLoading(false);
+        return;
+      }
       
       const res = await fetch(url, {
         method,
@@ -115,6 +143,10 @@ export default function Expenses({ type }) {
     return matchType && matchSearch;
   });
 
+  const targetAccountName = form.payment_source === 'Bank' ? form.bank_name : 'Cash';
+  const availableBal = liveBalances[targetAccountName] || 0;
+  const isInsufficient = parseFloat(form.amount || 0) > availableBal;
+
   return (
     <div className="module-page">
       <div className="module-header">
@@ -126,7 +158,7 @@ export default function Expenses({ type }) {
           </div>
         </div>
 
-        {user?.role === 'admin' && !type && (
+        {user?.role === 'admin' && !user?.module_type && !type && (
           <div className="counter-switcher">
             <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
             <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
@@ -212,6 +244,9 @@ export default function Expenses({ type }) {
                     <ActionMenu 
                       onEdit={() => { setForm(r); setEditId(r.id); setShowModal(true); }}
                       onDelete={() => handleDelete(r.id)}
+                      extraItems={r.payment_type === 'Pending' ? [
+                        { label: 'Payable', icon: 'pi pi-wallet', command: () => { setSelectedExpForPay(r); setShowPayModal(true); } }
+                      ] : []}
                     />
                   </td>
                 </tr>
@@ -300,6 +335,11 @@ export default function Expenses({ type }) {
                   </div>
                 )}
               </div>
+              {isInsufficient && (
+                <div style={{ color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '10px 14px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                  ⚠️ Insufficient Balance! Available: Rs. {availableBal.toLocaleString()}
+                </div>
+              )}
 
               <div className="section-label">Description & Notes</div>
               <div className="form-group full-width">
@@ -315,11 +355,102 @@ export default function Expenses({ type }) {
 
               <div className="form-actions">
                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={loading}>
+                <button type="submit" className="btn-primary" disabled={loading || isInsufficient}>
                   {loading ? "Processing..." : "Save Expense"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {showPayModal && (
+        <div className="modal-overlay" onClick={() => setShowPayModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3>Pay Transport Fare</h3>
+              <button className="modal-close" onClick={() => setShowPayModal(false)}><X size={20} /></button>
+            </div>
+            
+            <div style={{padding: '20px'}}>
+              <div style={{background: '#fff1f2', padding: '12px', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', border: '1px solid #fecdd3'}}>
+                <span style={{fontWeight: 600, color: '#e11d48'}}>Amount Payable:</span>
+                <span style={{fontWeight: 700, color: '#e11d48'}}>Rs. {parseFloat(selectedExpForPay?.amount).toLocaleString()}</span>
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label style={{display: 'block', marginBottom: '8px', fontWeight: 600}}>Payment Source *</label>
+                <select 
+                  value={payForm.source}
+                  style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none'}}
+                  onChange={(e) => setPayForm({...payForm, source: e.target.value, bank: e.target.value === 'Bank' ? (banks[0]?.bank_name || '') : ''})}
+                >
+                  <option value="Cash">Main Cash (Counter)</option>
+                  <option value="Bank">Bank / Online Account</option>
+                </select>
+              </div>
+
+              {payForm.source === "Bank" && (
+                <div className="form-group" style={{marginBottom: '15px'}}>
+                  <label style={{display: 'block', marginBottom: '8px', fontWeight: 600}}>Select Sending Bank *</label>
+                  <select 
+                    value={payForm.bank} 
+                    onChange={(e) => setPayForm({...payForm, bank: e.target.value})} 
+                    style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', background: '#f0f9ff', borderColor: '#3b82f6'}}
+                    required
+                  >
+                    <option value="">-- Choose Account --</option>
+                    {banks.map(b => (
+                      <option key={b.id} value={b.bank_name}>{b.bank_name} - {b.account_number}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              <div style={{background: '#f8fafc', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '0.85rem', color: '#64748b', border: '1px solid #e2e8f0'}}>
+                <strong>Ref:</strong> {selectedExpForPay?.title}
+              </div>
+
+              <div className="form-actions" style={{display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px'}}>
+                <button type="button" className="btn-secondary" onClick={() => setShowPayModal(false)}>Cancel</button>
+                <button className="btn-primary" style={{background: '#10b981', borderColor: '#10b981'}} disabled={loading} onClick={async () => {
+                   setLoading(true);
+                   try {
+                     const method = payForm.source === 'Bank' ? payForm.bank : 'Cash';
+                     // 1. Check Balance
+                     const balRes = await fetch(`http://localhost:5000/api/banks/balance/${method}?module_type=${activeTab}`, {
+                       headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+                     });
+                     const { balance } = await balRes.json();
+
+                     if (balance < parseFloat(selectedExpForPay.amount)) {
+                       alert(`Insufficient Balance in ${method}! Available: Rs. ${balance.toLocaleString()}`);
+                       setLoading(false);
+                       return;
+                     }
+
+                     // 2. Update Expense
+                     const finalPaymentType = payForm.source === 'Bank' ? `Bank - ${payForm.bank}` : 'Cash';
+                     const res = await fetch(`${API}/${selectedExpForPay.id}`, {
+                       method: 'PUT',
+                       headers: { 
+                         "Content-Type": "application/json",
+                         "Authorization": `Bearer ${localStorage.getItem('token')}`
+                       },
+                       body: JSON.stringify({ ...selectedExpForPay, payment_type: finalPaymentType }),
+                     });
+
+                     if (res.ok) {
+                       setShowPayModal(false);
+                       fetchRecords();
+                       alert("Fare paid successfully!");
+                     }
+                   } catch (err) { alert("Payment failed"); }
+                   setLoading(false);
+                }}>
+                  {loading ? "Processing..." : "Confirm Payment"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

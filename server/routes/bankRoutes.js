@@ -5,6 +5,112 @@ const auth = require('../middleware/auth');
 
 const isAdmin = (req) => req.user.role === 'admin';
 
+// Get real-time balances for all accounts
+router.get('/balances', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const isAdminUser = req.user.role === 'admin';
+
+    // 1. Fetch bank accounts opening balances
+    let accountsQ = 'SELECT bank_name, opening_balance FROM bank_accounts';
+    let params = [];
+    if (!isAdminUser) {
+      accountsQ += ' WHERE user_id = $1';
+      params.push(userId);
+    }
+    const accountsRes = await pool.query(accountsQ, params);
+    
+    const balances = { 'Cash': 0 };
+    accountsRes.rows.forEach(acc => {
+      let name = acc.bank_name.replace(' Account', '');
+      if (name.toLowerCase() === 'cash') name = 'Cash';
+      balances[name] = parseFloat(acc.opening_balance) || 0;
+    });
+
+    // 2. Fetch sales
+    let salesQ = 'SELECT net_amount, paid_amount, payment_type FROM sales';
+    let salesParams = [];
+    if (!isAdminUser) {
+      salesQ += ' WHERE user_id = $1';
+      salesParams.push(userId);
+    }
+    const salesRes = await pool.query(salesQ, salesParams);
+    salesRes.rows.forEach(s => {
+      let method = s.payment_type || 'Cash';
+      let cleanMethod = method.replace('Bank - ', '');
+      if (cleanMethod === 'Cash Account' || cleanMethod.toLowerCase() === 'cash') {
+        cleanMethod = 'Cash';
+      }
+      if (!balances[cleanMethod]) balances[cleanMethod] = 0;
+      balances[cleanMethod] += parseFloat(s.paid_amount) || 0;
+    });
+
+    // 3. Fetch purchases & supplier payments
+    let purchasesQ = 'SELECT paid_amount, payment_type FROM purchases';
+    let purchasesParams = [];
+    if (!isAdminUser) {
+      purchasesQ += ' WHERE user_id = $1';
+      purchasesParams.push(userId);
+    }
+    const purchasesRes = await pool.query(purchasesQ, purchasesParams);
+    purchasesRes.rows.forEach(p => {
+      let method = p.payment_type || 'Cash';
+      let cleanMethod = method.replace('Bank - ', '');
+      if (cleanMethod === 'Cash Account' || cleanMethod.toLowerCase() === 'cash') {
+        cleanMethod = 'Cash';
+      }
+      if (!balances[cleanMethod]) balances[cleanMethod] = 0;
+      balances[cleanMethod] -= parseFloat(p.paid_amount) || 0;
+    });
+
+    // 4. Fetch expenses
+    let expensesQ = 'SELECT amount, payment_type FROM expenses';
+    let expensesParams = [];
+    if (!isAdminUser) {
+      expensesQ += ' WHERE user_id = $1';
+      expensesParams.push(userId);
+    }
+    const expensesRes = await pool.query(expensesQ, expensesParams);
+    expensesRes.rows.forEach(e => {
+      let method = e.payment_type || 'Cash';
+      let cleanMethod = method.replace('Bank - ', '');
+      if (cleanMethod === 'Cash Account' || cleanMethod.toLowerCase() === 'cash') {
+        cleanMethod = 'Cash';
+      }
+      if (!balances[cleanMethod]) balances[cleanMethod] = 0;
+      balances[cleanMethod] -= parseFloat(e.amount) || 0;
+    });
+
+    // 5. Fetch salaries
+    let salariesQ = 'SELECT amount FROM salary';
+    let salariesParams = [];
+    if (!isAdminUser) {
+      salariesQ += ' WHERE user_id = $1';
+      salariesParams.push(userId);
+    }
+    const salariesRes = await pool.query(salariesQ, salariesParams);
+    salariesRes.rows.forEach(s => {
+      balances['Cash'] -= parseFloat(s.amount) || 0;
+    });
+
+    // 6. Fetch rents
+    let rentsQ = 'SELECT amount FROM rent';
+    let rentsParams = [];
+    if (!isAdminUser) {
+      rentsQ += ' WHERE user_id = $1';
+      rentsParams.push(userId);
+    }
+    const rentsRes = await pool.query(rentsQ, rentsParams);
+    rentsRes.rows.forEach(r => {
+      balances['Cash'] -= parseFloat(r.amount) || 0;
+    });
+
+    res.json(balances);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get all banks
 router.get('/', auth, async (req, res) => {
   try {
@@ -59,6 +165,44 @@ router.delete('/:id', auth, async (req, res) => {
       await pool.query('DELETE FROM bank_accounts WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
     }
     res.json({ message: 'Bank deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get Current Balance for a payment method
+router.get('/balance/:method', auth, async (req, res) => {
+  try {
+    const { method } = req.params;
+    const { module_type } = req.query;
+    const finalModule = module_type || req.user.module_type || 'Wholesale';
+    const searchPattern = method === 'Cash' ? 'Cash' : `%${method}%`;
+
+    const salesSum = await pool.query("SELECT SUM(paid_amount) FROM sales WHERE payment_type LIKE $1 AND sale_type = $2", [searchPattern, finalModule]);
+    const expSum = await pool.query("SELECT SUM(amount) FROM expenses WHERE payment_type LIKE $1 AND module_type = $2", [searchPattern, finalModule]);
+    
+    let supPaid = 0;
+    if (method === 'Cash') {
+      const supSum = await pool.query("SELECT SUM(paid_amount) FROM purchases WHERE module_type = $1", [finalModule]);
+      supPaid = parseFloat(supSum.rows[0].sum || 0);
+    } else {
+      const supSum = await pool.query("SELECT SUM(delivery_charges) FROM purchases WHERE fare_payment_type LIKE $1 AND module_type = $2", [searchPattern, finalModule]);
+      supPaid = parseFloat(supSum.rows[0].sum || 0);
+    }
+    
+    let openingBal = 0;
+    if (method === 'Cash') {
+       const bankRes = await pool.query("SELECT SUM(opening_balance) FROM bank_accounts WHERE bank_name ILIKE '%Cash%'");
+       openingBal = parseFloat(bankRes.rows[0].sum || 0);
+    } else {
+       const bankRes = await pool.query("SELECT SUM(opening_balance) FROM bank_accounts WHERE bank_name = $1", [method]);
+       openingBal = parseFloat(bankRes.rows[0].sum || 0);
+    }
+    
+    const balance = (parseFloat(salesSum.rows[0].sum || 0) + openingBal) - 
+                    (parseFloat(expSum.rows[0].sum || 0) + supPaid);
+                    
+    res.json({ balance });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

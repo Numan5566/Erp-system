@@ -55,6 +55,10 @@ export default function Billing({ type }) {
   const [returnStep, setReturnStep] = useState(1);
   const [returnSaleDetails, setReturnSaleDetails] = useState(null);
   const [selectedItemsToReturn, setSelectedItemsToReturn] = useState([]);
+  const [refundAmount, setRefundAmount] = useState(0);
+  const [refundMethod, setRefundMethod] = useState("Cash");
+  const [showReturnSlip, setShowReturnSlip] = useState(false);
+  const [lastReturnSlipData, setLastReturnSlipData] = useState(null);
   const [bankDigits, setBankDigits] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -256,12 +260,23 @@ export default function Billing({ type }) {
           sale_id: returnBillNo,
           items_to_return: selectedItemsToReturn
             .filter(i => i.selected)
-            .map(i => ({ ...i, qty: i.return_qty })) // Use the edited return quantity
+            .map(i => ({ ...i, qty: i.return_qty })),
+          refund_amount: refundAmount,
+          refund_method: refundMethod
         })
       });
       const data = await res.json();
       if (res.ok) {
+        setLastReturnSlipData({
+          sale_id: returnBillNo,
+          customer_name: returnSaleDetails?.customer_name || "N/A",
+          items_to_return: selectedItemsToReturn.filter(i => i.selected),
+          refund_amount: refundAmount,
+          refund_method: refundMethod,
+          date: new Date().toLocaleString()
+        });
         setShowReturnModal(false);
+        setShowReturnSlip(true);
         setReturnBillNo("");
         fetchData();
         alert("Stock successfully returned to inventory!");
@@ -423,7 +438,7 @@ export default function Billing({ type }) {
           </div>
         </div>
 
-        {user?.role === 'admin' && !type && (
+        {user?.role === 'admin' && !user?.module_type && !type && (
           <div className="counter-switcher">
             <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
             <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
@@ -948,7 +963,11 @@ export default function Billing({ type }) {
                         <tr key={row.id}>
                           <td>{new Date(row.created_at).toLocaleDateString()}</td>
                           <td>
-                            <strong>Invoice #SAL-{row.id}</strong>
+                            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                              <strong>Invoice #SAL-{row.id}</strong>
+                              {row.status === 'Returned' && <span style={{fontSize: '10px', background: '#fee2e2', color: '#b91c1c', padding: '2px 6px', borderRadius: '4px', fontWeight: 800}}>RETURNED</span>}
+                              {row.status === 'Partially Returned' && <span style={{fontSize: '10px', background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: '4px', fontWeight: 800}}>PARTIAL</span>}
+                            </div>
                             <br/><small style={{color:'#64748b'}}>{typeof row.items === 'string' ? JSON.parse(row.items).map(i => i.name).join(", ") : (row.items || []).map(i => i.name).join(", ")}</small>
                           </td>
                           <td className="bold">Rs. {parseFloat(row.net_amount).toLocaleString()}</td>
@@ -1110,15 +1129,49 @@ export default function Billing({ type }) {
                     </table>
                   </div>
 
+                  {/* Refund Details */}
+                  <div className="refund-summary mb-4 p-3" style={{background: '#fff1f2', borderRadius: '8px', border: '1px solid #fecdd3'}}>
+                    <div className="flex justify-content-between mb-2">
+                      <span className="font-bold">Total Return Value:</span>
+                      <span className="font-bold text-red-600">
+                        Rs. {selectedItemsToReturn.filter(i => i.selected).reduce((sum, i) => sum + (i.return_qty * i.rate), 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="grid">
+                      <div className="col-6">
+                        <label className="block mb-1 text-xs font-bold">Refund Amount</label>
+                        <InputText 
+                          type="number" 
+                          value={refundAmount} 
+                          onChange={e => setRefundAmount(parseFloat(e.target.value) || 0)}
+                          className="p-inputtext-sm w-full"
+                          placeholder="Cash back amount"
+                        />
+                      </div>
+                      <div className="col-6">
+                        <label className="block mb-1 text-xs font-bold">Refund Via</label>
+                        <Dropdown 
+                          value={refundMethod} 
+                          options={['Cash', ...bankAccounts.filter(b => b.bank_name.toLowerCase() !== 'cash').map(b => b.bank_name)]} 
+                          onChange={e => setRefundMethod(e.value)}
+                          className="p-inputtext-sm w-full"
+                        />
+                      </div>
+                    </div>
+                    <p style={{fontSize: '0.7rem', color: '#b91c1c', marginTop: '8px'}}>
+                      Note: Refund amount will be deducted from {refundMethod} in Accounts.
+                    </p>
+                  </div>
+
                   <div className="flex justify-content-between align-items-center">
                     <Button type="button" label="Back" onClick={() => setReturnStep(1)} className="p-button-text" />
                     <Button 
                       type="button" 
-                      label={returnLoading ? "Processing..." : "Process Selected Returns"} 
+                      label={returnLoading ? "Processing..." : "Confirm & Process Return"} 
                       icon="pi pi-check" 
                       onClick={handleSaleReturn} 
                       disabled={returnLoading || !selectedItemsToReturn.some(i => i.selected)} 
-                      className="p-button-danger" 
+                      className="p-button-danger shadow-2" 
                     />
                   </div>
                 </div>
@@ -1127,6 +1180,75 @@ export default function Billing({ type }) {
           </div>
         </div>
       )}
+      
+      {/* Return Slip Modal */}
+      <Dialog 
+        header="Return Receipt / Slip" 
+        visible={showReturnSlip} 
+        onHide={() => setShowReturnSlip(false)}
+        style={{width: '400px'}}
+        className="p-dialog-custom"
+        footer={(
+          <div className="flex justify-content-end gap-2 no-print">
+            <Button label="Print Slip" icon="pi pi-print" onClick={() => window.print()} className="p-button-primary" />
+            <Button label="Close" onClick={() => setShowReturnSlip(false)} className="p-button-text" />
+          </div>
+        )}
+      >
+        {lastReturnSlipData && (
+          <div id="return-slip-print" className="p-3" style={{fontFamily: 'monospace', color: '#000'}}>
+            <div style={{textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '10px', marginBottom: '10px'}}>
+              <h2 style={{margin: 0}}>DATA WALEY CEMENT</h2>
+              <p style={{margin: '2px 0', fontSize: '0.8rem'}}>SALE RETURN RECEIPT</p>
+              <p style={{margin: '2px 0', fontSize: '0.7rem'}}>{lastReturnSlipData.date}</p>
+            </div>
+            
+            <div style={{fontSize: '0.8rem', marginBottom: '10px'}}>
+              <p><strong>Original Bill:</strong> #SAL-{lastReturnSlipData.sale_id}</p>
+              <p><strong>Customer:</strong> {lastReturnSlipData.customer_name}</p>
+            </div>
+
+            <table style={{width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', marginBottom: '10px'}}>
+              <thead>
+                <tr style={{borderBottom: '1px solid #000'}}>
+                  <th style={{textAlign: 'left'}}>Item</th>
+                  <th style={{textAlign: 'right'}}>Qty</th>
+                  <th style={{textAlign: 'right'}}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lastReturnSlipData.items_to_return.map((item, i) => (
+                  <tr key={i}>
+                    <td>{item.product_name}</td>
+                    <td style={{textAlign: 'right'}}>{item.return_qty}</td>
+                    <td style={{textAlign: 'right'}}>Rs.{(item.return_qty * item.rate).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div style={{borderTop: '1px dashed #000', paddingTop: '10px', fontSize: '0.9rem'}}>
+              <div className="flex justify-content-between mb-1">
+                <span>Returned Value:</span>
+                <span>Rs. {lastReturnSlipData.items_to_return.reduce((sum, i) => sum + (i.return_qty * i.rate), 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-content-between mb-1" style={{fontWeight: 800}}>
+                <span>Refund Given ({lastReturnSlipData.refund_method}):</span>
+                <span>Rs. {lastReturnSlipData.refund_amount.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-content-between" style={{fontSize: '0.75rem', marginTop: '5px'}}>
+                <span>Balance Adjusted:</span>
+                <span>Rs. {(lastReturnSlipData.items_to_return.reduce((sum, i) => sum + (i.return_qty * i.rate), 0) - lastReturnSlipData.refund_amount).toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div style={{marginTop: '30px', textAlign: 'center', borderTop: '1px solid #eee', paddingTop: '10px', fontSize: '0.7rem'}}>
+              <p>Thank you for your business!</p>
+              <p>Software by Antigravity AI</p>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }

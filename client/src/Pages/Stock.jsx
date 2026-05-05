@@ -23,7 +23,7 @@ export default function Stock({ type }) {
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receiveForm, setReceiveForm] = useState({ 
     supplier_id: "", quantity: "", vehicle_number: "", vehicle_id: "", 
-    rate: "", paid_amount: "0", delivery_charges: "0", fare_payment_type: "Cash" 
+    rate: "", paid_amount: "0", delivery_charges: "0", fare_status: "Pending" 
   });
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -132,7 +132,27 @@ export default function Stock({ type }) {
       alert("Invalid Payment: Paid amount cannot exceed total purchase cost!");
       return;
     }
+    
+    const amt = parseFloat(receiveForm.paid_amount || 0);
     setLoading(true);
+    if (amt > 0) {
+      try {
+        // Fetch live balances
+        const balRes = await fetch('http://localhost:5000/api/banks/balances', {
+          headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (balRes.ok) {
+          const balances = await balRes.json();
+          const currentAvailable = balances['Cash'] || 0;
+          
+          if (amt > currentAvailable) {
+            alert(`Insufficient Balance! You only have Rs. ${currentAvailable.toLocaleString()} in your Cash account. You cannot make a payment of Rs. ${amt.toLocaleString()} for this stock!`);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (err) { console.error("Balance fetch failed:", err); }
+    }
     try {
       const res = await fetch(`http://localhost:5000/api/purchases`, {
         method: "POST",
@@ -147,6 +167,8 @@ export default function Stock({ type }) {
           quantity: receiveForm.quantity,
           rate: receiveForm.rate,
           paid_amount: receiveForm.paid_amount,
+          delivery_charges: receiveForm.delivery_charges,
+          fare_status: receiveForm.fare_status,
           module_type: activeTab
         })
       });
@@ -154,7 +176,7 @@ export default function Stock({ type }) {
         setShowReceiveModal(false);
         setReceiveForm({ 
           supplier_id: "", quantity: "", vehicle_number: "", vehicle_id: "", 
-          rate: "", paid_amount: "0", delivery_charges: "0", fare_payment_type: "Cash" 
+          rate: "", paid_amount: "0", delivery_charges: "0", fare_status: "Pending" 
         });
         fetchData();
       }
@@ -223,7 +245,7 @@ export default function Stock({ type }) {
         </div>
 
         {/* Counter Switcher for Admin */}
-        {user?.role === 'admin' && !type && (
+        {user?.role === 'admin' && !user?.module_type && !type && (
           <div className="counter-switcher">
             <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
             <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
@@ -497,13 +519,13 @@ export default function Stock({ type }) {
                 </div>
 
                 <div className="form-group">
-                  <label>Fare Payment Mode</label>
+                  <label>Fare Status</label>
                   <div className="input-wrapper">
                     <Tag size={18} />
-                    <select value={receiveForm.fare_payment_type} onChange={(e) => setReceiveForm({ ...receiveForm, fare_payment_type: e.target.value })}>
-                      <option value="Cash">Cash</option>
-                      {/* You can add bank accounts here if needed, or keep it simple */}
-                      <option value="Bank">Bank Account</option>
+                    <select value={receiveForm.fare_status} onChange={(e) => setReceiveForm({ ...receiveForm, fare_status: e.target.value })}>
+                      <option value="Pending">Pending</option>
+                      <option value="Paid">Paid (Cash)</option>
+                      <option value="Free">Free</option>
                     </select>
                   </div>
                 </div>

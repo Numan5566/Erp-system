@@ -17,8 +17,8 @@ router.get('/ledger/all', auth, async (req, res) => {
     let params = [];
 
     if (!isAdmin(req)) {
-      query += ' WHERE p.module_type = $1';
-      params.push(req.user.module_type || 'Retail 1');
+      query += ' WHERE p.module_type = $1 AND p.user_id = $2';
+      params.push(req.user.module_type || 'Retail 1', req.user.id);
     }
 
     query += ' ORDER BY p.purchase_date DESC';
@@ -43,8 +43,8 @@ router.get('/supplier/:supplierId', auth, async (req, res) => {
 
     let pIdx = 2;
     if (!isAdmin(req)) {
-      query += ` AND p.module_type = $${pIdx++}`;
-      params.push(req.user.module_type || 'Retail 1');
+      query += ` AND p.module_type = $${pIdx++} AND p.user_id = $${pIdx++}`;
+      params.push(req.user.module_type || 'Retail 1', req.user.id);
     } else if (type) {
       query += ` AND p.module_type = $${pIdx++}`;
       params.push(type);
@@ -70,7 +70,7 @@ router.post('/', auth, async (req, res) => {
     await client.query('BEGIN');
     const { 
       supplier_id, product_id, vehicle_number, quantity, rate, 
-      paid_amount, module_type, vehicle_id, delivery_charges, fare_payment_type 
+      paid_amount, module_type, vehicle_id, delivery_charges, fare_status 
     } = req.body;
     
     const qty = parseFloat(quantity) || 0;
@@ -94,7 +94,7 @@ router.post('/', auth, async (req, res) => {
       `INSERT INTO purchases 
       (supplier_id, product_id, vehicle_number, vehicle_id, quantity, rate, total_amount, paid_amount, balance_amount, delivery_charges, fare_payment_type, module_type, user_id) 
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
-      [supplier_id, product_id, vehicle_number, vId || null, qty, rt, totalAmount, paid, balanceAmount, fare, fare_payment_type || 'Cash', finalModule, req.user.id]
+      [supplier_id, product_id, vehicle_number, vId || null, qty, rt, totalAmount, paid, balanceAmount, fare, fare_status || 'Pending', finalModule, req.user.id]
     );
 
     // 2. Update Product Stock
@@ -109,23 +109,28 @@ router.post('/', auth, async (req, res) => {
       [balanceAmount, supplier_id]
     );
 
-    // 4. Update Vehicle Earnings (if vehicle_id provided)
-    if (vehicle_id && fare > 0) {
-      await client.query(
-        `UPDATE vehicles SET total_earnings = total_earnings + $1 WHERE id = $2`,
-        [fare, vehicle_id]
-      );
+    // 4. Update Vehicle Earnings (if vehicle provided)
+    if ((vId || vehicle_number) && fare > 0 && fare_status !== 'Free') {
+      if (vId) {
+        await client.query(
+          `UPDATE vehicles SET total_earnings = total_earnings + $1 WHERE id = $2`,
+          [fare, vId]
+        );
+      }
 
       // 5. Automatically record as an Expense
       await client.query(
-        `INSERT INTO expenses (description, amount, expense_type, user_id, module_type, created_at) 
-         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+        `INSERT INTO expenses (description, expense_type, category, amount, expense_date, notes, user_id, module_type, payment_type) 
+         VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, $8)`,
         [
-          `Transport Fare (Vehicle: ${vehicle_number}) for Stock Purchase`,
-          fare,
+          `Transport Fare: ${vehicle_number || 'Vehicle'}`,
+          'Office',
           'Transport',
+          fare,
+          JSON.stringify({ vehicle_id: vId, vehicle_number }),
           req.user.id,
-          finalModule
+          finalModule,
+          fare_status === 'Paid' ? 'Cash' : 'Pending'
         ]
       );
     }
@@ -146,7 +151,7 @@ router.post('/payment', auth, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { supplier_id, paid_amount, notes, module_type } = req.body;
+    const { supplier_id, paid_amount, notes, module_type, payment_type } = req.body;
     
     const paid = parseFloat(paid_amount) || 0;
     const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
@@ -154,9 +159,9 @@ router.post('/payment', auth, async (req, res) => {
     // 1. Insert Payment Record into Purchases (as a ledger entry)
     const paymentRes = await client.query(
       `INSERT INTO purchases 
-      (supplier_id, product_id, vehicle_number, quantity, rate, total_amount, paid_amount, balance_amount, module_type, user_id) 
-      VALUES ($1, NULL, $2, 0, 0, 0, $3, $4, $5, $6) RETURNING *`,
-      [supplier_id, notes || 'Payment', paid, -paid, finalModule, req.user.id]
+      (supplier_id, product_id, vehicle_number, quantity, rate, total_amount, paid_amount, balance_amount, module_type, user_id, payment_type) 
+      VALUES ($1, NULL, $2, 0, 0, 0, $3, $4, $5, $6, $7) RETURNING *`,
+      [supplier_id, notes || 'Payment', paid, -paid, finalModule, req.user.id, payment_type || 'Cash']
     );
 
     // 2. Update Supplier Balance

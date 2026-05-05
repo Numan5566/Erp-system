@@ -64,6 +64,23 @@ export default function Salary({ type }) {
     }
     setLoading(true);
     try {
+      const amt = parseFloat(form.salary_amount || form.amount || 0);
+      
+      // Fetch live balances
+      const balRes = await fetch('http://localhost:5000/api/banks/balances', {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (balRes.ok) {
+        const balances = await balRes.json();
+        const currentAvailable = balances['Cash'] || 0;
+        
+        if (amt > currentAvailable) {
+          alert(`Insufficient Balance! You only have Rs. ${currentAvailable.toLocaleString()} in your Cash account. You cannot make a salary payment of Rs. ${amt.toLocaleString()}!`);
+          setLoading(false);
+          return;
+        }
+      }
+
       const method = editId ? "PUT" : "POST";
       const url = editId ? `${API}/${editId}` : API;
       const res = await fetch(url, {
@@ -158,7 +175,7 @@ export default function Salary({ type }) {
           </div>
         </div>
 
-        {user?.role === 'admin' && !type && (
+        {user?.role === 'admin' && !user?.module_type && !type && (
           <div className="counter-switcher">
             <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
             <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>

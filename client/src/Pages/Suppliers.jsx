@@ -49,6 +49,24 @@ export default function Suppliers({ type }) {
   const [ledgerData, setLedgerData] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [liveBalances, setLiveBalances] = useState({});
+
+  useEffect(() => {
+    if (showPaymentModal) {
+      const fetchLiveBalances = async () => {
+        try {
+          const res = await fetch('http://localhost:5000/api/banks/balances', {
+            headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setLiveBalances(data);
+          }
+        } catch (e) { console.error(e); }
+      };
+      fetchLiveBalances();
+    }
+  }, [showPaymentModal]);
 
   const fetchRecords = async () => {
     if (!activeTab) return;
@@ -182,16 +200,26 @@ export default function Suppliers({ type }) {
   const handleMakePayment = async (e) => {
     e.preventDefault();
     const currentBalance = parseFloat(selectedSupplier.balance || 0);
+    const amt = parseFloat(paymentForm.amount || 0);
+    
     // Only restrict if there is a positive balance (money we owe them)
-    if (currentBalance > 0 && parseFloat(paymentForm.amount || 0) > currentBalance) {
+    if (currentBalance > 0 && amt > currentBalance) {
       alert(`Invalid Payment: You cannot pay more than the outstanding balance (Rs. ${currentBalance})!`);
       return;
     }
     setLoading(true);
     
     let finalPaymentType = selectedBank ? `Bank - ${selectedBank}` : 'Cash';
-    
+    const targetAccountName = selectedBank || 'Cash';
+    const currentAvailable = liveBalances[targetAccountName] || 0;
+
+    if (amt > currentAvailable) {
+      setLoading(false);
+      return;
+    }
+
     try {
+      // 3. Save the payment
       const res = await fetch(`http://localhost:5000/api/purchases/payment`, {
         method: "POST",
         headers: { 
@@ -292,7 +320,7 @@ export default function Suppliers({ type }) {
           </div>
         </div>
 
-        {user?.role === 'admin' && !type && (
+        {user?.role === 'admin' && !user?.module_type && !type && (
           <div className="counter-switcher">
             <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
             <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
@@ -664,15 +692,19 @@ export default function Suppliers({ type }) {
       )}
 
       {/* Make Payment Modal */}
-      {showPaymentModal && selectedSupplier && (
-        <div className="modal-overlay" onClick={() => setShowPaymentModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <div className="modal-header">
-              <h3>Make Payment to {selectedSupplier.company || selectedSupplier.name}</h3>
-              <button className="modal-close" onClick={() => setShowPaymentModal(false)}><X size={20} /></button>
-            </div>
-            
-            <form onSubmit={handleMakePayment} className="custom-form">
+      {showPaymentModal && selectedSupplier && (() => {
+        const supplierTargetAccount = paymentSource === "Bank" ? selectedBank : "Cash";
+        const supplierAvailableBal = liveBalances[supplierTargetAccount] || 0;
+        const isSupplierInsufficient = parseFloat(paymentForm.amount || 0) > supplierAvailableBal;
+        return (
+          <div className="modal-overlay" onClick={() => setShowPaymentModal(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+              <div className="modal-header">
+                <h3>Make Payment to {selectedSupplier.company || selectedSupplier.name}</h3>
+                <button className="modal-close" onClick={() => setShowPaymentModal(false)}><X size={20} /></button>
+              </div>
+              
+              <form onSubmit={handleMakePayment} className="custom-form">
               <div style={{background: '#fff1f2', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between'}}>
                 <span style={{fontWeight: 600, color: '#e11d48'}}>Current Balance:</span>
                 <span style={{fontWeight: 700, color: '#e11d48'}}>Rs. {parseFloat(selectedSupplier.balance).toLocaleString()}</span>
@@ -720,6 +752,12 @@ export default function Suppliers({ type }) {
                 </div>
               )}
               
+              {isSupplierInsufficient && (
+                <div style={{ color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '10px 14px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
+                  ⚠️ Insufficient Balance! Available: Rs. {supplierAvailableBal.toLocaleString()}
+                </div>
+              )}
+              
               <div className="form-group" style={{marginBottom: '20px'}}>
                 <label>Payment Notes / Reference</label>
                 <div className="input-wrapper">
@@ -731,14 +769,15 @@ export default function Suppliers({ type }) {
 
               <div className="form-actions" style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
                 <button type="button" className="btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary" style={{background: '#10b981', borderColor: '#10b981'}} disabled={loading}>
+                <button type="submit" className="btn-primary" style={{background: '#10b981', borderColor: '#10b981'}} disabled={loading || isSupplierInsufficient}>
                   {loading ? "Processing..." : "Confirm Payment"}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

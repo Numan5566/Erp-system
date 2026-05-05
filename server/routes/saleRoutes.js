@@ -13,8 +13,8 @@ router.get('/', auth, async (req, res) => {
     let params = [];
 
     if (!isAdmin(req)) {
-      query += ' WHERE sale_type=$1';
-      params.push(req.user.module_type || 'Retail 1');
+      query += ' WHERE sale_type=$1 AND user_id=$2';
+      params.push(req.user.module_type || 'Retail 1', req.user.id);
     } else if (type) {
       query += ' WHERE sale_type=$1';
       params.push(type);
@@ -351,9 +351,49 @@ router.post('/return', auth, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { sale_id, items_to_return } = req.body;
+    const { sale_id, items_to_return, refund_amount, refund_method } = req.body;
     const sId = parseInt(sale_id);
     if (isNaN(sId)) throw new Error('Invalid Bill Number');
+
+    // 0. Balance Check
+    const refAmt = parseFloat(refund_amount || 0);
+    if (refAmt > 0) {
+      const method = refund_method || 'Cash';
+      const searchPattern = method === 'Cash' ? 'Cash' : `%${method}%`;
+      
+      const finalModule = isAdmin(req) ? (sale.sale_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
+
+      const salesSum = await client.query("SELECT SUM(paid_amount) FROM sales WHERE payment_type LIKE $1 AND sale_type = $2", [searchPattern, finalModule]);
+      const expSum = await client.query("SELECT SUM(amount) FROM expenses WHERE payment_type LIKE $1 AND module_type = $2", [searchPattern, finalModule]);
+      
+      // Purchases table filtering by module_type
+      let supPaid = 0;
+      if (method === 'Cash') {
+        const supSum = await client.query("SELECT SUM(paid_amount) FROM purchases WHERE module_type = $1", [finalModule]);
+        supPaid = parseFloat(supSum.rows[0].sum || 0);
+      } else {
+        const supSum = await client.query("SELECT SUM(delivery_charges) FROM purchases WHERE fare_payment_type LIKE $1 AND module_type = $2", [searchPattern, finalModule]);
+        supPaid = parseFloat(supSum.rows[0].sum || 0);
+      }
+      
+      let openingBal = 0;
+      if (method !== 'Cash') {
+         // Bank accounts are usually per-user or shared. Filtering by user_id or bank_name.
+         // Since we don't have module_type in bank_accounts, we check the account name.
+         const bankRes = await client.query("SELECT SUM(opening_balance) FROM bank_accounts WHERE bank_name = $1", [method]);
+         openingBal = parseFloat(bankRes.rows[0].sum || 0);
+      } else {
+         const bankRes = await client.query("SELECT SUM(opening_balance) FROM bank_accounts WHERE bank_name ILIKE '%Cash%'");
+         openingBal = parseFloat(bankRes.rows[0].sum || 0);
+      }
+      
+      const currentBalance = (parseFloat(salesSum.rows[0].sum || 0) + openingBal) - 
+                             (parseFloat(expSum.rows[0].sum || 0) + supPaid);
+                             
+      if (refAmt > currentBalance) {
+        throw new Error(`Insufficient Balance in ${method}. Available: Rs. ${currentBalance.toLocaleString()}`);
+      }
+    }
 
     // 1. Get sale details
     const saleRes = await client.query('SELECT * FROM sales WHERE id = $1', [sId]);
@@ -387,30 +427,79 @@ router.post('/return', auth, async (req, res) => {
           [qty, prodId]
         );
         totalReturnedValue += (qty * rate);
-
-        // If partial return, we might want to record that this item was returned
-        // For now, let's just mark the whole sale if it's a full return
       }
     }
 
-    // 3. Update Sale status or totals
+    // 3. Create a NEW Sale record for the return (Separate Bill)
+    const returnBillResult = await client.query(
+      `INSERT INTO sales (
+        sale_type, customer_id, customer_name, customer_phone, 
+        net_amount, paid_amount, balance_amount, status, 
+        payment_type, user_id, items, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP) RETURNING id`,
+      [
+        sale.sale_type,
+        sale.customer_id,
+        sale.customer_name,
+        sale.customer_phone,
+        -totalReturnedValue,
+        -refAmt,
+        -(totalReturnedValue - refAmt),
+        'Returned',
+        refund_method || 'Cash',
+        req.user.id,
+        JSON.stringify(items.map(i => ({ ...i, quantity: i.return_qty || i.qty, name: i.product_name || i.name })))
+      ]
+    );
+    const newReturnId = returnBillResult.rows[0].id;
+
+    // 4. Insert returned items into sale_items for the return bill
+    for (const item of items) {
+      await client.query(
+        `INSERT INTO sale_items (sale_id, product_id, product_name, qty, rate, subtotal) 
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          newReturnId,
+          item.product_id,
+          item.product_name || item.name,
+          -(item.return_qty || item.qty),
+          item.rate,
+          -(item.return_qty || item.qty) * item.rate
+        ]
+      );
+    }
+
+    // 5. Update Original Sale status if fully returned
     if (!items_to_return) {
       await client.query('UPDATE sales SET status = $1 WHERE id = $2', ['Returned', sId]);
     } else {
-      // For partial return, maybe just add a note or leave as Completed but with reduced value?
-      // Usually, it's better to mark as 'Partially Returned'
       await client.query("UPDATE sales SET status = 'Partially Returned' WHERE id = $1", [sId]);
     }
 
-    // 4. Adjust Customer Balance
+    // 5. Adjust Customer Balance
     if (sale.customer_id) {
-      // We reduce the balance by the value of returned items
-      // (capped by the sale's balance_amount to avoid negative balance if they already paid)
-      const reduction = items_to_return ? totalReturnedValue : sale.balance_amount;
-      
+      const reduction = totalReturnedValue - refAmt;
+      if (reduction !== 0) {
+        await client.query(
+          'UPDATE customers SET balance = balance - $1 WHERE id = $2',
+          [reduction, sale.customer_id]
+        );
+      }
+    }
+
+    // 6. Record Expense for Refund
+    if (refAmt > 0) {
       await client.query(
-        'UPDATE customers SET balance = balance - $1 WHERE id = $2',
-        [reduction, sale.customer_id]
+        `INSERT INTO expenses (description, expense_type, amount, payment_type, user_id, module_type, created_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)`,
+        [
+          `Sale Return Refund (Return Bill #${newReturnId}, Orig #${sId})`,
+          'Sale Return',
+          refAmt,
+          refund_method || 'Cash',
+          req.user.id,
+          sale.sale_type
+        ]
       );
     }
 

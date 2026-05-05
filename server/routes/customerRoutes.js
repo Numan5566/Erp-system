@@ -17,9 +17,9 @@ router.get('/', auth, async (req, res) => {
         params.push(type);
       }
     } else {
-      // Normal users are strictly isolated to their own module_type
-      query += ' WHERE module_type = $1';
-      params.push(req.user.module_type || 'Retail 1');
+      // Normal users are strictly isolated to their own module_type AND own user_id
+      query += ' WHERE module_type = $1 AND user_id = $2';
+      params.push(req.user.module_type || 'Retail 1', req.user.id);
     }
 
     query += ' ORDER BY name ASC';
