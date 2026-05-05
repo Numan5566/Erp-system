@@ -42,6 +42,7 @@ export default function Suppliers({ type }) {
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedBank, setSelectedBank] = useState("");
+  const [paymentSource, setPaymentSource] = useState("Cash");
   const [ledgerFrom, setLedgerFrom] = useState("");
   const [ledgerTo, setLedgerTo] = useState("");
   const [ledgerFilter, setLedgerFilter] = useState("all");
@@ -62,7 +63,22 @@ export default function Suppliers({ type }) {
     }
   };
 
-  useEffect(() => { fetchRecords(); }, [activeTab]);
+  const fetchBanks = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/banks', {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      setBankAccounts(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch banks", err);
+    }
+  };
+
+  useEffect(() => { 
+    fetchRecords(); 
+    fetchBanks();
+  }, [activeTab]);
 
   // If Admin and no counter selected, show selection screen
   if (user?.role === 'admin' && !activeTab && !type) {
@@ -154,13 +170,19 @@ export default function Suppliers({ type }) {
 
   const openPayment = (supplier) => {
     setSelectedSupplier(supplier);
-    setPaymentForm({ amount: "", notes: "Payment via Cash/Bank" });
+    setPaymentForm({ amount: "", notes: "Payment Sent" });
+    setSelectedBank("");
+    setPaymentSource("Cash");
+    fetchBanks(); // Refresh banks list when modal opens
     setShowPaymentModal(true);
   };
 
   const handlePayment = async (e) => {
     e.preventDefault();
     setLoading(true);
+    
+    let finalPaymentType = selectedBank ? `Bank - ${selectedBank}` : 'Cash';
+    
     try {
       const res = await fetch(`http://localhost:5000/api/purchases/payment`, {
         method: "POST",
@@ -172,6 +194,7 @@ export default function Suppliers({ type }) {
           supplier_id: selectedSupplier.id,
           paid_amount: paymentForm.amount,
           notes: paymentForm.notes,
+          payment_type: finalPaymentType,
           module_type: activeTab
         })
       });
@@ -598,12 +621,45 @@ export default function Suppliers({ type }) {
                     onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
                 </div>
               </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Payment Source *</label>
+                <select 
+                  value={paymentSource}
+                  style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none'}}
+                  onChange={(e) => {
+                    setPaymentSource(e.target.value);
+                    if (e.target.value === "Cash") setSelectedBank("");
+                  }}
+                >
+                  <option value="Cash">Main Cash (Counter)</option>
+                  <option value="Bank">Bank / Online Account</option>
+                </select>
+              </div>
+
+              {/* Show Bank Dropdown ONLY if source is Bank */}
+              {paymentSource === "Bank" && (
+                <div className="form-group" style={{marginBottom: '15px'}}>
+                  <label>Select Sending Bank *</label>
+                  <select 
+                    value={selectedBank} 
+                    onChange={(e) => setSelectedBank(e.target.value)} 
+                    style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', background: '#f0f9ff', borderColor: '#3b82f6'}}
+                    required
+                  >
+                    <option value="">-- Choose Account --</option>
+                    {bankAccounts.map(b => (
+                      <option key={b.id} value={b.bank_name}>{b.bank_name} - {b.account_number}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
               <div className="form-group" style={{marginBottom: '20px'}}>
                 <label>Payment Notes / Reference</label>
                 <div className="input-wrapper">
                   <ClipboardList size={18} />
-                  <input type="text" value={paymentForm.notes} placeholder="e.g. Cash, Cheque No, Bank Transfer" required
+                  <input type="text" value={paymentForm.notes} placeholder="e.g. Paid via Check #123" required
                     onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} />
                 </div>
               </div>

@@ -623,8 +623,12 @@ export default function Customers({ type }) {
 
               <div className="form-group" style={{marginBottom: '15px'}}>
                 <label>Payment Method *</label>
-                <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)} style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none'}}>
-                  <option value="Cash">Cash</option>
+                <select value={paymentType} onChange={(e) => {
+                    setPaymentType(e.target.value);
+                    if (e.target.value !== 'Bank') setSelectedBank("");
+                  }} 
+                  style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none'}}>
+                  <option value="Cash">Cash Account</option>
                   <option value="Bank">Bank Transfer</option>
                   <option value="Cheque">Cheque</option>
                 </select>
@@ -633,11 +637,14 @@ export default function Customers({ type }) {
               {paymentType === 'Bank' && (
                 <div className="form-group" style={{marginBottom: '15px'}}>
                   <label>Select Receiving Bank *</label>
-                  <select value={selectedBank} onChange={(e) => setSelectedBank(e.target.value)} style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none'}}>
-                    <option value="">Select Admin Bank</option>
+                  <select value={selectedBank} onChange={(e) => setSelectedBank(e.target.value)} 
+                    style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #3b82f6', background: '#f0f9ff', outline: 'none'}}
+                    required
+                  >
+                    <option value="">-- Select Admin Bank --</option>
                     {bankAccounts.map(b => {
                       const digits = b.account_number ? b.account_number.slice(-4) : '';
-                      return <option key={b.id} value={`${b.bank_name} ${digits ? `(****${digits})` : ''}`}>{b.bank_name} {digits ? `(****${digits})` : ''}</option>;
+                      return <option key={b.id} value={b.bank_name}>{b.bank_name} {digits ? `(****${digits})` : ''}</option>;
                     })}
                   </select>
                 </div>

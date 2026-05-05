@@ -16,7 +16,11 @@ const availableModules = [
   { id: 'transport', label: 'Transport' },
   { id: 'expenses', label: 'Expenses' },
   { id: 'salary', label: 'Salary' },
-  { id: 'profit', label: 'Profit' }
+  { id: 'profit', label: 'Profit' },
+  { id: 'accounts', label: 'Accounts' },
+  { id: 'rent', label: 'Rent' },
+  { id: 'investment', label: 'Investment' },
+  { id: 'other_expenses', label: 'Other Expenses' }
 ];
 
 export default function UsersManager() {
@@ -49,13 +53,21 @@ export default function UsersManager() {
 
   const handleEditClick = (user) => {
     setEditingId(user.id);
+    
+    // Safety check: Ensure permissions is an array (sometimes it comes as a string from DB)
+    let userPermissions = user.permissions;
+    if (typeof userPermissions === 'string') {
+      try { userPermissions = JSON.parse(userPermissions); } catch(e) { userPermissions = []; }
+    }
+    if (!Array.isArray(userPermissions)) userPermissions = [];
+
     setFormData({
       name: user.name,
       email: user.email,
-      password: user.password || '', // Populate plain text password
+      password: user.password || '', 
       role: user.role,
       module_type: user.module_type || '',
-      permissions: user.permissions || []
+      permissions: userPermissions
     });
     setShowForm(true);
   };
@@ -111,16 +123,14 @@ export default function UsersManager() {
           </div>
           
           <div className="form-row">
-            <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-            </select>
-            
-            <select value={formData.module_type} onChange={e => setFormData({...formData, module_type: e.target.value})} disabled={formData.role === 'admin'}>
-              <option value="">Select Counter (for Users)</option>
-              <option value="Wholesale">Wholesale</option>
-              <option value="Retail 1">Retail 1</option>
-              <option value="Retail 2">Retail 2</option>
+            <label style={{fontSize: '0.9rem', color: '#666', marginBottom: '5px', display: 'block'}}>Account Role</label>
+            <select 
+              value={formData.role} 
+              onChange={e => setFormData({...formData, role: e.target.value})}
+              style={{padding: '8px', borderRadius: '4px', border: '1px solid #ddd', width: '200px'}}
+            >
+              <option value="user">Operator (Limited)</option>
+              <option value="admin">Admin (Full Access)</option>
             </select>
           </div>
 
@@ -150,8 +160,6 @@ export default function UsersManager() {
             <tr>
               <th>Name</th>
               <th>Email</th>
-              <th>Role</th>
-              <th>Counter</th>
               <th>Permissions</th>
               <th>Actions</th>
             </tr>
@@ -161,13 +169,11 @@ export default function UsersManager() {
               <tr key={u.id}>
                 <td>{u.name}</td>
                 <td>{u.email}</td>
-                <td><span className={`badge ${u.role}`}>{u.role}</span></td>
-                <td><span className="badge" style={{background: '#e0e7ff', color: '#3730a3'}}>{u.module_type || 'N/A'}</span></td>
                 <td className="perms-cell">
                   {u.permissions?.length ? u.permissions.join(', ') : 'None'}
                 </td>
                 <td>
-                  {u.role !== 'admin' && (
+                  {u.email !== 'admin@erp.com' && (
                     <ActionMenu 
                       onEdit={() => handleEditClick(u)} 
                       onDelete={() => handleDelete(u.id)} 

@@ -1,7 +1,7 @@
 import React, { useContext, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { 
-  Building2, Store, Package, Boxes, Receipt, Users as UsersIcon, 
+import {
+  Building2, Store, Package, Boxes, Receipt, Users as UsersIcon,
   Truck, Wallet, Banknote, LineChart, UserSquare2, Home,
   TrendingUp, MoreHorizontal, ArrowRight, AlertTriangle
 } from "lucide-react";
@@ -21,17 +21,17 @@ export default function Dashboard() {
     const fetchStats = async () => {
       try {
         const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
-        
+
         const counterQuery = user?.role === 'admin' ? '' : `?type=${user?.module_type}`;
-        
+
         // Fetch products for stock stats
         const prodRes = await fetch(`http://localhost:5000/api/products${counterQuery}`, { headers });
         const products = await prodRes.json();
-        
+
         // Fetch expenses
         const expRes = await fetch(`http://localhost:5000/api/expenses${counterQuery}`, { headers });
         const expenses = await expRes.json();
-        
+
         // Fetch customers
         const custRes = await fetch(`http://localhost:5000/api/customers${counterQuery}`, { headers });
         const customers = await custRes.json();
@@ -67,7 +67,7 @@ export default function Dashboard() {
   ];
 
   const hasPermission = (moduleId) => {
-    if (user?.role === 'admin') return true;
+    if (user?.email === 'admin@erp.com') return true;
     return user?.permissions?.includes(moduleId);
   };
 
@@ -75,7 +75,7 @@ export default function Dashboard() {
     <div className="dashboard-container">
       <header className="dashboard-header">
         <div className="welcome-section">
-          <h1>Welcome back, <span className="user-name">{user?.username || 'User'}</span> 👋</h1>
+          <h1>Welcome back, <span className="user-name">{user?.name || 'User'}</span> 👋</h1>
           <p className="subtitle">Here's a quick overview of your building materials empire today.</p>
         </div>
         <div className="current-time">
@@ -84,41 +84,43 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Quick Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card premium-shadow">
-          <div className="stat-icon blue"><Package size={24} /></div>
-          <div className="stat-info">
-            <span className="stat-label">Inventory</span>
-            <span className="stat-value">{stats.products} Items</span>
+      {/* Stats Grid - ONLY for Master Admin */}
+      {user?.email === 'admin@erp.com' && (
+        <div className="stats-grid">
+          <div className="stat-card premium-shadow">
+            <div className="stat-icon blue"><Package size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">Inventory</span>
+              <span className="stat-value">{stats.products} Items</span>
+            </div>
+            <div className="stat-chart mini-line blue"></div>
           </div>
-          <div className="stat-chart mini-line blue"></div>
-        </div>
-        <div className="stat-card premium-shadow">
-          <div className="stat-icon orange"><AlertTriangle size={24} /></div>
-          <div className="stat-info">
-            <span className="stat-label">Low Stock</span>
-            <span className="stat-value">{stats.lowStock} Alerts</span>
+          <div className="stat-card premium-shadow">
+            <div className="stat-icon orange"><AlertTriangle size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">Low Stock</span>
+              <span className="stat-value">{stats.lowStock} Alerts</span>
+            </div>
+            <div className="stat-chart mini-line orange"></div>
           </div>
-          <div className="stat-chart mini-line orange"></div>
-        </div>
-        <div className="stat-card premium-shadow">
-          <div className="stat-icon green"><UsersIcon size={24} /></div>
-          <div className="stat-info">
-            <span className="stat-label">Partners</span>
-            <span className="stat-value">{stats.customers} Contacts</span>
+          <div className="stat-card premium-shadow">
+            <div className="stat-icon green"><UsersIcon size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">Partners</span>
+              <span className="stat-value">{stats.customers} Contacts</span>
+            </div>
+            <div className="stat-chart mini-line green"></div>
           </div>
-          <div className="stat-chart mini-line green"></div>
-        </div>
-        <div className="stat-card premium-shadow">
-          <div className="stat-icon red"><Wallet size={24} /></div>
-          <div className="stat-info">
-            <span className="stat-label">Expense Flow</span>
-            <span className="stat-value">Rs. {stats.monthlyExpenses.toLocaleString()}</span>
+          <div className="stat-card premium-shadow">
+            <div className="stat-icon red"><Wallet size={24} /></div>
+            <div className="stat-info">
+              <span className="stat-label">Expense Flow</span>
+              <span className="stat-value">Rs. {stats.monthlyExpenses.toLocaleString()}</span>
+            </div>
+            <div className="stat-chart mini-line red"></div>
           </div>
-          <div className="stat-chart mini-line red"></div>
         </div>
-      </div>
+      )}
 
       {/* Primary Actions */}
       <div className="primary-modules">

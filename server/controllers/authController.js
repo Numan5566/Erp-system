@@ -20,6 +20,7 @@ exports.register = async (req, res) => {
     const payload = {
       user: {
         id: user.id,
+        email: user.email,
         role: user.role,
         module_type: user.module_type
       }
@@ -59,6 +60,7 @@ exports.login = async (req, res) => {
     const payload = {
       user: {
         id: user.id,
+        email: user.email,
         role: user.role,
         module_type: user.module_type
       }

@@ -47,26 +47,15 @@ const Sidebar = () => {
     { id: 'users', name: 'Admin Control', path: '/users', icon: <ShieldAlert size={20} /> }
   ];
 
-  // Filter menu items based on Role and Module
+  // Filter menu items based on Permissions
   const filteredMenuItems = menuItems.filter(item => {
-    // Admin sees EVERYTHING
-    if (user?.role === 'admin') return true;
+    // Master Admin sees EVERYTHING
+    if (user?.email === 'admin@erp.com') return true;
 
     // Dashboard is always visible for everyone
     if (item.id === 'dashboard') return true;
 
-    // For non-admin users, we strictly limit based on their module_type
-    const userModule = user?.module_type; // e.g. 'Wholesale', 'Retail 1', 'Retail 2'
-
-    // 1. Hide other counter modules
-    if (item.id === 'wholesale' && userModule !== 'Wholesale') return false;
-    if (item.id === 'retail1' && userModule !== 'Retail 1') return false;
-    if (item.id === 'retail2' && userModule !== 'Retail 2') return false;
-
-    // 2. Hide Admin-only modules
-    if (item.id === 'users' || item.id === 'profit' || item.id === 'investment' || item.id === 'accounts') return false;
-
-    // Fallback to permissions array if available
+    // For everyone else, strictly follow the permissions array
     return user?.permissions?.includes(item.id);
   });
 

@@ -8,21 +8,27 @@ const isAdmin = (req) => req.user.role === 'admin';
 // Get all banks
 router.get('/', auth, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM bank_accounts ORDER BY id ASC');
+    let result;
+    if (req.user.email === 'admin@erp.com') {
+      // Master Admin sees ALL banks
+      result = await pool.query('SELECT * FROM bank_accounts ORDER BY id ASC');
+    } else {
+      // Everyone else sees ONLY their own banks
+      result = await pool.query('SELECT * FROM bank_accounts WHERE user_id = $1 ORDER BY id ASC', [req.user.id]);
+    }
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Add a bank (Admin only)
+// Add a bank (Allowed for everyone, linked to user_id)
 router.post('/', auth, async (req, res) => {
-  if (!isAdmin(req)) return res.status(403).json({ error: 'Access denied' });
   try {
     const { bank_name, account_title, account_number } = req.body;
     const result = await pool.query(
-      'INSERT INTO bank_accounts (bank_name, account_title, account_number) VALUES ($1, $2, $3) RETURNING *',
-      [bank_name, account_title, account_number]
+      'INSERT INTO bank_accounts (bank_name, account_title, account_number, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
+      [bank_name, account_title, account_number, req.user.id]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -30,11 +36,14 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// Delete a bank (Admin only)
+// Delete a bank (Owner or Admin)
 router.delete('/:id', auth, async (req, res) => {
-  if (!isAdmin(req)) return res.status(403).json({ error: 'Access denied' });
   try {
-    await pool.query('DELETE FROM bank_accounts WHERE id=$1', [req.params.id]);
+    if (req.user.role === 'admin') {
+      await pool.query('DELETE FROM bank_accounts WHERE id=$1', [req.params.id]);
+    } else {
+      await pool.query('DELETE FROM bank_accounts WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+    }
     res.json({ message: 'Bank deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

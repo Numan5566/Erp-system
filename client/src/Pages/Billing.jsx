@@ -203,7 +203,9 @@ export default function Billing({ type }) {
           totalAmount: netTotal,
           paidAmount: saleData.paid_amount,
           previousBalance: prevBal,
-          newBalance: finalBal
+          newBalance: finalBal,
+          paymentMethod: finalPaymentType,
+          bankAccount: paymentType === 'Bank' ? selectedBank : null,
         });
         setShowSuccess(true);
         setCart([]);
