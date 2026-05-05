@@ -13,7 +13,8 @@ export default function Accounts() {
 
   // State for bank accounts
   const [accounts, setAccounts] = useState([]);
-  const [form, setForm] = useState({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 });
+  const [form, setForm] = useState({ bank_name: "", account_title: "", account_number: "", opening_balance: "" });
+
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
@@ -28,6 +29,66 @@ export default function Accounts() {
   const [investments, setInvestments] = useState([]);
   const [otherExpenses, setOtherExpenses] = useState([]);
 
+  // State for active switcher tab (For Admin)
+  const [activeTab, setActiveTab] = useState(user?.role === 'admin' ? 'Wholesale' : (user?.module_type || 'Wholesale'));
+
+  const filteredAccounts = useMemo(() => {
+    if (user?.role === 'admin') {
+      return accounts.filter(a => (a.module_type || 'Wholesale') === activeTab);
+    }
+    return accounts;
+  }, [accounts, activeTab, user]);
+
+  const filteredSales = useMemo(() => {
+    if (user?.role === 'admin') {
+      return sales.filter(s => (s.sale_type || s.module_type || 'Wholesale') === activeTab);
+    }
+    return sales;
+  }, [sales, activeTab, user]);
+
+  const filteredSupplierPayments = useMemo(() => {
+    if (user?.role === 'admin') {
+      return supplierPayments.filter(p => (p.module_type || 'Wholesale') === activeTab);
+    }
+    return supplierPayments;
+  }, [supplierPayments, activeTab, user]);
+
+  const filteredGeneralExpenses = useMemo(() => {
+    if (user?.role === 'admin') {
+      return generalExpenses.filter(e => (e.module_type || 'Wholesale') === activeTab);
+    }
+    return generalExpenses;
+  }, [generalExpenses, activeTab, user]);
+
+  const filteredSalaries = useMemo(() => {
+    if (user?.role === 'admin') {
+      return salaries.filter(s => (s.module_type || 'Wholesale') === activeTab);
+    }
+    return salaries;
+  }, [salaries, activeTab, user]);
+
+  const filteredRents = useMemo(() => {
+    if (user?.role === 'admin') {
+      return rents.filter(r => (r.module_type || 'Wholesale') === activeTab);
+    }
+    return rents;
+  }, [rents, activeTab, user]);
+
+  const filteredInvestments = useMemo(() => {
+    if (user?.role === 'admin') {
+      return investments.filter(i => (i.module_type || 'Wholesale') === activeTab);
+    }
+    return investments;
+  }, [investments, activeTab, user]);
+
+  const filteredOtherExpenses = useMemo(() => {
+    if (user?.role === 'admin') {
+      return otherExpenses.filter(o => (o.module_type || 'Wholesale') === activeTab);
+    }
+    return otherExpenses;
+  }, [otherExpenses, activeTab, user]);
+
+
   // State for Ledger view
   const [showLedger, setShowLedger] = useState(false);
   const [selectedLedgerAccount, setSelectedLedgerAccount] = useState(null);
@@ -36,6 +97,78 @@ export default function Accounts() {
   // State for Bill Viewer
   const [showBill, setShowBill] = useState(false);
   const [selectedBill, setSelectedBill] = useState(null);
+
+  // State & Handlers for Galla Closeout
+  const [showCloseoutModal, setShowCloseoutModal] = useState(false);
+  const [closeoutForm, setCloseoutForm] = useState({
+    amount_sent_to_admin: "",
+    amount_kept_as_opening: "",
+    notes: ""
+  });
+
+
+  const handleOpenCloseout = () => {
+    setCloseoutForm({
+      amount_sent_to_admin: totalCash,
+      amount_kept_as_opening: "",
+      notes: ""
+    });
+    setShowCloseoutModal(true);
+  };
+
+  const handleCloseoutFieldChange = (field, val) => {
+    // Strip leading zeroes from the string (e.g. "04" -> "4", "044" -> "44")
+    let cleanVal = String(val).replace(/^0+(?=\d)/, '');
+    if (cleanVal === '0' && val === '0') {
+      cleanVal = '0';
+    } else if (cleanVal === '' || isNaN(parseFloat(cleanVal))) {
+      setCloseoutForm(prev => ({
+        ...prev,
+        [field]: "",
+        ...(field === 'amount_sent_to_admin' ? { amount_kept_as_opening: totalCash } : { amount_sent_to_admin: totalCash })
+      }));
+      return;
+    }
+
+    const value = parseFloat(cleanVal) || 0;
+    if (field === 'amount_sent_to_admin') {
+      const kept = Math.max(0, totalCash - value);
+      setCloseoutForm(prev => ({ ...prev, amount_sent_to_admin: cleanVal, amount_kept_as_opening: kept === 0 ? "" : kept }));
+    } else if (field === 'amount_kept_as_opening') {
+      const sent = Math.max(0, totalCash - value);
+      setCloseoutForm(prev => ({ ...prev, amount_kept_as_opening: cleanVal, amount_sent_to_admin: sent === 0 ? "" : sent }));
+    } else {
+      setCloseoutForm(prev => ({ ...prev, [field]: cleanVal }));
+    }
+  };
+
+
+  const handleCloseoutSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch('http://localhost:5000/api/banks/closeout', {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(closeoutForm)
+      });
+      if (res.ok) {
+        setShowCloseoutModal(false);
+        // Refresh all data
+        fetchAccounts();
+        fetchSales();
+        fetchSupplierPayments();
+        fetchOthers();
+      }
+    } catch (err) {
+      console.error('Failed to submit closeout', err);
+    }
+    setLoading(false);
+  };
+
 
   // Fetch bank accounts
   const fetchAccounts = async () => {
@@ -117,8 +250,9 @@ export default function Accounts() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, module_type: activeTab })
       });
+
       setShowModal(false);
       setEditId(null);
       setForm({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 });
@@ -188,14 +322,14 @@ export default function Accounts() {
 
   const paymentSummary = useMemo(() => {
     return [
-      ...sales, 
-      ...supplierPayments.map(p => ({ ...p, isExpense: true })),
-      ...generalExpenses.map(e => ({ ...e, isExpense: true })),
-      ...salaries.map(s => ({ ...s, isExpense: true, payment_type: 'Cash' })),
-      ...rents.map(r => ({ ...r, isExpense: true, payment_type: 'Cash' })),
-      ...otherExpenses.map(o => ({ ...o, isExpense: true, payment_type: o.payment_method || 'Cash' })),
-      ...investments.map(i => ({ ...i, isIncome: true, payment_type: 'Cash' })),
-      ...supplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
+      ...filteredSales, 
+      ...filteredSupplierPayments.map(p => ({ ...p, isExpense: true })),
+      ...filteredGeneralExpenses.map(e => ({ ...e, isExpense: true })),
+      ...filteredSalaries.map(s => ({ ...s, isExpense: true, payment_type: 'Cash' })),
+      ...filteredRents.map(r => ({ ...r, isExpense: true, payment_type: 'Cash' })),
+      ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, payment_type: o.payment_method || 'Cash' })),
+      ...filteredInvestments.map(i => ({ ...i, isIncome: true, payment_type: 'Cash' })),
+      ...filteredSupplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
         ...p, isExpense: true, payment_type: p.fare_payment_type || 'Cash', 
         isTransportFare: true 
       }))
@@ -216,14 +350,15 @@ export default function Accounts() {
         acc[cleanMethod] += amount;
       }
       return acc;
-    }, accounts.reduce((acc, b) => {
+    }, filteredAccounts.reduce((acc, b) => {
       let name = b.bank_name.replace(' Account', '');
       if (name.toLowerCase() === 'cash') name = 'Cash';
       if (!acc[name]) acc[name] = 0;
       acc[name] += parseFloat(b.opening_balance) || 0;
       return acc;
     }, { 'Cash': 0 }));
-  }, [sales, supplierPayments, generalExpenses, salaries, rents, otherExpenses, investments, accounts]);
+  }, [filteredSales, filteredSupplierPayments, filteredGeneralExpenses, filteredSalaries, filteredRents, filteredOtherExpenses, filteredInvestments, filteredAccounts]);
+
 
   const totalCash = paymentSummary['Cash'] || 0;
   const totalBank = Object.entries(paymentSummary)
@@ -233,18 +368,18 @@ export default function Accounts() {
   // Filter all transactions for the selected ledger account and date range
   const ledgerTransactions = useMemo(() => {
     return [
-      ...sales, 
-      ...supplierPayments.map(p => ({ ...p, isExpense: true, customer_name: p.supplier_name || 'Supplier', amount: p.paid_amount, created_at: p.purchase_date })),
-      ...supplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
+      ...filteredSales, 
+      ...filteredSupplierPayments.map(p => ({ ...p, isExpense: true, customer_name: p.supplier_name || 'Supplier', amount: p.paid_amount, created_at: p.purchase_date })),
+      ...filteredSupplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
         ...p, isExpense: true, customer_name: `Fare: ${p.vehicle_number || 'Vehicle'}`, 
         amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
         created_at: p.purchase_date, isTransportFare: true
       })),
-      ...generalExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
-      ...salaries.map(s => ({ ...s, isExpense: true, customer_name: `Salary: ${s.employee_name}`, payment_type: 'Cash', created_at: s.payment_date })),
-      ...rents.map(r => ({ ...r, isExpense: true, customer_name: `Rent: ${r.property_name}`, payment_type: 'Cash', created_at: r.rent_date })),
-      ...otherExpenses.map(o => ({ ...o, isExpense: true, customer_name: `Other: ${o.title}`, payment_type: o.payment_method, created_at: o.date })),
-      ...investments.map(i => ({ ...i, isIncome: true, customer_name: `Invest: ${i.investor}`, payment_type: 'Cash', created_at: i.date }))
+      ...filteredGeneralExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
+      ...filteredSalaries.map(s => ({ ...s, isExpense: true, customer_name: `Salary: ${s.employee_name}`, payment_type: 'Cash', created_at: s.payment_date })),
+      ...filteredRents.map(r => ({ ...r, isExpense: true, customer_name: `Rent: ${r.property_name}`, payment_type: 'Cash', created_at: r.rent_date })),
+      ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, customer_name: `Other: ${o.title}`, payment_type: o.payment_method, created_at: o.date })),
+      ...filteredInvestments.map(i => ({ ...i, isIncome: true, customer_name: `Invest: ${i.investor}`, payment_type: 'Cash', created_at: i.date }))
     ].filter(s => {
         if (!selectedLedgerAccount) return false;
         
@@ -269,7 +404,8 @@ export default function Accounts() {
         if (dateFilter === 'Month') return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
         return true;
       }).sort((a, b) => new Date(b.created_at || b.purchase_date || b.date) - new Date(a.created_at || a.purchase_date || a.date));
-  }, [sales, supplierPayments, generalExpenses, salaries, rents, otherExpenses, investments, selectedLedgerAccount, dateFilter]);
+  }, [filteredSales, filteredSupplierPayments, filteredGeneralExpenses, filteredSalaries, filteredRents, filteredOtherExpenses, filteredInvestments, selectedLedgerAccount, dateFilter]);
+
   
   // Calculate running balances chronologically (ascending), then return descending for display
   const calculatedTransactions = useMemo(() => {
@@ -311,18 +447,18 @@ export default function Accounts() {
   const getRecentTransactionsForAccount = (acc) => {
     const isCash = acc.isCash || acc.bank_name.toLowerCase() === 'cash' || acc.bank_name.toLowerCase() === 'cash account';
     const accountTransactions = [
-      ...sales,
-      ...supplierPayments.map(p => ({ ...p, isExpense: true, customer_name: p.supplier_name || 'Supplier', amount: p.paid_amount, created_at: p.purchase_date })),
-      ...supplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
+      ...filteredSales,
+      ...filteredSupplierPayments.map(p => ({ ...p, isExpense: true, customer_name: p.supplier_name || 'Supplier', amount: p.paid_amount, created_at: p.purchase_date })),
+      ...filteredSupplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
         ...p, isExpense: true, customer_name: `Fare: ${p.vehicle_number || 'Vehicle'}`, 
         amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
         created_at: p.purchase_date, isTransportFare: true
       })),
-      ...generalExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
-      ...salaries.map(s => ({ ...s, isExpense: true, customer_name: `Salary: ${s.employee_name}`, payment_type: 'Cash', created_at: s.payment_date })),
-      ...rents.map(r => ({ ...r, isExpense: true, customer_name: `Rent: ${r.property_name}`, payment_type: 'Cash', created_at: r.rent_date })),
-      ...otherExpenses.map(o => ({ ...o, isExpense: true, customer_name: `Other: ${o.title}`, payment_type: o.payment_method, created_at: o.date })),
-      ...investments.map(i => ({ ...i, isIncome: true, customer_name: `Invest: ${i.investor}`, payment_type: 'Cash', created_at: i.date }))
+      ...filteredGeneralExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
+      ...filteredSalaries.map(s => ({ ...s, isExpense: true, customer_name: `Salary: ${s.employee_name}`, payment_type: 'Cash', created_at: s.payment_date })),
+      ...filteredRents.map(r => ({ ...r, isExpense: true, customer_name: `Rent: ${r.property_name}`, payment_type: 'Cash', created_at: r.rent_date })),
+      ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, customer_name: `Other: ${o.title}`, payment_type: o.payment_method, created_at: o.date })),
+      ...filteredInvestments.map(i => ({ ...i, isIncome: true, customer_name: `Invest: ${i.investor}`, payment_type: 'Cash', created_at: i.date }))
     ].filter(s => {
       const payType = (s.payment_type || 'Cash').replace('Bank - ', '');
       return isCash ? (payType === 'Cash' || payType === 'Cash Account') : payType === acc.bank_name;
@@ -330,6 +466,7 @@ export default function Accounts() {
 
     return accountTransactions.slice(0, 3);
   };
+
 
   const summarySection = (
     <div className="payment-overview-cards" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '30px'}}>
@@ -378,13 +515,14 @@ export default function Accounts() {
 
   // Combine Bank Accounts with a virtual "Cash" account ONLY if no real Cash account exists
   const displayAccounts = useMemo(() => {
-    const hasRealCash = accounts.some(a => a.bank_name.toLowerCase() === 'cash' || a.bank_name.toLowerCase() === 'cash account');
-    if (hasRealCash) return accounts;
+    const hasRealCash = filteredAccounts.some(a => a.bank_name.toLowerCase() === 'cash' || a.bank_name.toLowerCase() === 'cash account');
+    if (hasRealCash) return filteredAccounts;
     return [
       { id: 'cash-id', bank_name: 'Cash Account', account_title: 'Main Counter', account_number: 'N/A', isCash: true, opening_balance: 0 },
-      ...accounts
+      ...filteredAccounts
     ];
-  }, [accounts]);
+  }, [filteredAccounts]);
+
 
   const filtered = displayAccounts.filter(acc => acc.bank_name.toLowerCase().includes(search.toLowerCase()));
 
@@ -398,10 +536,22 @@ export default function Accounts() {
             <p>Manage cash and bank accounts tracking all inflows</p>
           </div>
         </div>
-        <div className="module-actions">
-          <Button label="Add Bank Account" icon="pi pi-plus" onClick={() => { setEditId(null); setForm({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 }); setShowModal(true); }} className="p-button-primary" />
+
+        {user?.role === 'admin' && (
+          <div className="counter-switcher">
+            <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
+            <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
+            <button className={activeTab === 'Retail 2' ? 'active' : ''} onClick={() => setActiveTab('Retail 2')}>Retail 2</button>
+          </div>
+        )}
+
+        <div className="module-actions" style={{display: 'flex', gap: '10px'}}>
+          <Button label="Galla Closeout" icon="pi pi-lock" onClick={handleOpenCloseout} className="p-button-warning" style={{borderRadius: '12px'}} />
+          <Button label="Add Bank Account" icon="pi pi-plus" onClick={() => { setEditId(null); setForm({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 }); setShowModal(true); }} className="p-button-primary" style={{borderRadius: '12px'}} />
         </div>
+
       </div>
+
 
       {/* Payment summary */}
       <div className="no-print">
@@ -828,6 +978,70 @@ export default function Accounts() {
           </div>
         </div>
       )}
+
+      {showCloseoutModal && (
+        <div className="modal-overlay" onClick={() => setShowCloseoutModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Daily Galla Closeout / Transfer to Admin</h3>
+              <button className="modal-close" onClick={() => setShowCloseoutModal(false)}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleCloseoutSubmit} className="custom-form p-fluid">
+              <div style={{
+                background: '#f0fdf4',
+                padding: '15px',
+                borderRadius: '12px',
+                border: '1px solid #bbf7d0',
+                color: '#16a34a',
+                marginBottom: '20px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <p style={{margin: 0, fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase'}}>Total Cash in Register</p>
+                  <h3 style={{margin: '5px 0 0 0', fontSize: '1.5rem', fontWeight: 800}}>Rs. {totalCash.toLocaleString()}</h3>
+                </div>
+                <div style={{fontSize: '1.8rem'}}>💰</div>
+              </div>
+
+              <div className="field mb-3">
+                <label className="block mb-2 font-bold" style={{color: '#1e293b'}}>Amount Sent to Admin *</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon">Rs.</span>
+                  <input type="number" required value={closeoutForm.amount_sent_to_admin} placeholder="0.00"
+                    className="p-inputtext p-component"
+                    onChange={e => handleCloseoutFieldChange('amount_sent_to_admin', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="field mb-3">
+                <label className="block mb-2 font-bold" style={{color: '#1e293b'}}>Remaining Kept as Opening Balance *</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon">Rs.</span>
+                  <input type="number" required value={closeoutForm.amount_kept_as_opening} placeholder="0.00"
+                    className="p-inputtext p-component"
+                    onChange={e => handleCloseoutFieldChange('amount_kept_as_opening', e.target.value)} />
+                </div>
+                <small style={{color: '#64748b', marginTop: '5px', display: 'block'}}>This remaining amount will be kept in your drawer for tomorrow's transactions.</small>
+              </div>
+
+              <div className="field mb-4">
+                <label className="block mb-2 font-bold" style={{color: '#1e293b'}}>Notes / Remarks</label>
+                <textarea rows="2" value={closeoutForm.notes} placeholder="e.g. Cleared register after end of shift..."
+                  className="p-inputtext p-component" style={{borderRadius: '8px', padding: '10px'}}
+                  onChange={e => handleCloseoutFieldChange('notes', e.target.value)} />
+              </div>
+
+              <div className="flex justify-content-end gap-2">
+                <Button type="button" label="Cancel" icon="pi pi-times" onClick={() => setShowCloseoutModal(false)} className="p-button-text" />
+                <Button type="submit" label={loading ? "Submitting..." : "Submit Handover & Close Register"} icon="pi pi-check" loading={loading} className="p-button-warning" />
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

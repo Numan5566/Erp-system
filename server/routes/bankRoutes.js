@@ -119,8 +119,8 @@ router.get('/', auth, async (req, res) => {
       // Master Admin sees ALL banks
       result = await pool.query('SELECT * FROM bank_accounts ORDER BY id ASC');
     } else {
-      // Everyone else sees ONLY their own banks
-      result = await pool.query('SELECT * FROM bank_accounts WHERE user_id = $1 ORDER BY id ASC', [req.user.id]);
+      // Everyone else sees ONLY their own banks or those added by Admin for their shop
+      result = await pool.query('SELECT * FROM bank_accounts WHERE user_id = $1 OR module_type = $2 ORDER BY id ASC', [req.user.id, req.user.module_type || 'Retail 1']);
     }
     res.json(result.rows);
   } catch (err) {
@@ -128,13 +128,15 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// Add a bank (Allowed for everyone, linked to user_id)
+// Add a bank
 router.post('/', auth, async (req, res) => {
   try {
-    const { bank_name, account_title, account_number, opening_balance } = req.body;
+    const { bank_name, account_title, account_number, opening_balance, module_type } = req.body;
+    const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
+    
     const result = await pool.query(
-      'INSERT INTO bank_accounts (bank_name, account_title, account_number, opening_balance, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [bank_name, account_title, account_number, opening_balance || 0, req.user.id]
+      'INSERT INTO bank_accounts (bank_name, account_title, account_number, opening_balance, user_id, module_type) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [bank_name, account_title, account_number, opening_balance || 0, req.user.id, finalModule]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -156,7 +158,7 @@ router.put('/:id', auth, async (req, res) => {
   }
 });
 
-// Delete a bank (Owner or Admin)
+// Delete a bank
 router.delete('/:id', auth, async (req, res) => {
   try {
     if (req.user.role === 'admin') {
@@ -177,25 +179,64 @@ router.get('/balance/:method', auth, async (req, res) => {
     const { module_type } = req.query;
     const finalModule = module_type || req.user.module_type || 'Wholesale';
     const searchPattern = method === 'Cash' ? 'Cash' : `%${method}%`;
+    const userId = req.user.id;
+    const isAdminUser = req.user.role === 'admin';
 
-    const salesSum = await pool.query("SELECT SUM(paid_amount) FROM sales WHERE payment_type LIKE $1 AND sale_type = $2", [searchPattern, finalModule]);
-    const expSum = await pool.query("SELECT SUM(amount) FROM expenses WHERE payment_type LIKE $1 AND module_type = $2", [searchPattern, finalModule]);
+    let salesQ = "SELECT SUM(paid_amount) FROM sales WHERE payment_type LIKE $1 AND sale_type = $2";
+    let salesParams = [searchPattern, finalModule];
+    if (!isAdminUser) {
+      salesQ += " AND user_id = $3";
+      salesParams.push(userId);
+    }
+    const salesSum = await pool.query(salesQ, salesParams);
+
+    let expQ = "SELECT SUM(amount) FROM expenses WHERE payment_type LIKE $1 AND module_type = $2";
+    let expParams = [searchPattern, finalModule];
+    if (!isAdminUser) {
+      expQ += " AND user_id = $3";
+      expParams.push(userId);
+    }
+    const expSum = await pool.query(expQ, expParams);
     
     let supPaid = 0;
     if (method === 'Cash') {
-      const supSum = await pool.query("SELECT SUM(paid_amount) FROM purchases WHERE module_type = $1", [finalModule]);
+      let supQ = "SELECT SUM(paid_amount) FROM purchases WHERE module_type = $1";
+      let supParams = [finalModule];
+      if (!isAdminUser) {
+        supQ += " AND user_id = $2";
+        supParams.push(userId);
+      }
+      const supSum = await pool.query(supQ, supParams);
       supPaid = parseFloat(supSum.rows[0].sum || 0);
     } else {
-      const supSum = await pool.query("SELECT SUM(delivery_charges) FROM purchases WHERE fare_payment_type LIKE $1 AND module_type = $2", [searchPattern, finalModule]);
-      supPaid = parseFloat(supSum.rows[0].sum || 0);
+      let supQ = "SELECT SUM(delivery_charges) FROM purchases WHERE fare_payment_type LIKE $1 AND module_type = $2";
+      let supParams = [searchPattern, finalModule];
+      if (!isAdminUser) {
+        supQ += " AND user_id = $3";
+        supParams.push(userId);
+      }
+      const poolRes = await pool.query(supQ, supParams);
+      supPaid = parseFloat(poolRes.rows[0].sum || 0);
     }
     
     let openingBal = 0;
     if (method === 'Cash') {
-       const bankRes = await pool.query("SELECT SUM(opening_balance) FROM bank_accounts WHERE bank_name ILIKE '%Cash%'");
+       let bankQ = "SELECT SUM(opening_balance) FROM bank_accounts WHERE bank_name ILIKE '%Cash%'";
+       let bankParams = [];
+       if (!isAdminUser) {
+         bankQ += " AND user_id = $1";
+         bankParams.push(userId);
+       }
+       const bankRes = await pool.query(bankQ, bankParams);
        openingBal = parseFloat(bankRes.rows[0].sum || 0);
     } else {
-       const bankRes = await pool.query("SELECT SUM(opening_balance) FROM bank_accounts WHERE bank_name = $1", [method]);
+       let bankQ = "SELECT SUM(opening_balance) FROM bank_accounts WHERE bank_name = $1";
+       let bankParams = [method];
+       if (!isAdminUser) {
+         bankQ += " AND user_id = $2";
+         bankParams.push(userId);
+       }
+       const bankRes = await pool.query(bankQ, bankParams);
        openingBal = parseFloat(bankRes.rows[0].sum || 0);
     }
     
@@ -203,6 +244,35 @@ router.get('/balance/:method', auth, async (req, res) => {
                     (parseFloat(expSum.rows[0].sum || 0) + supPaid);
                     
     res.json({ balance });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Register Closeout / Galla Transfer
+router.post('/closeout', auth, async (req, res) => {
+  try {
+    const { amount_sent_to_admin, amount_kept_as_opening, notes } = req.body;
+    const userId = req.user.id;
+    const moduleType = req.user.module_type || 'Retail 1';
+
+    // Insert closeout expense to deduct cash balance by the amount sent to Admin
+    const result = await pool.query(
+      `INSERT INTO expenses (description, expense_type, category, amount, payment_type, expense_date, notes, user_id, module_type) 
+       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, $7, $8) RETURNING *`,
+      [
+        `Daily Galla Closeout: Handover to Admin`,
+        'Galla Closeout',
+        'Handover',
+        amount_sent_to_admin,
+        'Cash',
+        notes || `Galla cleared. Opening balance Rs. ${amount_kept_as_opening} kept for tomorrow.`,
+        userId,
+        moduleType
+      ]
+    );
+
+    res.json({ message: 'Register closed out successfully!', record: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

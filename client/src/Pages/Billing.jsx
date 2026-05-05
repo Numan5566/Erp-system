@@ -3,7 +3,7 @@ import {
   ShoppingCart, Search, Trash2, User, Plus, Minus, 
   Printer, CreditCard, Banknote, Truck, Tag, X, CheckCircle, Pencil,
   History, ArrowLeft, FileText, Download, Filter, Package, Phone, MapPin,
-  ArrowDownCircle, Hash
+  ArrowDownCircle, Hash, Users
 } from "lucide-react";
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
@@ -44,9 +44,10 @@ export default function Billing({ type }) {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [discount, setDiscount] = useState(0);
-  const [delivery, setDelivery] = useState(0);
-  const [paidAmount, setPaidAmount] = useState(0);
+  const [discount, setDiscount] = useState("");
+  const [delivery, setDelivery] = useState("");
+  const [paidAmount, setPaidAmount] = useState("");
+
   const [paymentType, setPaymentType] = useState("Cash");
   const [selectedBank, setSelectedBank] = useState('');
   const [showReturnModal, setShowReturnModal] = useState(false);
@@ -79,26 +80,37 @@ export default function Billing({ type }) {
   const [selectedCustForLedger, setSelectedCustForLedger] = useState(null);
   const [heldBills, setHeldBills] = useState([]);
   const [showHoldModal, setShowHoldModal] = useState(false);
+  
+  // Labour tracking states
+  const [labourGroups, setLabourGroups] = useState([]);
+  const [selectedLabourGroup, setSelectedLabourGroup] = useState("");
+  const [labourWages, setLabourWages] = useState("");
 
   const fetchData = async () => {
     const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
-    const [prodRes, salesRes, vehiclesRes, banksRes, custsRes] = await Promise.all([
+    const [prodRes, salesRes, vehiclesRes, banksRes, custsRes, labRes] = await Promise.all([
       fetch(`${PRODUCTS_API}?type=${activeTab}`, { headers }),
       fetch(`${SALES_API}?type=${activeTab}`, { headers }),
       fetch(`${TRANSPORT_API}?type=${activeTab}`, { headers }),
       fetch(`http://localhost:5000/api/banks`, { headers }),
-      fetch(`http://localhost:5000/api/customers?type=${activeTab}`, { headers })
+      fetch(`${CUSTOMERS_API}?type=${activeTab}`, { headers }),
+      fetch(`http://localhost:5000/api/labours`, { headers })
     ]);
     const prods = await prodRes.json();
     const sls = await salesRes.json();
     const vehs = await vehiclesRes.json();
     const banks = await banksRes.json();
     const custs = await custsRes.json();
+    const labours = await labRes.json();
+
     setProducts(Array.isArray(prods) ? prods : []);
     setSales(Array.isArray(sls) ? sls : []);
     setVehicles(Array.isArray(vehs) ? vehs : []);
     setBankAccounts(Array.isArray(banks) ? banks : []);
     setCustomers(Array.isArray(custs) ? custs : []);
+    if (Array.isArray(labours)) {
+      setLabourGroups([...new Set(labours.map(l => l.group_name))]);
+    }
   };
 
   useEffect(() => { fetchData(); }, [activeTab]);
@@ -337,6 +349,25 @@ export default function Billing({ type }) {
       if (res.ok) {
         const result = await res.json();
         setLastSaleId(result.saleId);
+
+        // Record Labour Loading Work Entry if selected
+        if (selectedLabourGroup) {
+          try {
+            await fetch("http://localhost:5000/api/labours/work-history", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({
+                group_name: selectedLabourGroup,
+                bill_id: result.saleId,
+                description: `Loading cement for Bill #${result.saleId} (${customerName || "Walk-in"})`,
+                amount: 0
+              })
+            });
+          } catch (e) { console.error("Labour logging failed:", e); }
+        }
         
         const prevBal = selectedCustomer ? parseFloat(selectedCustomer.balance) : 0;
         const finalBal = prevBal + balance;
@@ -366,6 +397,8 @@ export default function Billing({ type }) {
         setSelectedVehicleId('');
         setSelectedBank('');
         setBankDigits('');
+        setSelectedLabourGroup('');
+        setLabourWages('');
         fetchData();
       }
     } catch (err) {
@@ -632,6 +665,23 @@ export default function Billing({ type }) {
                   )}
                 </div>
               </div>
+              
+              {/* Assign Labour Loading Group */}
+              <div className="input-box mt-2" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '8px', paddingBottom: '4px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  <Users size={14} /> Assign Labour Loading Group
+                </label>
+                <div className="flex gap-2">
+                  <Dropdown 
+                    value={selectedLabourGroup} 
+                    options={labourGroups.map(g => ({ label: g, value: g }))} 
+                    onChange={(e) => setSelectedLabourGroup(e.value)} 
+                    placeholder="Select Group" 
+                    className="w-full" 
+                  />
+                </div>
+              </div>
+
               <Button label={loading ? "Processing..." : "Complete Sale"} icon="pi pi-check" onClick={handleCheckout} 
                       disabled={loading || cart.length === 0} className="w-full mt-3 p-button-lg shadow-2" />
             </div>

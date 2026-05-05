@@ -39,6 +39,7 @@ const Sidebar = () => {
     { id: 'transport', name: 'Transport Logistics', path: '/transport', icon: <Truck size={20} /> },
     { id: 'expenses', name: 'Daily Expenses', path: '/expenses', icon: <Wallet size={20} /> },
     { id: 'salary', name: 'Employee Salary', path: '/salary', icon: <Banknote size={20} /> },
+    { id: 'labours', name: 'Labour Tracking', path: '/labours', icon: <UsersIcon size={20} /> },
     { id: 'profit', name: 'Profit & Loss', path: '/profit', icon: <LineChart size={20} /> },
     { id: 'rent', name: 'Rent Tracking', path: '/rent', icon: <Home size={20} /> },
     { id: 'investment', name: 'Investments', path: '/investment', icon: <TrendingUp size={20} /> },

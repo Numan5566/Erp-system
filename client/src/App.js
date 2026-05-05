@@ -24,6 +24,7 @@ import Rent from "./Pages/Rent.jsx";
 import Investment from "./Pages/Investment.jsx";
 import OtherExpenses from "./Pages/OtherExpenses.jsx";
 import Accounts from "./Pages/Accounts.jsx";
+import Labours from "./Pages/Labours.jsx";
 
 
 class ErrorBoundary extends React.Component {
@@ -53,8 +54,69 @@ class ErrorBoundary extends React.Component {
 
 
 function App() {
+  React.useEffect(() => {
+    const handleGlobalFocus = (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        const val = e.target.value;
+        if (val === '0' || parseFloat(val) === 0) {
+          e.target.value = '';
+          // Dispatch native input event to update React state
+          const event = new Event('input', { bubbles: true });
+          e.target.dispatchEvent(event);
+        } else if (typeof e.target.select === 'function') {
+          e.target.select();
+        }
+      }
+    };
+
+    const handleGlobalInput = (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        const val = e.target.value;
+        // Strip any leading zeroes followed by other digits (e.g. "04455" becomes "4455")
+        if (/^0+\d+/.test(val)) {
+          e.target.value = val.replace(/^0+/, '');
+          const event = new Event('input', { bubbles: true });
+          e.target.dispatchEvent(event);
+        } else if (val === '0' && e.target.type === 'number') {
+          // If the value is strictly "0" in a number field, clear it immediately
+          e.target.value = '';
+          const event = new Event('input', { bubbles: true });
+          e.target.dispatchEvent(event);
+        }
+      }
+    };
+
+
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'Enter' && e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        if (e.target.type === 'submit' || e.target.tagName === 'TEXTAREA') return;
+        
+        e.preventDefault();
+        const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), .p-inputtext:not([disabled])'));
+        const index = inputs.indexOf(e.target);
+        if (index > -1 && index < inputs.length - 1) {
+          inputs[index + 1].focus();
+        }
+      }
+    };
+
+    document.addEventListener('focusin', handleGlobalFocus);
+    document.addEventListener('click', handleGlobalFocus);
+    document.addEventListener('input', handleGlobalInput);
+    document.addEventListener('keydown', handleGlobalKeyDown);
+
+    return () => {
+      document.removeEventListener('focusin', handleGlobalFocus);
+      document.removeEventListener('click', handleGlobalFocus);
+      document.removeEventListener('input', handleGlobalInput);
+      document.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, []);
+
+
   return (
     <ErrorBoundary>
+
       <AuthProvider>
         <Router>
         <Routes>
@@ -81,6 +143,7 @@ function App() {
           <Route path="/investment" element={<PrivateRoute><MainLayout><Investment /></MainLayout></PrivateRoute>} />
           <Route path="/other-expenses" element={<PrivateRoute><MainLayout><OtherExpenses /></MainLayout></PrivateRoute>} />
           <Route path="/accounts" element={<PrivateRoute><MainLayout><Accounts /></MainLayout></PrivateRoute>} />
+          <Route path="/labours" element={<PrivateRoute><MainLayout><Labours /></MainLayout></PrivateRoute>} />
         </Routes>
       </Router>
     </AuthProvider>

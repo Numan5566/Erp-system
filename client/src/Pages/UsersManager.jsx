@@ -20,7 +20,8 @@ const availableModules = [
   { id: 'accounts', label: 'Accounts' },
   { id: 'rent', label: 'Rent' },
   { id: 'investment', label: 'Investment' },
-  { id: 'other_expenses', label: 'Other Expenses' }
+  { id: 'other_expenses', label: 'Other Expenses' },
+  { id: 'labours', label: 'Labour Tracking' }
 ];
 
 export default function UsersManager() {
@@ -122,17 +123,6 @@ export default function UsersManager() {
             <input type="text" placeholder={editingId ? "Edit Password" : "Password"} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required />
           </div>
           
-          <div className="form-row">
-            <label style={{fontSize: '0.9rem', color: '#666', marginBottom: '5px', display: 'block'}}>Account Role</label>
-            <select 
-              value={formData.role} 
-              onChange={e => setFormData({...formData, role: e.target.value})}
-              style={{padding: '8px', borderRadius: '4px', border: '1px solid #ddd', width: '200px'}}
-            >
-              <option value="user">Operator (Limited)</option>
-              <option value="admin">Admin (Full Access)</option>
-            </select>
-          </div>
 
           <h4>Assign Module Permissions</h4>
           <div className="permissions-grid">
