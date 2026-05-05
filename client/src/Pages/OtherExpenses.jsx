@@ -30,15 +30,15 @@ const emptyForm = {
 
 export default function OtherExpenses({ type }) {
   const { user } = useContext(AuthContext);
-  const [activeTab, setActiveTab] = useState(type || (user?.role === 'admin' ? "" : user?.module_type || "Wholesale"));
+  const [activeTab, setActiveTab] = useState(type || (user?.email === 'admin@erp.com' ? "" : user?.module_type || "Wholesale"));
 
   useEffect(() => {
     if (type) {
       setActiveTab(type);
-    } else if (user?.module_type && user.role !== 'admin') {
+    } else if (user?.module_type && user?.email !== 'admin@erp.com') {
       setActiveTab(user.module_type);
     }
-  }, [type, user?.module_type, user?.role]);
+  }, [type, user?.module_type, user?.email]);
 
   const [records, setRecords] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -100,7 +100,7 @@ export default function OtherExpenses({ type }) {
   });
 
   // If Admin and no counter selected, show selection screen
-  if (user?.role === 'admin' && !activeTab && !type) {
+  if (user?.email === 'admin@erp.com' && !activeTab && !type) {
     return (
       <div className="admin-selection-container">
         <h2>Select Counter</h2>

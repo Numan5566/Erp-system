@@ -78,8 +78,12 @@ export default function Billing({ type }) {
   const [ledgerTo, setLedgerTo] = useState("");
   const [ledgerFilter, setLedgerFilter] = useState("all");
   const [selectedCustForLedger, setSelectedCustForLedger] = useState(null);
-  const [heldBills, setHeldBills] = useState([]);
+  const [heldBills, setHeldBills] = useState(() => JSON.parse(localStorage.getItem('heldBills') || '[]'));
   const [showHoldModal, setShowHoldModal] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('heldBills', JSON.stringify(heldBills));
+  }, [heldBills]);
   
   // Labour tracking states
   const [labourGroups, setLabourGroups] = useState([]);
@@ -106,7 +110,7 @@ export default function Billing({ type }) {
     setProducts(Array.isArray(prods) ? prods : []);
     setSales(Array.isArray(sls) ? sls : []);
     setVehicles(Array.isArray(vehs) ? vehs : []);
-    setBankAccounts(Array.isArray(banks) ? banks : []);
+    setBankAccounts(Array.isArray(banks) ? banks.filter(b => b.module_type !== 'Admin Recipient') : []);
     setCustomers(Array.isArray(custs) ? custs : []);
     if (Array.isArray(labours)) {
       setLabourGroups([...new Set(labours.map(l => l.group_name))]);
@@ -646,7 +650,7 @@ export default function Billing({ type }) {
                   <div className="flex gap-2">
                     <div className="flex flex-1 gap-1">
                       <InputText type="number" min="0" placeholder="Paid Amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} className="flex-1" />
-                      <Button icon="pi pi-pause" onClick={holdBill} tooltip="Hold Bill" className="p-button-warning p-button-outlined" style={{width: '42px'}} />
+                      <Button icon="pi pi-pause" onClick={holdBill} tooltip="Hold Bill" className="hold-bill-btn" />
                     </div>
                     <Dropdown value={paymentType} options={[
                       {label: 'Cash', value: 'Cash'},

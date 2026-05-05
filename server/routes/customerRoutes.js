@@ -17,9 +17,9 @@ router.get('/', auth, async (req, res) => {
         params.push(type);
       }
     } else {
-      // Normal users see their own data OR data added by Admin for their module_type
-      query += ' WHERE user_id = $1 OR module_type = $2';
-      params.push(req.user.id, req.user.module_type || 'Retail 1');
+      // Normal users strictly see only their own created customers
+      query += ' WHERE user_id = $1';
+      params.push(req.user.id);
     }
 
     query += ' ORDER BY name ASC';

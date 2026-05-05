@@ -114,16 +114,28 @@ router.get('/balances', auth, async (req, res) => {
 // Get all banks
 router.get('/', auth, async (req, res) => {
   try {
+    const includeRecipients = req.query.include_recipients === 'true';
     let result;
     if (req.user.email === 'admin@erp.com') {
       // Master Admin sees ALL banks
-      result = await pool.query('SELECT * FROM bank_accounts ORDER BY id ASC');
+      if (includeRecipients) {
+        result = await pool.query('SELECT * FROM bank_accounts ORDER BY id ASC');
+      } else {
+        result = await pool.query('SELECT * FROM bank_accounts WHERE module_type IS NULL OR module_type != \'Admin Recipient\' ORDER BY id ASC');
+      }
     } else {
-      // Everyone else sees their own banks, those added for their shop, AND all Admin bank accounts so they can select them as Galla recipients!
-      result = await pool.query(
-        'SELECT * FROM bank_accounts WHERE user_id = $1 OR module_type = $2 OR user_id IN (SELECT id FROM users WHERE role = \'admin\') ORDER BY id ASC',
-        [req.user.id, req.user.module_type || 'Retail 1']
-      );
+      // Everyone else sees their own banks, those added for their shop
+      if (includeRecipients) {
+        result = await pool.query(
+          'SELECT * FROM bank_accounts WHERE user_id = $1 OR module_type = $2 OR module_type = \'Admin Recipient\' OR user_id IN (SELECT id FROM users WHERE role = \'admin\') ORDER BY id ASC',
+          [req.user.id, req.user.module_type || 'Retail 1']
+        );
+      } else {
+        result = await pool.query(
+          'SELECT * FROM bank_accounts WHERE (user_id = $1 OR module_type = $2 OR user_id IN (SELECT id FROM users WHERE role = \'admin\')) AND (module_type IS NULL OR module_type != \'Admin Recipient\') ORDER BY id ASC',
+          [req.user.id, req.user.module_type || 'Retail 1']
+        );
+      }
     }
     res.json(result.rows);
   } catch (err) {

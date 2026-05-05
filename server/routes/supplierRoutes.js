@@ -17,8 +17,9 @@ router.get('/', auth, async (req, res) => {
         params.push(type);
       }
     } else {
-      query += ' WHERE user_id = $1 OR module_type = $2';
-      params.push(req.user.id, req.user.module_type || 'Retail 1');
+      // Normal users strictly see only their own created suppliers
+      query += ' WHERE user_id = $1';
+      params.push(req.user.id);
     }
 
     query += ' ORDER BY name ASC';

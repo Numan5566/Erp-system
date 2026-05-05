@@ -200,7 +200,7 @@ export default function Expenses({ type }) {
           <Search size={18} />
           <input type="text" placeholder="Search expenses..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <div className="filter-group" style={{display:'flex', gap:'10px'}}>
+        <div className="filter-group">
            {["All", "Office", "House"].map(t => (
              <button key={t} className={`tab-btn ${filterType === t ? 'active' : ''}`} onClick={() => setFilterType(t)}>{t}</button>
            ))}

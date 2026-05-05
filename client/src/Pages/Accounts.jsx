@@ -33,10 +33,17 @@ export default function Accounts() {
   const [activeTab, setActiveTab] = useState(user?.role === 'admin' ? 'Wholesale' : (user?.module_type || 'Wholesale'));
 
   const filteredAccounts = useMemo(() => {
+    const recipientAccounts = accounts.filter(a => a.module_type === 'Admin Recipient');
     if (user?.role === 'admin') {
-      return accounts.filter(a => (a.module_type || 'Wholesale') === activeTab);
+      return [
+        ...accounts.filter(a => (a.module_type || 'Wholesale') === activeTab && a.module_type !== 'Admin Recipient'),
+        ...recipientAccounts
+      ];
     }
-    return accounts;
+    return [
+      ...accounts.filter(a => a.module_type !== 'Admin Recipient'),
+      ...recipientAccounts
+    ];
   }, [accounts, activeTab, user]);
 
   const filteredSales = useMemo(() => {
@@ -212,7 +219,7 @@ export default function Accounts() {
   // Fetch bank accounts
   const fetchAccounts = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/banks', {
+      const res = await fetch('http://localhost:5000/api/banks?include_recipients=true', {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -414,12 +421,25 @@ export default function Accounts() {
         amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
         created_at: p.purchase_date, isTransportFare: true
       })),
-      ...filteredGeneralExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
+      ...generalExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
       ...filteredSalaries.map(s => ({ ...s, isExpense: true, customer_name: `Salary: ${s.employee_name}`, payment_type: 'Cash', created_at: s.payment_date })),
       ...filteredRents.map(r => ({ ...r, isExpense: true, customer_name: `Rent: ${r.property_name}`, payment_type: 'Cash', created_at: r.rent_date })),
       ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, customer_name: `Other: ${o.title}`, payment_type: o.payment_method, created_at: o.date })),
       ...filteredInvestments.map(i => ({ ...i, isIncome: true, customer_name: `Invest: ${i.investor}`, payment_type: 'Cash', created_at: i.date }))
-    ].filter(s => {
+    ].map(s => {
+        if (selectedLedgerAccount?.module_type === 'Admin Recipient') {
+          const isGallaCloseout = s.customer_name?.includes('Galla Closeout') || s.title?.includes('Galla Closeout') || s.notes?.includes('Recipient Bank') || String(s.notes).includes(selectedLedgerAccount.bank_name);
+          if (isGallaCloseout && s.notes?.includes(selectedLedgerAccount.bank_name) && s.notes?.includes(selectedLedgerAccount.account_number)) {
+            return {
+              ...s,
+              isExpense: false,
+              isIncome: true,
+              customer_name: `Received Galla Handover`
+            };
+          }
+        }
+        return s;
+    }).filter(s => {
         if (!selectedLedgerAccount) return false;
         
         let method = (s.payment_type || 'Cash').replace('Bank - ', '');
@@ -428,6 +448,11 @@ export default function Accounts() {
         }
         
         const isAccCash = selectedLedgerAccount.isCash || selectedLedgerAccount.bank_name.toLowerCase() === 'cash' || selectedLedgerAccount.bank_name.toLowerCase() === 'cash account';
+        
+        if (selectedLedgerAccount.module_type === 'Admin Recipient') {
+          return s.customer_name === 'Received Galla Handover' && s.notes?.includes(selectedLedgerAccount.bank_name) && s.notes?.includes(selectedLedgerAccount.account_number);
+        }
+
         let accountMatch = isAccCash ? method === 'Cash' : method === selectedLedgerAccount.bank_name;
         
         if (!accountMatch) return false;
@@ -493,12 +518,28 @@ export default function Accounts() {
         amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
         created_at: p.purchase_date, isTransportFare: true
       })),
-      ...filteredGeneralExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
+      ...generalExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
       ...filteredSalaries.map(s => ({ ...s, isExpense: true, customer_name: `Salary: ${s.employee_name}`, payment_type: 'Cash', created_at: s.payment_date })),
       ...filteredRents.map(r => ({ ...r, isExpense: true, customer_name: `Rent: ${r.property_name}`, payment_type: 'Cash', created_at: r.rent_date })),
       ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, customer_name: `Other: ${o.title}`, payment_type: o.payment_method, created_at: o.date })),
       ...filteredInvestments.map(i => ({ ...i, isIncome: true, customer_name: `Invest: ${i.investor}`, payment_type: 'Cash', created_at: i.date }))
-    ].filter(s => {
+    ].map(s => {
+      if (acc.module_type === 'Admin Recipient') {
+        const isGallaCloseout = s.customer_name?.includes('Galla Closeout') || s.title?.includes('Galla Closeout') || s.notes?.includes('Recipient Bank') || String(s.notes).includes(acc.bank_name);
+        if (isGallaCloseout && s.notes?.includes(acc.bank_name) && s.notes?.includes(acc.account_number)) {
+          return {
+            ...s,
+            isExpense: false,
+            isIncome: true,
+            customer_name: `Received Galla Handover`
+          };
+        }
+      }
+      return s;
+    }).filter(s => {
+      if (acc.module_type === 'Admin Recipient') {
+        return s.customer_name === 'Received Galla Handover' && s.notes?.includes(acc.bank_name) && s.notes?.includes(acc.account_number);
+      }
       const payType = (s.payment_type || 'Cash').replace('Bank - ', '');
       return isCash ? (payType === 'Cash' || payType === 'Cash Account') : payType === acc.bank_name;
     }).sort((a, b) => new Date(b.created_at || b.purchase_date || b.date) - new Date(a.created_at || a.purchase_date || a.date));
@@ -606,8 +647,15 @@ export default function Accounts() {
         }}>
           {displayAccounts.map(acc => {
             const cleanName = acc.bank_name.replace(' Account', '');
-            const bal = paymentSummary[cleanName] || paymentSummary[acc.bank_name] || 0;
+            let bal = paymentSummary[cleanName] || paymentSummary[acc.bank_name] || 0;
+            
+            if (acc.module_type === 'Admin Recipient') {
+              bal = filteredGeneralExpenses
+                .filter(e => (e.title === 'Galla Closeout' || e.description?.includes('Galla Closeout') || e.notes?.includes('Recipient Bank')) && e.notes?.includes(acc.bank_name) && e.notes?.includes(acc.account_number))
+                .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+            }
             const recent = getRecentTransactionsForAccount(acc);
+            const isAdminRecipient = acc.module_type === 'Admin Recipient';
 
             return (
               <div key={acc.id} 
@@ -616,7 +664,7 @@ export default function Accounts() {
                   background: 'white',
                   borderRadius: '20px',
                   padding: '20px',
-                  border: '1px solid #e2e8f0',
+                  border: isAdminRecipient ? '1px dashed #f59e0b' : '1px solid #e2e8f0',
                   boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
                   cursor: 'pointer',
                   transition: 'transform 0.2s, box-shadow 0.2s',
@@ -637,11 +685,25 @@ export default function Accounts() {
                 <div>
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
                     <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                      <div style={{padding: '8px', borderRadius: '10px', background: acc.isCash ? '#f0fdf4' : '#eff6ff', color: acc.isCash ? '#16a34a' : '#2563eb'}}>
+                      <div style={{padding: '8px', borderRadius: '10px', background: acc.isCash ? '#f0fdf4' : (isAdminRecipient ? '#fef3c7' : '#eff6ff'), color: acc.isCash ? '#16a34a' : (isAdminRecipient ? '#d97706' : '#2563eb')}}>
                         {acc.isCash ? <CreditCard size={18}/> : <Landmark size={18}/>}
                       </div>
                       <div>
-                        <h4 style={{margin: 0, fontWeight: 800, color: '#1e293b', fontSize: '1rem'}}>{acc.bank_name}</h4>
+                        <div style={{display: 'flex', alignItems: 'center', gap: '5px'}}>
+                          <h4 style={{margin: 0, fontWeight: 800, color: '#1e293b', fontSize: '1rem'}}>{acc.bank_name}</h4>
+                          {isAdminRecipient && (
+                            <span style={{
+                              background: '#fef3c7',
+                              color: '#d97706',
+                              fontSize: '0.6rem',
+                              fontWeight: 800,
+                              padding: '2px 6px',
+                              borderRadius: '20px',
+                              textTransform: 'uppercase',
+                              border: '1px solid #fde68a'
+                            }}>Admin</span>
+                          )}
+                        </div>
                         {acc.account_number && acc.account_number !== 'N/A' && (
                           <span style={{fontSize: '0.75rem', color: '#64748b'}}>A/C: {acc.account_number}</span>
                         )}
@@ -651,7 +713,7 @@ export default function Accounts() {
                   </div>
 
                   <div style={{marginBottom: '15px'}}>
-                    <span style={{fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase'}}>Current Balance</span>
+                    <span style={{fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase'}}>{isAdminRecipient ? 'Total Handovers Received' : 'Current Balance'}</span>
                     <div style={{fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', marginTop: '2px'}}>
                       Rs. {bal.toLocaleString()}
                     </div>
@@ -1067,7 +1129,7 @@ export default function Accounts() {
                     onChange={e => setCloseoutForm(prev => ({ ...prev, admin_bank_id: e.target.value }))}
                   >
                     <option value="">-- Select Recipient Admin Account --</option>
-                    {displayAccounts.filter(acc => !acc.isCash && acc.bank_name.toLowerCase() !== 'cash' && acc.bank_name.toLowerCase() !== 'cash account' && (user?.role === 'admin' || acc.user_id !== user?.id)).map(acc => (
+                    {displayAccounts.filter(acc => acc.module_type === 'Admin Recipient').map(acc => (
                       <option key={acc.id} value={acc.id}>{acc.bank_name} - {acc.account_title}</option>
                     ))}
 

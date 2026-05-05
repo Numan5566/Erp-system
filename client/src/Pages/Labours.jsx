@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Users, FolderGit2, Contact, Coins, Plus, Search, Edit, Trash2, X, Phone, Hash, CreditCard, ChevronLeft, ArrowUpCircle, ArrowDownCircle, ClipboardList } from "lucide-react";
+import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
@@ -18,10 +19,11 @@ export default function Labours() {
   const [selectedGroup, setSelectedGroup] = useState(null); // Which group card is clicked
   const [loading, setLoading] = useState(false);
   const [liveBalances, setLiveBalances] = useState({});
+  const [banks, setBanks] = useState([]);
 
   // Payment disburse modal
   const [showPayModal, setShowPayModal] = useState(false);
-  const [payForm, setPayForm] = useState({ amount: "", notes: "" });
+  const [payForm, setPayForm] = useState({ amount: "", notes: "", payment_type: "Cash" });
 
   // Log manual work modal
   const [showWorkModal, setShowWorkModal] = useState(false);
@@ -35,18 +37,21 @@ export default function Labours() {
     setLoading(true);
     try {
       const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
-      const [labRes, workRes, balRes] = await Promise.all([
+      const [labRes, workRes, balRes, banksRes] = await Promise.all([
         fetch(API, { headers }),
         fetch(`${API}/work-history`, { headers }),
-        fetch("http://localhost:5000/api/banks/balances", { headers })
+        fetch("http://localhost:5000/api/banks/balances", { headers }),
+        fetch("http://localhost:5000/api/banks", { headers })
       ]);
       const labData = await labRes.json();
       const workData = await workRes.json();
       const balData = await balRes.json();
+      const banksData = await banksRes.json();
 
       setLabours(Array.isArray(labData) ? labData : []);
       setWorkHistory(Array.isArray(workData) ? workData : []);
       setLiveBalances(balData || {});
+      setBanks(Array.isArray(banksData) ? banksData : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -119,9 +124,14 @@ export default function Labours() {
   const handlePayWages = async (e) => {
     e.preventDefault();
     const amt = parseFloat(payForm.amount || 0);
-    const cashAvailable = liveBalances['Cash'] || 0;
+    const getSelectedPaymentBalance = () => {
+      if (payForm.payment_type === 'Cash') return liveBalances['Cash'] || 0;
+      const cleanBank = payForm.payment_type.replace('Bank - ', '');
+      return liveBalances[cleanBank] || 0;
+    };
+    const availableBalance = getSelectedPaymentBalance();
 
-    if (amt > cashAvailable) {
+    if (amt > availableBalance) {
       return; // Blocked dynamically by UI inline warning
     }
 
@@ -136,13 +146,14 @@ export default function Labours() {
         body: JSON.stringify({
           group_name: selectedGroup,
           amount: amt,
-          notes: payForm.notes
+          notes: payForm.notes,
+          payment_type: payForm.payment_type
         })
       });
 
       if (res.ok) {
         setShowPayModal(false);
-        setPayForm({ amount: "", notes: "" });
+        setPayForm({ amount: "", notes: "", payment_type: "Cash" });
         fetchData();
       }
     } catch (err) {
@@ -208,7 +219,12 @@ export default function Labours() {
   // Stats Calculations
   const totalLabours = labours.length;
   const totalOutstandingWages = groupsStats.reduce((sum, g) => sum + (g.balance > 0 ? g.balance : 0), 0);
-  const cashAvailable = liveBalances['Cash'] || 0;
+  const getSelectedPaymentBalance = () => {
+    if (payForm.payment_type === 'Cash') return liveBalances['Cash'] || 0;
+    const cleanBank = payForm.payment_type.replace('Bank - ', '');
+    return liveBalances[cleanBank] || 0;
+  };
+  const cashAvailable = getSelectedPaymentBalance();
   const isWagePayInsufficient = parseFloat(payForm.amount || 0) > cashAvailable;
 
   return (
@@ -334,14 +350,10 @@ export default function Labours() {
                       <td>{l.contact || "N/A"}</td>
                       <td style={{fontWeight: 700, color: '#0f766e'}}>Rs. {parseFloat(l.rate_per_day || 0).toLocaleString()}</td>
                       <td style={{textAlign: 'center'}}>
-                        <div style={{display: 'flex', gap: '8px', justifyContent: 'center'}}>
-                          <button className="action-btnedit" onClick={() => handleEdit(l)} style={{padding: '6px', background: '#f1f5f9', border: 'none', borderRadius: '6px', color: '#0f766e', cursor: 'pointer'}}>
-                            <Edit size={16} />
-                          </button>
-                          <button className="action-btndelete" onClick={() => handleDelete(l.id)} style={{padding: '6px', background: '#fef2f2', border: 'none', borderRadius: '6px', color: '#ef4444', cursor: 'pointer'}}>
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                        <ActionMenu 
+                          onEdit={() => handleEdit(l)} 
+                          onDelete={() => handleDelete(l.id)} 
+                        />
                       </td>
                     </tr>
                   ))
@@ -482,32 +494,50 @@ export default function Labours() {
             </div>
 
             <form onSubmit={handlePayWages} className="custom-form">
-              <div style={{background: '#f0fdf4', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between'}}>
-                <span style={{fontWeight: 600, color: '#15803d'}}>Cash on Hand:</span>
-                <span style={{fontWeight: 700, color: '#15803d'}}>Rs. {cashAvailable.toLocaleString()}</span>
-              </div>
+               <div className="form-group" style={{marginBottom: '15px'}}>
+                 <label>Payment Method / Account *</label>
+                 <div className="input-wrapper">
+                   <CreditCard size={18} />
+                   <select 
+                     value={payForm.payment_type} 
+                     onChange={(e) => setPayForm({ ...payForm, payment_type: e.target.value })}
+                     style={{width: '100%', padding: '12px 10px', borderRadius: '8px', border: 'none', outline: 'none', background: 'transparent'}}
+                     required
+                   >
+                     <option value="Cash">Cash Account (Main Counter)</option>
+                     {banks.map(b => (
+                       <option key={b.id} value={`Bank - ${b.bank_name}`}>{b.bank_name} - {b.account_title}</option>
+                     ))}
+                   </select>
+                 </div>
+               </div>
 
-              <div className="form-group" style={{marginBottom: '15px'}}>
-                <label>Amount Disbursed (Rs.) *</label>
-                <div className="input-wrapper">
-                  <Coins size={18} />
-                  <input type="number" required placeholder="e.g. 5000" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} />
-                </div>
-              </div>
+               <div style={{background: '#f0fdf4', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between'}}>
+                 <span style={{fontWeight: 600, color: '#15803d'}}>Available Balance:</span>
+                 <span style={{fontWeight: 700, color: '#15803d'}}>Rs. {cashAvailable.toLocaleString()}</span>
+               </div>
 
-              {isWagePayInsufficient && (
-                <div style={{ color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '10px 14px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
-                  ⚠️ Insufficient Balance! Available: Rs. {cashAvailable.toLocaleString()}
-                </div>
-              )}
+               <div className="form-group" style={{marginBottom: '15px'}}>
+                 <label>Amount Disbursed (Rs.) *</label>
+                 <div className="input-wrapper">
+                   <Coins size={18} />
+                   <input type="number" required placeholder="0.00" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} />
+                 </div>
+               </div>
 
-              <div className="form-group" style={{marginBottom: '20px'}}>
-                <label>Notes / References *</label>
-                <div className="input-wrapper">
-                  <ArrowUpCircle size={18} />
-                  <input type="text" required placeholder="e.g. Loading wages for July" value={payForm.notes} onChange={(e) => setPayForm({ ...payForm, notes: e.target.value })} />
-                </div>
-              </div>
+               {isWagePayInsufficient && (
+                 <div style={{ color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '10px 14px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
+                   ⚠️ Insufficient Balance! Available: Rs. {cashAvailable.toLocaleString()}
+                 </div>
+               )}
+
+               <div className="form-group" style={{marginBottom: '20px'}}>
+                 <label>Notes / References *</label>
+                 <div className="input-wrapper">
+                   <ArrowUpCircle size={18} />
+                   <input type="text" required placeholder="e.g. Wages Paid" value={payForm.notes} onChange={(e) => setPayForm({ ...payForm, notes: e.target.value })} />
+                 </div>
+               </div>
 
               <div className="form-actions" style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
                 <button type="button" className="btn-secondary" onClick={() => setShowPayModal(false)}>Cancel</button>
