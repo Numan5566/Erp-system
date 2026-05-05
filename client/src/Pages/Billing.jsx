@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { 
   ShoppingCart, Search, Trash2, User, Plus, Minus, 
-  Printer, CreditCard, Banknote, Truck, Tag, X, CheckCircle,
+  Printer, CreditCard, Banknote, Truck, Tag, X, CheckCircle, Pencil,
   History, ArrowLeft, FileText, Download, Filter, Package, Phone, MapPin
 } from "lucide-react";
 import { Button } from 'primereact/button';
@@ -59,6 +59,15 @@ export default function Billing({ type }) {
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [viewSale, setViewSale] = useState(null);
   const [receiptData, setReceiptData] = useState(null);
+  const [editId, setEditId] = useState(null);
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [ledgerData, setLedgerData] = useState([]);
+  const [ledgerFrom, setLedgerFrom] = useState("");
+  const [ledgerTo, setLedgerTo] = useState("");
+  const [ledgerFilter, setLedgerFilter] = useState("all");
+  const [selectedCustForLedger, setSelectedCustForLedger] = useState(null);
+  const [heldBills, setHeldBills] = useState([]);
+  const [showHoldModal, setShowHoldModal] = useState(false);
 
   const fetchData = async () => {
     const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
@@ -145,6 +154,57 @@ export default function Billing({ type }) {
     }));
   };
 
+  const holdBill = () => {
+    if (cart.length === 0) return alert("Cannot hold an empty cart!");
+    const billToHold = {
+      id: Date.now(),
+      time: new Date().toLocaleTimeString(),
+      cart,
+      customerName,
+      customerPhone,
+      customerAddress,
+      discount,
+      delivery,
+      paidAmount,
+      paymentType,
+      selectedBank,
+      transportType,
+      selectedVehicleId,
+      selectedCustomer
+    };
+    setHeldBills([...heldBills, billToHold]);
+    // Clear current state
+    setCart([]);
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerAddress('');
+    setDiscount(0);
+    setDelivery(0);
+    setPaidAmount(0);
+    setTransportType('');
+    setSelectedVehicleId('');
+    setSelectedCustomer(null);
+    alert("Current bill is now on hold. You can start a new one!");
+  };
+
+  const resumeBill = (held) => {
+    setCart(held.cart);
+    setCustomerName(held.customerName);
+    setCustomerPhone(held.customerPhone);
+    setCustomerAddress(held.customerAddress);
+    setDiscount(held.discount);
+    setDelivery(held.delivery);
+    setPaidAmount(held.paidAmount);
+    setPaymentType(held.paymentType);
+    setSelectedBank(held.selectedBank);
+    setTransportType(held.transportType);
+    setSelectedVehicleId(held.selectedVehicleId);
+    setSelectedCustomer(held.selectedCustomer);
+    
+    setHeldBills(heldBills.filter(b => b.id !== held.id));
+    setShowHoldModal(false);
+  };
+
   const removeFromCart = (id) => setCart(cart.filter(item => item.id !== id));
 
   const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
@@ -154,6 +214,11 @@ export default function Billing({ type }) {
   const handleCheckout = async () => {
     if (cart.length === 0) return alert("Cart is empty!");
     
+    if (parseFloat(paidAmount || 0) > netTotal) {
+      alert("Invalid Payment: Paid amount cannot be more than the total bill amount!");
+      return;
+    }
+
     let finalPaymentType = paymentType;
     if (paymentType === 'Bank') {
       if (!selectedBank) return alert('Please select a Bank');
@@ -179,8 +244,9 @@ export default function Billing({ type }) {
         items: cart
       };
 
-      const res = await fetch(SALES_API, {
-        method: "POST",
+      const url = editId ? `${SALES_API}/${editId}` : SALES_API;
+      const res = await fetch(url, {
+        method: editId ? "PUT" : "POST",
         headers: { 
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
@@ -209,6 +275,7 @@ export default function Billing({ type }) {
         });
         setShowSuccess(true);
         setCart([]);
+        setEditId(null);
         setDiscount(0);
         setDelivery(0);
         setPaidAmount(0);
@@ -226,6 +293,53 @@ export default function Billing({ type }) {
     } finally {
       setLoading(false);
     }
+  };
+  
+  const openLedger = async (customer, from = "", to = "", filter = "all") => {
+    if (!customer?.id) return alert("This customer record does not have a valid ID for ledger.");
+    setSelectedCustForLedger(customer);
+    setLedgerFrom(from);
+    setLedgerTo(to);
+    setLedgerFilter(filter);
+    setShowLedgerModal(true);
+    setLoading(true);
+    try {
+      let url = `${SALES_API}/ledger/${customer.id}`;
+      if (from && to) url += `?from=${from}&to=${to}`;
+      const res = await fetch(url, {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      setLedgerData(data);
+    } catch (err) {
+      console.error("Failed to fetch ledger", err);
+    }
+    setLoading(false);
+  };
+
+  const applyLedgerFilter = (filterKey) => {
+    let from = "", to = "";
+    const today = new Date();
+    
+    if (filterKey === 'today') {
+      from = today.toISOString().split('T')[0];
+      to = from;
+    } else if (filterKey === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(today.getDate() - 7);
+      from = weekAgo.toISOString().split('T')[0];
+      to = today.toISOString().split('T')[0];
+    } else if (filterKey === 'month') {
+      from = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+      to = today.toISOString().split('T')[0];
+    }
+
+    if (filterKey === 'custom') {
+      setLedgerFilter('custom');
+      return;
+    }
+
+    openLedger(selectedCustForLedger, from, to, filterKey);
   };
 
   const filteredProducts = products.filter(p => 
@@ -253,8 +367,27 @@ export default function Billing({ type }) {
         )}
 
         <div className="module-nav" style={{ display: 'flex', gap: '12px' }}>
-          <button className={view === 'POS' ? 'active' : ''} onClick={() => setView('POS')}><Plus size={18}/> New Sale</button>
+          <button className={view === 'POS' ? 'active' : ''} onClick={() => setView('POS')}>
+            {editId ? <><Pencil size={18}/> Editing Sale #{editId}</> : <><Plus size={18}/> New Sale</>}
+          </button>
           <button className={view === 'History' ? 'active' : ''} onClick={() => setView('History')}><History size={18}/> Sales History</button>
+          {heldBills.length > 0 && (
+            <button className="btn-secondary" onClick={() => setShowHoldModal(true)} style={{background: '#fff7ed', color: '#c2410c', borderColor: '#fdba74'}}>
+              <History size={18}/> Held Bills ({heldBills.length})
+            </button>
+          )}
+          {editId && (
+            <button className="btn-secondary" onClick={() => {
+              setEditId(null);
+              setCart([]);
+              setCustomerName('');
+              setCustomerPhone('');
+              setCustomerAddress('');
+              setDiscount(0);
+              setDelivery(0);
+              setPaidAmount(0);
+            }}><X size={18}/> Cancel Edit</button>
+          )}
         </div>
       </div>
 
@@ -281,7 +414,7 @@ export default function Billing({ type }) {
                   </div>
                   <h4>{prod.name}</h4>
                   <div className="card-bottom">
-                    <span className="price">Rs.{prod.price}</span>
+                    <span className="price">Rs. {prod.price}</span>
                     <div className="add-btn"><Plus size={18}/></div>
                   </div>
                 </div>
@@ -348,14 +481,16 @@ export default function Billing({ type }) {
                       <Button icon="pi pi-trash" className="p-button-rounded p-button-danger p-button-text p-button-sm" onClick={() => removeFromCart(item.id)} />
                     </div>
                     <div className="item-bottom">
-                      <div className="p-inputgroup" style={{width: '100px'}}>
-                        <span className="p-inputgroup-addon" style={{fontSize: '0.7rem'}}>Rs.</span>
-                        <InputText type="number" value={item.price} onChange={(e) => updatePrice(item.id, e.target.value)} className="p-inputtext-sm" />
+                      <div className="p-inputgroup" style={{flex: '1', minWidth: '100px', maxWidth: '150px'}}>
+                        <span className="p-inputgroup-addon" style={{fontWeight: '800', color: '#3b82f6', background: '#eff6ff', fontSize: '0.8rem'}}>Rs</span>
+                        <InputText type="number" value={item.price} onChange={(e) => updatePrice(item.id, e.target.value)} 
+                                  className="p-inputtext-sm font-bold" style={{width: '100%'}} />
                       </div>
                       <div className="qty-ctrl">
                         <Button icon="pi pi-minus" className="p-button-rounded p-button-secondary p-button-text p-button-sm" onClick={() => updateQty(item.id, -1)} />
                         <InputText type="number" value={item.qty} onChange={(e) => setQtyDirect(item.id, e.target.value)} 
-                                  className="p-inputtext-sm text-center font-bold" style={{width: '50px', border: 'none', background: 'transparent'}} />
+                                  className="p-inputtext-sm text-center font-bold" 
+                                  style={{width: `${Math.max(40, (String(item.qty).length * 10) + 20)}px`, border: 'none', background: 'transparent', transition: 'width 0.2s'}} />
                         <Button icon="pi pi-plus" className="p-button-rounded p-button-secondary p-button-text p-button-sm" onClick={() => updateQty(item.id, 1)} />
                       </div>
                       <div className="item-subtotal">Rs. {(item.price * item.qty).toLocaleString()}</div>
@@ -373,16 +508,16 @@ export default function Billing({ type }) {
                 </div>
                 <div className="calc-row">
                   <span>Discount</span>
-                  <div className="p-inputgroup p-inputgroup-sm" style={{width: '100px'}}>
-                    <span className="p-inputgroup-addon">Rs.</span>
-                    <InputText type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                  <div className="p-inputgroup p-inputgroup-sm" style={{width: '140px'}}>
+                    <span className="p-inputgroup-addon font-bold" style={{color: '#ef4444'}}>Rs</span>
+                    <InputText type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} className="font-bold" />
                   </div>
                 </div>
                 <div className="calc-row">
                   <span>Delivery</span>
-                  <div className="p-inputgroup p-inputgroup-sm" style={{width: '100px'}}>
-                    <span className="p-inputgroup-addon">Rs.</span>
-                    <InputText type="number" min="0" value={delivery} onChange={(e) => setDelivery(e.target.value)} />
+                  <div className="p-inputgroup p-inputgroup-sm" style={{width: '140px'}}>
+                    <span className="p-inputgroup-addon font-bold" style={{color: '#3b82f6'}}>Rs</span>
+                    <InputText type="number" min="0" value={delivery} onChange={(e) => setDelivery(e.target.value)} className="font-bold" />
                   </div>
                 </div>
                 <div className="grand-total">
@@ -391,7 +526,10 @@ export default function Billing({ type }) {
                 </div>
                 <div className="flex flex-column gap-2 mt-2">
                   <div className="flex gap-2">
-                    <InputText type="number" min="0" placeholder="Paid Amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} className="flex-1" />
+                    <div className="flex flex-1 gap-1">
+                      <InputText type="number" min="0" placeholder="Paid Amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} className="flex-1" />
+                      <Button icon="pi pi-pause" onClick={holdBill} tooltip="Hold Bill" className="p-button-warning p-button-outlined" style={{width: '42px'}} />
+                    </div>
                     <Dropdown value={paymentType} options={[
                       {label: 'Cash', value: 'Cash'},
                       {label: 'Bank', value: 'Bank'},
@@ -436,6 +574,38 @@ export default function Billing({ type }) {
             <Column header="Type" body={(s) => <span className={`status-badge ${s.payment_type.toLowerCase()}`} style={{padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700}}>{s.payment_type}</span>} sortable field="payment_type" />
             <Column header="" body={(s) => (
               <ActionMenu 
+                onEdit={user?.role === 'admin' ? () => {
+                  const items = typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []);
+                  setCart(items.map(i => ({
+                    id: i.id || i.product_id,
+                    name: i.name || i.product_name,
+                    price: parseFloat(i.price || i.rate),
+                    qty: parseFloat(i.qty),
+                    subtotal: parseFloat(i.subtotal)
+                  })));
+                  setCustomerName(s.customer_name || '');
+                  setCustomerPhone(s.customer_phone || '');
+                  setCustomerAddress(s.customer_address || '');
+                  setDiscount(s.discount);
+                  setDelivery(s.delivery_charges);
+                  setPaidAmount(s.paid_amount);
+                  setPaymentType(s.payment_type.includes('Bank') ? 'Bank' : s.payment_type);
+                  if (s.payment_type.includes('Bank')) {
+                    setSelectedBank(s.payment_type.replace('Bank - ', ''));
+                  }
+                  setSelectedVehicleId(s.vehicle_id || '');
+                  setEditId(s.id);
+                  setView('POS');
+                } : null}
+                onDelete={user?.role === 'admin' ? async () => {
+                  if (window.confirm('Are you sure you want to delete this sale? Stock and balance will be reverted.')) {
+                    await fetch(`${SALES_API}/${s.id}`, { 
+                      method: 'DELETE',
+                      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                    });
+                    fetchData();
+                  }
+                } : null}
                 extraItems={[
                   { 
                     label: 'Print Receipt', 
@@ -457,6 +627,19 @@ export default function Billing({ type }) {
                       });
                       setTimeout(() => window.print(), 500);
                     } 
+                  },
+                  {
+                    label: 'View Ledger',
+                    icon: 'pi pi-book',
+                    command: () => {
+                      const cust = customers.find(c => c.id === s.customer_id);
+                      if (cust) {
+                        openLedger(cust);
+                      } else {
+                        // Fallback if customer object not found in current list
+                        openLedger({ id: s.customer_id, name: s.customer_name });
+                      }
+                    }
                   }
                 ]}
               />
@@ -566,6 +749,202 @@ export default function Billing({ type }) {
           </div>
         </div>
       )}
+      {/* Customer Ledger Modal */}
+      {showLedgerModal && selectedCustForLedger && (
+        <div className="modal-overlay" onClick={() => setShowLedgerModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '95%' }}>
+            <div className="modal-header no-print">
+              <div className="header-info" style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                <FileText size={24} color="#3b82f6" />
+                <h3>Customer Ledger: {selectedCustForLedger.name}</h3>
+              </div>
+              <div style={{display:'flex', gap:'10px'}}>
+                <button className="btn-secondary" onClick={() => window.print()} style={{padding: '6px 12px', display:'flex', alignItems:'center', gap:'6px'}}>
+                  <Printer size={16} /> Print Report
+                </button>
+                <button className="modal-close" onClick={() => setShowLedgerModal(false)}><X size={20} /></button>
+              </div>
+            </div>
+
+            <div className="ledger-report print-only" style={{padding: '20px', color: 'black'}}>
+              <div style={{textAlign: 'center', marginBottom: '20px', borderBottom: '2px solid #000', paddingBottom: '10px'}}>
+                <h2 style={{margin: 0}}>DATA WALEY CEMENT DEALER</h2>
+                <p style={{margin: '5px 0'}}>Customer Sales Ledger Report</p>
+                <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '15px', fontSize: '14px'}}>
+                  <span><strong>Customer:</strong> {selectedCustForLedger.name}</span>
+                  <span><strong>Period:</strong> {ledgerFilter === 'all' ? 'All Time' : `${ledgerFrom} to ${ledgerTo}`}</span>
+                  <span><strong>Date:</strong> {new Date().toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              <table style={{width: '100%', borderCollapse: 'collapse', marginTop: '10px'}}>
+                <thead>
+                  <tr style={{background: '#f1f5f9'}}>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Date</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Bill No / Items</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Total Amount</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Paid</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Balance Impact</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledgerData.map(row => (
+                    <tr key={row.id}>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.created_at).toLocaleDateString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>
+                        #{row.id} - {typeof row.items === 'string' ? JSON.parse(row.items).map(i => i.name).join(", ") : (row.items || []).map(i => i.name).join(", ")}
+                      </td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.net_amount).toLocaleString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.paid_amount).toLocaleString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.balance_amount).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="detail-body no-print" style={{padding: '24px'}}>
+              <div className="profit-filter-bar" style={{marginBottom: '20px', padding: '10px', background: '#f8fafc', borderRadius: '8px'}}>
+                <span className="filter-label" style={{marginRight: '12px', fontWeight: 600, color: '#64748b'}}>📅 Period:</span>
+                {[
+                  { key:'all',   label:'All Time' },
+                  { key:'today', label:'Today' },
+                  { key:'week',  label:'7 Days' },
+                  { key:'month', label:'Month' },
+                  { key:'custom',label:'Custom Range' },
+                ].map(f => (
+                  <button key={f.key} onClick={() => applyLedgerFilter(f.key)}
+                    className={`filter-btn ${ledgerFilter === f.key ? 'active' : ''}`}
+                    style={{
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      marginRight: '8px',
+                      fontSize: '0.85rem',
+                      background: ledgerFilter === f.key ? '#3b82f6' : 'white',
+                      color: ledgerFilter === f.key ? 'white' : '#64748b',
+                      cursor: 'pointer'
+                    }}>
+                    {f.label}
+                  </button>
+                ))}
+
+                {ledgerFilter === 'custom' && (
+                  <div className="custom-date-row" style={{display: 'inline-flex', alignItems: 'center', gap: '8px', marginLeft: '12px'}}>
+                    <input type="date" value={ledgerFrom} onChange={e => setLedgerFrom(e.target.value)} style={{padding: '2px 8px', borderRadius: '4px', border: '1px solid #cbd5e1'}} />
+                    <span className="sep">→</span>
+                    <input type="date" value={ledgerTo} onChange={e => setLedgerTo(e.target.value)} style={{padding: '2px 8px', borderRadius: '4px', border: '1px solid #cbd5e1'}} />
+                    <button className="btn-primary" onClick={() => openLedger(selectedCustForLedger, ledgerFrom, ledgerTo, 'custom')} style={{padding: '2px 10px', fontSize: '0.8rem'}}>Apply Range</button>
+                  </div>
+                )}
+              </div>
+
+              <div className="stats-mini-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                <div className="stat-item" style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Invoices</div>
+                  <div style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 700 }}>{ledgerData.length}</div>
+                </div>
+                <div className="stat-item" style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Value</div>
+                  <div style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 700 }}>Rs. {ledgerData.reduce((sum, item) => sum + parseFloat(item.net_amount), 0).toLocaleString()}</div>
+                </div>
+                <div className="stat-item" style={{ background: '#f0fdf4', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Collected</div>
+                  <div style={{ fontSize: '1.25rem', color: '#16a34a', fontWeight: 700 }}>Rs. {ledgerData.reduce((sum, item) => sum + parseFloat(item.paid_amount), 0).toLocaleString()}</div>
+                </div>
+              </div>
+
+              <div className="module-table-container" style={{maxHeight: '400px', overflowY: 'auto'}}>
+                <table className="module-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Bill Details</th>
+                      <th>Total Amount</th>
+                      <th>Paid Now</th>
+                      <th>Balance Impact</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledgerData.length === 0 ? (
+                      <tr><td colSpan="5" className="empty-msg">No sales history found for this customer.</td></tr>
+                    ) : (
+                      ledgerData.map((row) => (
+                        <tr key={row.id}>
+                          <td>{new Date(row.created_at).toLocaleDateString()}</td>
+                          <td>
+                            <strong>Invoice #SAL-{row.id}</strong>
+                            <br/><small style={{color:'#64748b'}}>{typeof row.items === 'string' ? JSON.parse(row.items).map(i => i.name).join(", ") : (row.items || []).map(i => i.name).join(", ")}</small>
+                          </td>
+                          <td className="bold">Rs. {parseFloat(row.net_amount).toLocaleString()}</td>
+                          <td className="text-green">Rs. {parseFloat(row.paid_amount).toLocaleString()}</td>
+                          <td className="text-red">Rs. {parseFloat(row.balance_amount).toLocaleString()}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div className="modal-footer no-print" style={{padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end'}}>
+              <button className="btn-secondary" onClick={() => setShowLedgerModal(false)}>Close Ledger</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Held Bills Modal */}
+      <Dialog 
+        header="Held Bills (Drafts)" 
+        visible={showHoldModal} 
+        onHide={() => setShowHoldModal(false)}
+        style={{width: '600px'}}
+        className="p-dialog-custom"
+      >
+        <div className="held-bills-list">
+          {heldBills.length === 0 ? (
+            <div style={{textAlign: 'center', padding: '40px', color: '#64748b'}}>
+              <History size={48} style={{opacity: 0.3, marginBottom: '16px'}} />
+              <p>No bills are currently on hold.</p>
+            </div>
+          ) : (
+            heldBills.map(held => (
+              <div key={held.id} style={{
+                background: 'white', 
+                padding: '16px', 
+                borderRadius: '12px', 
+                border: '1px solid #e2e8f0',
+                marginBottom: '12px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <div style={{fontWeight: 800, fontSize: '1rem', color: '#1e293b'}}>{held.customerName || "Walk-in Customer"}</div>
+                  <div style={{fontSize: '0.85rem', color: '#64748b', marginTop: '4px'}}>
+                    {held.cart.length} Items • Total: Rs. {held.cart.reduce((sum, i) => sum + i.subtotal, 0).toLocaleString()}
+                  </div>
+                  <div style={{fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px'}}>Held at: {held.time}</div>
+                </div>
+                <div style={{display: 'flex', gap: '8px'}}>
+                  <Button 
+                    label="Resume" 
+                    icon="pi pi-play" 
+                    onClick={() => resumeBill(held)} 
+                    className="p-button-primary p-button-sm" 
+                  />
+                  <Button 
+                    icon="pi pi-trash" 
+                    onClick={() => setHeldBills(heldBills.filter(b => b.id !== held.id))} 
+                    className="p-button-danger p-button-text p-button-sm" 
+                  />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </Dialog>
+
     </div>
   );
 }

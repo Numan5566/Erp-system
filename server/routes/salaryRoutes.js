@@ -80,6 +80,16 @@ router.put('/:id', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.get('/ledger/:name', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM salary WHERE employee_name = $1 ORDER BY created_at DESC',
+      [req.params.name]
+    );
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.delete('/:id', auth, async (req, res) => {
   try {
     await pool.query('DELETE FROM salary WHERE id=$1 AND (user_id=$2 OR $3)', [req.params.id, req.user.id, isAdmin(req)]);

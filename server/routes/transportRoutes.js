@@ -80,6 +80,30 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 // Delete vehicle
+// Get Vehicle Ledger (Combined Sales & Purchases)
+router.get('/ledger/:id', auth, async (req, res) => {
+  try {
+    const vId = req.params.id;
+    
+    // 1. Trips from Sales (Outward)
+    const salesTrips = await pool.query(
+      `SELECT id, customer_name as party_name, delivery_charges as amount, created_at as date, 'Outward (Sale)' as trip_type, payment_type
+       FROM sales WHERE vehicle_id = $1`, [vId]
+    );
+
+    // 2. Trips from Purchases (Inward Stock)
+    const purchaseTrips = await pool.query(
+      `SELECT p.id, s.name as party_name, p.delivery_charges as amount, p.purchase_date as date, 'Inward (Stock)' as trip_type, p.fare_payment_type as payment_type
+       FROM purchases p 
+       JOIN suppliers s ON p.supplier_id = s.id
+       WHERE p.vehicle_id = $1`, [vId]
+    );
+
+    const combined = [...salesTrips.rows, ...purchaseTrips.rows].sort((a, b) => new Date(b.date) - new Date(a.date));
+    res.json(combined);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.delete('/:id', auth, async (req, res) => {
   try {
     await pool.query('DELETE FROM vehicles WHERE id=$1 AND (user_id=$2 OR $3)', [req.params.id, req.user.id, isAdmin(req)]);

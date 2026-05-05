@@ -33,15 +33,28 @@ const buildSummary = async (fromDate, toDate) => {
   const summary = {};
 
   for (const c of counters) {
-    const sales    = await getSum('sales',          'net_amount', c, 'sale_type',    'created_at',   fromDate, toDate);
-    const expenses = await getSum('expenses',       'amount',     c, 'module_type',  'created_at',   fromDate, toDate);
-    const rent     = await getSum('rent',           'amount',     c, 'module_type',  'rent_date',    fromDate, toDate);
-    const salary   = await getSum('salary',         'amount',     c, 'module_type',  'payment_date', fromDate, toDate);
-    const other    = await getSum('other_expenses', 'amount',     c, 'module_type',  'date',         fromDate, toDate);
-    const investment = await getSum('investment',   'amount',     c, 'module_type',  'date',         fromDate, toDate);
-
-    const totalExpenses = expenses + rent + salary + other;
-    summary[c] = { sales, expenses, rent, salary, other, investment, totalExpenses, netProfit: sales - totalExpenses };
+    // REVENUE: Only what has been actually PAID by customers
+    const sales = await getSum('sales', 'paid_amount', c, 'sale_type', 'created_at', fromDate, toDate);
+    
+    // EXPENSES: Operational + Supply chain payments
+    const expenses = await getSum('expenses',       'amount',      c, 'module_type',  'created_at',    fromDate, toDate);
+    const rent     = await getSum('rent',           'amount',      c, 'module_type',  'rent_date',     fromDate, toDate);
+    const salary   = await getSum('salary',         'amount',      c, 'module_type',  'payment_date',  fromDate, toDate);
+    const other    = await getSum('other_expenses', 'amount',      c, 'module_type',  'date',          fromDate, toDate);
+    const supply   = await getSum('purchases',      'paid_amount', c, 'module_type',  'purchase_date', fromDate, toDate);
+    
+    const totalExpenses = expenses + rent + salary + other + supply;
+    
+    summary[c] = { 
+      sales, 
+      expenses, 
+      rent, 
+      salary, 
+      other, 
+      supply, // Added supply chain costs
+      totalExpenses, 
+      netProfit: sales - totalExpenses 
+    };
   }
   return summary;
 };
@@ -112,9 +125,9 @@ router.get('/detail/:counter', auth, async (req, res) => {
 
     // Investments
     const investRes = await pool.query(
-      `SELECT id, title, investor, amount, date FROM investment WHERE module_type = $1
-       ${from ? `AND date >= $2` : ''} ${to ? `AND date <= $${from ? 3 : 2}` : ''}
-       ORDER BY date DESC LIMIT 30`,
+      `SELECT id, investment_name as title, amount, investment_date as date FROM investments WHERE module_type = $1
+       ${from ? `AND investment_date >= $2` : ''} ${to ? `AND investment_date <= $${from ? 3 : 2}` : ''}
+       ORDER BY investment_date DESC LIMIT 30`,
       [c, ...(from ? [from] : []), ...(to ? [to] : [])]
     );
 
@@ -127,6 +140,15 @@ router.get('/detail/:counter', auth, async (req, res) => {
       [c, ...(from ? [from] : []), ...(to ? [to] : [])]
     );
 
+    // Supply Chain (Purchases)
+    const supplyRes = await pool.query(
+      `SELECT p.id, s.name as supplier_name, p.paid_amount, p.purchase_date as date, p.vehicle_number
+       FROM purchases p JOIN suppliers s ON s.id = p.supplier_id
+       WHERE p.module_type = $1 ${from ? `AND p.purchase_date >= $2` : ''} ${to ? `AND p.purchase_date <= $${from ? 3 : 2}` : ''}
+       ORDER BY p.purchase_date DESC LIMIT 50`,
+      [c, ...(from ? [from] : []), ...(to ? [to] : [])]
+    );
+
     res.json({
       counter: c,
       sales: salesRes.rows,
@@ -135,6 +157,7 @@ router.get('/detail/:counter', auth, async (req, res) => {
       salary: salaryRes.rows,
       other: otherRes.rows,
       investments: investRes.rows,
+      supply: supplyRes.rows,
       topProducts: productsRes.rows,
     });
   } catch (err) { res.status(500).json({ error: err.message }); }

@@ -37,6 +37,9 @@ export default function Salary({ type }) {
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [ledgerData, setLedgerData] = useState([]);
+  const [selectedStaff, setSelectedStaff] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -84,6 +87,20 @@ export default function Salary({ type }) {
     });
     setEditId(rec.id);
     setShowModal(true);
+  };
+
+  const openLedger = async (staff) => {
+    setSelectedStaff(staff);
+    setShowLedgerModal(true);
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/ledger/${staff.employee_name}`, {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      setLedgerData(data);
+    } catch (err) { console.error(err); }
+    setLoading(false);
   };
 
   const handleDelete = async (id) => {
@@ -215,6 +232,9 @@ export default function Salary({ type }) {
                     <ActionMenu
                       onEdit={() => openEdit(r)}
                       onDelete={() => handleDelete(r.id)}
+                      extraItems={[
+                        { label: 'View Ledger', icon: 'pi pi-book', command: () => openLedger(r) }
+                      ]}
                     />
                   </td>
                 </tr>
@@ -311,6 +331,110 @@ export default function Salary({ type }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Staff Ledger Modal */}
+      {showLedgerModal && selectedStaff && (
+        <div className="modal-overlay" onClick={() => setShowLedgerModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '95%' }}>
+            <div className="modal-header no-print">
+              <div className="header-info" style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                <Users size={24} color="#3b82f6" />
+                <h3>Staff Ledger: {selectedStaff.employee_name}</h3>
+              </div>
+              <div style={{display:'flex', gap:'10px'}}>
+                <button className="btn-secondary" onClick={() => window.print()} style={{padding: '6px 12px', display:'flex', alignItems:'center', gap:'6px'}}>
+                  <Plus size={16} /> Print Report
+                </button>
+                <button className="modal-close" onClick={() => setShowLedgerModal(false)}><X size={20} /></button>
+              </div>
+            </div>
+
+            <div className="ledger-report print-only" style={{padding: '20px', color: 'black'}}>
+              <div style={{textAlign: 'center', marginBottom: '20px', borderBottom: '2px solid #000', paddingBottom: '10px'}}>
+                <h2 style={{margin: 0}}>DATA WALEY CEMENT DEALER</h2>
+                <p style={{margin: '5px 0'}}>Staff Salary Ledger Report</p>
+                <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '15px', fontSize: '14px'}}>
+                  <span><strong>Employee:</strong> {selectedStaff.employee_name}</span>
+                  <span><strong>Designation:</strong> {selectedStaff.designation}</span>
+                  <span><strong>Date:</strong> {new Date().toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              <table style={{width: '100%', borderCollapse: 'collapse', marginTop: '10px'}}>
+                <thead>
+                  <tr style={{background: '#f1f5f9'}}>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Date</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Month</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Salary</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Advance</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledgerData.map(row => (
+                    <tr key={row.id}>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.payment_date).toLocaleDateString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.month}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.amount).toLocaleString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.advance_salary).toLocaleString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="detail-body no-print" style={{padding: '24px'}}>
+              <div className="stats-mini-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                <div className="stat-item" style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Records</div>
+                  <div style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 700 }}>{ledgerData.length}</div>
+                </div>
+                <div className="stat-item" style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Salaries Paid</div>
+                  <div style={{ fontSize: '1.25rem', color: '#16a34a', fontWeight: 700 }}>Rs. {ledgerData.filter(d => d.status === 'Paid').reduce((sum, item) => sum + parseFloat(item.amount), 0).toLocaleString()}</div>
+                </div>
+                <div className="stat-item" style={{ background: '#fff1f2', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Advances</div>
+                  <div style={{ fontSize: '1.25rem', color: '#e11d48', fontWeight: 700 }}>Rs. {ledgerData.reduce((sum, item) => sum + parseFloat(item.advance_salary), 0).toLocaleString()}</div>
+                </div>
+              </div>
+
+              <div className="module-table-container" style={{maxHeight: '400px', overflowY: 'auto'}}>
+                <table className="module-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Month</th>
+                      <th>Salary</th>
+                      <th>Advance</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledgerData.length === 0 ? (
+                      <tr><td colSpan="5" className="empty-msg">No history found for this staff member.</td></tr>
+                    ) : (
+                      ledgerData.map((row) => (
+                        <tr key={row.id}>
+                          <td>{new Date(row.payment_date).toLocaleDateString()}</td>
+                          <td>{row.month}</td>
+                          <td className="bold">Rs. {parseFloat(row.amount).toLocaleString()}</td>
+                          <td className="text-red">Rs. {parseFloat(row.advance_salary).toLocaleString()}</td>
+                          <td><span className={`status-badge ${row.status.toLowerCase()}`}>{row.status}</span></td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div className="modal-footer no-print" style={{padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end'}}>
+              <button className="btn-secondary" onClick={() => setShowLedgerModal(false)}>Close Ledger</button>
+            </div>
           </div>
         </div>
       )}

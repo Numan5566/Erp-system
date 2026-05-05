@@ -96,6 +96,7 @@ export default function Profit() {
   const TABS = [
     { key: 'sales',     label: 'Sales',           icon: <ShoppingBag size={15}/> },
     { key: 'expenses',  label: 'Expenses',         icon: <Wallet size={15}/> },
+    { key: 'supply',    label: 'Supplier Pay',     icon: <Briefcase size={15}/> },
     { key: 'rent',      label: 'Rent',             icon: <Home size={15}/> },
     { key: 'salary',    label: 'Salary',           icon: <Users size={15}/> },
     { key: 'other',     label: 'Other Exp.',       icon: <MoreHorizontal size={15}/> },
@@ -208,6 +209,7 @@ export default function Profit() {
                 {[
                   { label: 'Total Sales',  val: stats.sales,    cls: 'plus'  },
                   { label: 'Expenses',     val: stats.expenses, cls: 'minus' },
+                  { label: 'Supply Pay',   val: stats.supply,   cls: 'minus' },
                   { label: 'Rent',         val: stats.rent,     cls: 'minus' },
                   { label: 'Salaries',     val: stats.salary,   cls: 'minus' },
                   { label: 'Other Costs',  val: stats.other,    cls: 'minus' },
@@ -314,6 +316,15 @@ export default function Profit() {
                 <Column header="Description" field="description" sortable />
                 <Column header="Type"        field="expense_type" />
                 <Column header="Amount"      body={r => <span style={{fontWeight:700,color:'#e11d48'}}>{fmt(r.amount)}</span>} sortable field="amount" />
+              </DataTable>
+            )}
+
+            {activeTab === 'supply' && (
+              <DataTable value={detail.supply} paginator rows={10} className="p-datatable-sm" stripedRows emptyMessage="No supplier payments found.">
+                <Column header="Date"      body={r => fmtDate(r.date)} sortable field="date" />
+                <Column header="Supplier"  field="supplier_name" sortable />
+                <Column header="Vehicle"   field="vehicle_number" />
+                <Column header="Paid Amt"  body={r => <span style={{fontWeight:700,color:'#e11d48'}}>{fmt(r.paid_amount)}</span>} sortable field="paid_amount" />
               </DataTable>
             )}
 

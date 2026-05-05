@@ -44,22 +44,33 @@ router.post('/', auth, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { supplier_id, product_id, vehicle_number, quantity, rate, paid_amount, module_type } = req.body;
+    const { 
+      supplier_id, product_id, vehicle_number, quantity, rate, 
+      paid_amount, module_type, vehicle_id, delivery_charges, fare_payment_type 
+    } = req.body;
     
     const qty = parseFloat(quantity) || 0;
     const rt = parseFloat(rate) || 0;
     const paid = parseFloat(paid_amount) || 0;
+    const fare = parseFloat(delivery_charges) || 0;
     const totalAmount = qty * rt;
     const balanceAmount = totalAmount - paid;
     
     const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
 
+    // Find vehicle_id if not provided but number is present
+    let vId = vehicle_id;
+    if (!vId && vehicle_number) {
+      const vRes = await client.query('SELECT id FROM vehicles WHERE vehicle_number = $1 LIMIT 1', [vehicle_number]);
+      if (vRes.rows.length > 0) vId = vRes.rows[0].id;
+    }
+
     // 1. Insert Purchase Record
     const purchaseRes = await client.query(
       `INSERT INTO purchases 
-      (supplier_id, product_id, vehicle_number, quantity, rate, total_amount, paid_amount, balance_amount, module_type, user_id) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [supplier_id, product_id, vehicle_number, qty, rt, totalAmount, paid, balanceAmount, finalModule, req.user.id]
+      (supplier_id, product_id, vehicle_number, vehicle_id, quantity, rate, total_amount, paid_amount, balance_amount, delivery_charges, fare_payment_type, module_type, user_id) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+      [supplier_id, product_id, vehicle_number, vId || null, qty, rt, totalAmount, paid, balanceAmount, fare, fare_payment_type || 'Cash', finalModule, req.user.id]
     );
 
     // 2. Update Product Stock
@@ -69,12 +80,31 @@ router.post('/', auth, async (req, res) => {
     );
 
     // 3. Update Supplier Balance
-    // NOTE: Supplier balance means "How much we owe them". 
-    // So if balanceAmount is positive, we owe them that much more, so we ADD it to their balance.
     await client.query(
       `UPDATE suppliers SET balance = balance + $1 WHERE id = $2`,
       [balanceAmount, supplier_id]
     );
+
+    // 4. Update Vehicle Earnings (if vehicle_id provided)
+    if (vehicle_id && fare > 0) {
+      await client.query(
+        `UPDATE vehicles SET total_earnings = total_earnings + $1 WHERE id = $2`,
+        [fare, vehicle_id]
+      );
+
+      // 5. Automatically record as an Expense
+      await client.query(
+        `INSERT INTO expenses (description, amount, expense_type, user_id, module_type, created_at) 
+         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+        [
+          `Transport Fare (Vehicle: ${vehicle_number}) for Stock Purchase`,
+          fare,
+          'Transport',
+          req.user.id,
+          finalModule
+        ]
+      );
+    }
 
     await client.query('COMMIT');
     res.json(purchaseRes.rows[0]);

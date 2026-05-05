@@ -21,6 +21,11 @@ export default function Accounts() {
   // State for sales (payment overview)
   const [sales, setSales] = useState([]);
   const [supplierPayments, setSupplierPayments] = useState([]);
+  const [generalExpenses, setGeneralExpenses] = useState([]);
+  const [salaries, setSalaries] = useState([]);
+  const [rents, setRents] = useState([]);
+  const [investments, setInvestments] = useState([]);
+  const [otherExpenses, setOtherExpenses] = useState([]);
 
   // State for Ledger view
   const [showLedger, setShowLedger] = useState(false);
@@ -71,26 +76,58 @@ export default function Accounts() {
     }
   };
 
+  // Fetch all other modules
+  const fetchOthers = async () => {
+    const h = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
+    try {
+      const [salRes, rentRes, invRes, othRes, expRes] = await Promise.all([
+        fetch('http://localhost:5000/api/salary', { headers: h }),
+        fetch('http://localhost:5000/api/rent', { headers: h }),
+        fetch('http://localhost:5000/api/investments', { headers: h }),
+        fetch('http://localhost:5000/api/other-expenses', { headers: h }),
+        fetch('http://localhost:5000/api/expenses', { headers: h })
+      ]);
+      setSalaries(await salRes.json());
+      setRents(await rentRes.json());
+      setInvestments(await invRes.json());
+      setOtherExpenses(await othRes.json());
+      setGeneralExpenses(await expRes.json());
+    } catch (err) { console.error(err); }
+  };
+
   // Initialise data on mount
   useEffect(() => {
     fetchAccounts();
     fetchSales();
     fetchSupplierPayments();
+    fetchOthers();
   }, []);
 
   // Compute totals per payment method (Unified)
-  const paymentSummary = [...sales, ...supplierPayments.map(p => ({ ...p, isExpense: true }))].reduce((acc, s) => {
+  const paymentSummary = [
+    ...sales, 
+    ...supplierPayments.map(p => ({ ...p, isExpense: true, amount: p.paid_amount })),
+    ...generalExpenses.map(e => ({ ...e, isExpense: true })),
+    ...salaries.map(s => ({ ...s, isExpense: true, payment_type: 'Cash' })),
+    ...rents.map(r => ({ ...r, isExpense: true, payment_type: 'Cash' })),
+    ...otherExpenses.map(o => ({ ...o, isExpense: true, payment_type: o.payment_method || 'Cash' })),
+    ...investments.map(i => ({ ...i, isIncome: true, payment_type: 'Cash' })),
+    // Include delivery charges from purchases as expenses
+    ...supplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
+      ...p, isExpense: true, amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
+      isTransportFare: true 
+    }))
+  ].reduce((acc, s) => {
     const method = s.payment_type || 'Cash';
-    // Remove "Bank - " prefix if it exists to match bank names
     const cleanMethod = method.replace('Bank - ', '');
-    const amount = parseFloat(s.paid_amount) || 0;
+    const amount = parseFloat(s.amount || s.paid_amount || s.net_amount || 0);
     
     if (!acc[cleanMethod]) acc[cleanMethod] = 0;
     
     if (s.isExpense) {
-      acc[cleanMethod] -= amount; // Subtract for supplier payments
+      acc[cleanMethod] -= amount;
     } else {
-      acc[cleanMethod] += amount; // Add for sales/customer payments
+      acc[cleanMethod] += amount;
     }
     return acc;
   }, {});
@@ -101,35 +138,39 @@ export default function Accounts() {
     .reduce((sum, [, v]) => sum + v, 0);
 
   // Filter all transactions for the selected ledger account and date range
-  const ledgerTransactions = [...sales, ...supplierPayments.map(p => ({ ...p, isExpense: true, customer_name: p.supplier_name || p.company || 'Supplier' }))]
-    .filter(s => {
+  const ledgerTransactions = [
+    ...sales, 
+    ...supplierPayments.map(p => ({ ...p, isExpense: true, customer_name: p.supplier_name || 'Supplier', amount: p.paid_amount })),
+    // Add Transport Fares as separate ledger entries
+    ...supplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
+      ...p, isExpense: true, customer_name: `Fare: ${p.vehicle_number || 'Vehicle'}`, 
+      amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
+      created_at: p.purchase_date, isTransportFare: true
+    })),
+    ...generalExpenses.map(e => ({ ...e, isExpense: true, customer_name: 'General Expense' })),
+    ...salaries.map(s => ({ ...s, isExpense: true, customer_name: `Salary: ${s.employee_name}`, payment_type: 'Cash', created_at: s.payment_date })),
+    ...rents.map(r => ({ ...r, isExpense: true, customer_name: `Rent: ${r.property_name}`, payment_type: 'Cash', created_at: r.rent_date })),
+    ...otherExpenses.map(o => ({ ...o, isExpense: true, customer_name: `Other: ${o.title}`, payment_type: o.payment_method, created_at: o.date })),
+    ...investments.map(i => ({ ...i, isIncome: true, customer_name: `Invest: ${i.investor}`, payment_type: 'Cash', created_at: i.date }))
+  ].filter(s => {
       if (!selectedLedgerAccount) return false;
       
-      // Account filter
-      let accountMatch = false;
       const method = (s.payment_type || 'Cash').replace('Bank - ', '');
+      let accountMatch = selectedLedgerAccount.isCash ? method === 'Cash' : method === selectedLedgerAccount.bank_name;
       
-      if (selectedLedgerAccount.isCash) {
-        accountMatch = method === 'Cash';
-      } else {
-        accountMatch = method === selectedLedgerAccount.bank_name;
-      }
       if (!accountMatch) return false;
 
-      // Date filter
-      const saleDate = new Date(s.created_at || s.purchase_date);
+      const saleDate = new Date(s.created_at || s.purchase_date || s.date);
       const now = new Date();
-      if (dateFilter === 'Today') {
-        return saleDate.toDateString() === now.toDateString();
-      } else if (dateFilter === 'Week') {
+      if (dateFilter === 'Today') return saleDate.toDateString() === now.toDateString();
+      if (dateFilter === 'Week') {
         const weekAgo = new Date();
         weekAgo.setDate(now.getDate() - 7);
         return saleDate >= weekAgo;
-      } else if (dateFilter === 'Month') {
-        return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
       }
-      return true; // 'All'
-    }).sort((a, b) => new Date(b.created_at || b.purchase_date) - new Date(a.created_at || a.purchase_date));
+      if (dateFilter === 'Month') return saleDate.getMonth() === now.getMonth() && saleDate.getFullYear() === now.getFullYear();
+      return true;
+    }).sort((a, b) => new Date(b.created_at || b.purchase_date || b.date) - new Date(a.created_at || a.purchase_date || a.date));
 
   const summarySection = (
     <div className="payment-overview-cards" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '30px'}}>
@@ -339,18 +380,23 @@ export default function Accounts() {
             )} sortable />
             <Column header="Details/Items" body={s => (
               <div style={{fontSize: '0.85rem', color: '#475569'}}>
-                {s.isExpense ? (
+                {s.isTransportFare ? (
+                  <span style={{fontWeight: 600, color: '#0369a1'}}>🚛 Transport Fare for Stock</span>
+                ) : s.isExpense ? (
                   <span style={{fontWeight: 600, color: '#e11d48'}}>💸 Payment Sent to Supplier</span>
                 ) : (
                   Array.isArray(s.items) ? s.items.map(i => `${i.name} (x${i.quantity})`).join(', ') : 'Details not available'
                 )}
               </div>
             )} />
-            <Column field="paid_amount" header="Amount" body={s => (
-              <div style={{fontWeight: 800, color: s.isExpense ? '#e11d48' : '#16a34a'}}>
-                {s.isExpense ? '-' : '+'} Rs. {parseFloat(s.paid_amount).toLocaleString()}
-              </div>
-            )} sortable />
+            <Column field="paid_amount" header="Amount" body={s => {
+              const amt = parseFloat(s.amount || s.paid_amount || s.net_amount || 0);
+              return (
+                <div style={{fontWeight: 800, color: s.isExpense ? '#e11d48' : '#16a34a'}}>
+                  {s.isExpense ? '-' : '+'} Rs. {amt.toLocaleString()}
+                </div>
+              );
+            }} sortable />
           </DataTable>
         </div>
       </Dialog>

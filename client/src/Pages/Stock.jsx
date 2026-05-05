@@ -22,8 +22,10 @@ export default function Stock({ type }) {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receiveForm, setReceiveForm] = useState({ 
-    supplier_id: "", quantity: "", vehicle_number: "", rate: "", paid_amount: "0" 
+    supplier_id: "", quantity: "", vehicle_number: "", vehicle_id: "", 
+    rate: "", paid_amount: "0", delivery_charges: "0", fare_payment_type: "Cash" 
   });
+  const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [activeTab, setActiveTab] = useState(type || (user?.role === 'admin' ? "" : user?.module_type || "Wholesale"));
@@ -54,15 +56,18 @@ export default function Stock({ type }) {
     setLoading(true);
     try {
       const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
-      const [prodRes, supRes] = await Promise.all([
+      const [prodRes, supRes, vehRes] = await Promise.all([
         fetch(`${API}?type=${activeTab}`, { headers }),
-        fetch(`http://localhost:5000/api/suppliers?type=${activeTab}`, { headers })
+        fetch(`http://localhost:5000/api/suppliers?type=${activeTab}`, { headers }),
+        fetch(`http://localhost:5000/api/transport?type=${activeTab}`, { headers })
       ]);
       const prodData = await prodRes.json();
       const supData = await supRes.json();
+      const vehData = await vehRes.json();
       
       setProducts(Array.isArray(prodData) ? prodData : []);
       setSuppliers(Array.isArray(supData) ? supData : []);
+      setVehicles(Array.isArray(vehData) ? vehData : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -139,7 +144,10 @@ export default function Stock({ type }) {
       });
       if (res.ok) {
         setShowReceiveModal(false);
-        setReceiveForm({ supplier_id: "", quantity: "", vehicle_number: "", rate: "", paid_amount: "0" });
+        setReceiveForm({ 
+          supplier_id: "", quantity: "", vehicle_number: "", vehicle_id: "", 
+          rate: "", paid_amount: "0", delivery_charges: "0", fare_payment_type: "Cash" 
+        });
         fetchData();
       }
     } catch (err) { console.error(err); }
@@ -427,8 +435,29 @@ export default function Stock({ type }) {
                   <label>Vehicle Number *</label>
                   <div className="input-wrapper">
                     <Truck size={18} />
-                    <input type="text" value={receiveForm.vehicle_number} placeholder="e.g. LET-123" required
+                    <input type="text" required value={receiveForm.vehicle_number} placeholder="e.g. LET-123"
                       onChange={(e) => setReceiveForm({ ...receiveForm, vehicle_number: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Fare (Delivery Charges) *</label>
+                  <div className="input-wrapper">
+                    <CircleDollarSign size={18} />
+                    <input type="number" required value={receiveForm.delivery_charges} placeholder="0.00"
+                      onChange={(e) => setReceiveForm({ ...receiveForm, delivery_charges: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Fare Payment Mode</label>
+                  <div className="input-wrapper">
+                    <Tag size={18} />
+                    <select value={receiveForm.fare_payment_type} onChange={(e) => setReceiveForm({ ...receiveForm, fare_payment_type: e.target.value })}>
+                      <option value="Cash">Cash</option>
+                      {/* You can add bank accounts here if needed, or keep it simple */}
+                      <option value="Bank">Bank Account</option>
+                    </select>
                   </div>
                 </div>
 

@@ -16,7 +16,9 @@ const emptyForm = {
   category: "General",
   amount: "",
   expense_date: new Date().toISOString().split('T')[0],
-  notes: ""
+  notes: "",
+  payment_source: "Cash",
+  bank_name: ""
 };
 
 const CATEGORIES = {
@@ -28,6 +30,7 @@ export default function Expenses({ type }) {
   const { user } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState(type || user?.module_type || "Wholesale");
   const [records, setRecords] = useState([]);
+  const [banks, setBanks] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -54,7 +57,20 @@ export default function Expenses({ type }) {
     } catch (err) { console.error(err); }
   };
 
-  useEffect(() => { fetchRecords(); }, [activeTab]);
+  const fetchBanks = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/banks', {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      setBanks(Array.isArray(data) ? data : []);
+    } catch (err) { console.error(err); }
+  };
+
+  useEffect(() => { 
+    fetchRecords();
+    fetchBanks();
+  }, [activeTab]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,13 +78,17 @@ export default function Expenses({ type }) {
     try {
       const method = editId ? "PUT" : "POST";
       const url = editId ? `${API}/${editId}` : API;
+      
+      // Determine final payment type
+      const finalPaymentType = form.payment_source === 'Bank' ? `Bank - ${form.bank_name}` : 'Cash';
+      
       const res = await fetch(url, {
         method,
         headers: { 
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ ...form, module_type: activeTab }),
+        body: JSON.stringify({ ...form, payment_type: finalPaymentType, module_type: activeTab }),
       });
       if (res.ok) {
         setShowModal(false);
@@ -181,7 +201,12 @@ export default function Expenses({ type }) {
                       <span className="v-num">{r.category}</span>
                     </div>
                   </td>
-                  <td className="bold">{r.title}</td>
+                  <td className="bold">
+                    {r.title}
+                    <div style={{fontSize: '0.75rem', color: '#64748b', fontWeight: 400}}>
+                      Payment: {r.payment_type || 'Cash'}
+                    </div>
+                  </td>
                   <td className="bold text-red">Rs. {parseFloat(r.amount).toLocaleString()}</td>
                   <td style={{ textAlign: 'center' }}>
                     <ActionMenu 
@@ -239,6 +264,41 @@ export default function Expenses({ type }) {
                     <input type="number" required value={form.amount} placeholder="0.00" onChange={(e) => setForm({...form, amount: e.target.value})} />
                   </div>
                 </div>
+              </div>
+
+              <div className="section-label">Payment Information</div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Payment Source *</label>
+                  <div className="input-wrapper">
+                    <Wallet size={18} />
+                    <select 
+                      value={form.payment_source || 'Cash'} 
+                      onChange={(e) => setForm({...form, payment_source: e.target.value, bank_name: e.target.value === 'Bank' ? (banks[0]?.bank_name || '') : ''})}
+                    >
+                      <option value="Cash">Cash Payment</option>
+                      <option value="Bank">Bank Transfer</option>
+                    </select>
+                  </div>
+                </div>
+                {form.payment_source === 'Bank' && (
+                  <div className="form-group">
+                    <label>Select Bank *</label>
+                    <div className="input-wrapper">
+                      <Building2 size={18} />
+                      <select 
+                        value={form.bank_name} 
+                        required
+                        onChange={(e) => setForm({...form, bank_name: e.target.value})}
+                      >
+                        <option value="">Choose Bank...</option>
+                        {banks.map(b => (
+                          <option key={b.id} value={b.bank_name}>{b.bank_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="section-label">Description & Notes</div>

@@ -50,7 +50,6 @@ router.post('/', auth, async (req, res) => {
       let c = await client.query(cQuery, cParams);
       if (c.rows.length > 0) {
         finalCustomerId = c.rows[0].id;
-        // Optionally update address if provided
         if (req.body.customer_address) {
           await client.query('UPDATE customers SET address=$1 WHERE id=$2', [req.body.customer_address, finalCustomerId]);
         }
@@ -74,15 +73,18 @@ router.post('/', auth, async (req, res) => {
 
     // 2. Insert items and update stock
     for (const item of items) {
+      const prodId = item.product_id || item.id;
+      const prodName = item.product_name || item.name;
+      const rate = item.rate || item.price;
+
       await client.query(
         'INSERT INTO sale_items (sale_id, product_id, product_name, qty, rate, subtotal) VALUES ($1, $2, $3, $4, $5, $6)',
-        [saleId, item.product_id, item.product_name, item.qty, item.rate, item.subtotal]
+        [saleId, prodId, prodName, item.qty, rate, item.subtotal]
       );
 
-      // Deduct stock (Defaulting to retail stock for now, can be changed based on logic)
       await client.query(
         'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-        [item.qty, item.product_id]
+        [item.qty, prodId]
       );
     }
 
@@ -179,6 +181,102 @@ router.post('/payment', auth, async (req, res) => {
 
     await client.query('COMMIT');
     res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Update a sale (Bill Edit)
+router.put('/:id', auth, async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Access denied' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { 
+      customer_name, customer_phone, customer_address, total_amount, discount, 
+      delivery_charges, net_amount, paid_amount, balance_amount, 
+      payment_type, items, vehicle_id 
+    } = req.body;
+
+    // 1. Revert OLD stock
+    const oldItems = await client.query('SELECT product_id, qty FROM sale_items WHERE sale_id = $1', [req.params.id]);
+    for (const item of oldItems.rows) {
+      await client.query('UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2', [item.qty, item.product_id]);
+    }
+
+    // 2. Revert OLD customer balance
+    const oldSale = await client.query('SELECT customer_id, balance_amount FROM sales WHERE id = $1', [req.params.id]);
+    if (oldSale.rows[0].customer_id && oldSale.rows[0].balance_amount !== 0) {
+      await client.query('UPDATE customers SET balance = balance - $1 WHERE id = $2', [oldSale.rows[0].balance_amount, oldSale.rows[0].customer_id]);
+    }
+
+    // 3. Delete old items
+    await client.query('DELETE FROM sale_items WHERE sale_id = $1', [req.params.id]);
+
+    // 4. Update sales table
+    await client.query(
+      `UPDATE sales SET 
+        customer_name=$1, customer_phone=$2, customer_address=$3, total_amount=$4, 
+        discount=$5, delivery_charges=$6, net_amount=$7, paid_amount=$8, 
+        balance_amount=$9, payment_type=$10, vehicle_id=$11, items=$12
+      WHERE id=$13`,
+      [customer_name, customer_phone, customer_address, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, vehicle_id, JSON.stringify(items), req.params.id]
+    );
+
+    // 5. Insert NEW items and update stock
+    for (const item of items) {
+      const prodId = item.product_id || item.id;
+      const prodName = item.product_name || item.name;
+      const rate = item.rate || item.price;
+
+      await client.query(
+        'INSERT INTO sale_items (sale_id, product_id, product_name, qty, rate, subtotal) VALUES ($1, $2, $3, $4, $5, $6)',
+        [req.params.id, prodId, prodName, item.qty, rate, item.subtotal]
+      );
+      await client.query('UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2', [item.qty, prodId]);
+    }
+
+    // 6. Update NEW customer balance
+    if (oldSale.rows[0].customer_id && balance_amount !== 0) {
+      await client.query('UPDATE customers SET balance = balance + $1 WHERE id = $2', [balance_amount, oldSale.rows[0].customer_id]);
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.delete('/:id', auth, async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Access denied' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Revert stock before deleting
+    const oldItems = await client.query('SELECT product_id, qty FROM sale_items WHERE sale_id = $1', [req.params.id]);
+    for (const item of oldItems.rows) {
+      await client.query('UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2', [item.qty, item.product_id]);
+    }
+
+    // Revert customer balance
+    const oldSale = await client.query('SELECT customer_id, balance_amount FROM sales WHERE id = $1', [req.params.id]);
+    if (oldSale.rows[0].customer_id && oldSale.rows[0].balance_amount !== 0) {
+      await client.query('UPDATE customers SET balance = balance - $1 WHERE id = $2', [oldSale.rows[0].balance_amount, oldSale.rows[0].customer_id]);
+    }
+
+    await client.query('DELETE FROM sale_items WHERE sale_id = $1', [req.params.id]);
+    await client.query('DELETE FROM sales WHERE id = $1', [req.params.id]);
+    
+    await client.query('COMMIT');
+    res.json({ message: 'Sale deleted' });
   } catch (err) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
