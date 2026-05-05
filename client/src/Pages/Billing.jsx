@@ -490,7 +490,7 @@ export default function Billing({ type }) {
                         <Button icon="pi pi-minus" className="p-button-rounded p-button-secondary p-button-text p-button-sm" onClick={() => updateQty(item.id, -1)} />
                         <InputText type="number" value={item.qty} onChange={(e) => setQtyDirect(item.id, e.target.value)} 
                                   className="p-inputtext-sm text-center font-bold" 
-                                  style={{width: `${Math.max(40, (String(item.qty).length * 10) + 20)}px`, border: 'none', background: 'transparent', transition: 'width 0.2s'}} />
+                                  style={{width: `${Math.max(50, (String(item.qty).length * 12) + 30)}px`, border: 'none', background: 'transparent', transition: 'width 0.2s'}} />
                         <Button icon="pi pi-plus" className="p-button-rounded p-button-secondary p-button-text p-button-sm" onClick={() => updateQty(item.id, 1)} />
                       </div>
                       <div className="item-subtotal">Rs. {(item.price * item.qty).toLocaleString()}</div>

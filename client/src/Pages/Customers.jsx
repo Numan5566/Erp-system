@@ -170,6 +170,13 @@ export default function Customers({ type }) {
   const handlePayment = async (e) => {
     e.preventDefault();
     if (!paymentAmount || isNaN(paymentAmount) || Number(paymentAmount) <= 0) return alert("Enter a valid amount");
+
+    const currentBalance = parseFloat(selectedCustomer.balance || 0);
+    // Only restrict if there is a positive balance (money they owe us)
+    if (currentBalance > 0 && parseFloat(paymentAmount) > currentBalance) {
+      alert(`Invalid Payment: You cannot receive more than the outstanding balance (Rs. ${currentBalance})!`);
+      return;
+    }
     
     let finalPaymentType = paymentType;
     if (paymentType === 'Bank') {

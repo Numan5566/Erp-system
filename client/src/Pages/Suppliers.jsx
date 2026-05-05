@@ -177,8 +177,14 @@ export default function Suppliers({ type }) {
     setShowPaymentModal(true);
   };
 
-  const handlePayment = async (e) => {
+  const handleMakePayment = async (e) => {
     e.preventDefault();
+    const currentBalance = parseFloat(selectedSupplier.balance || 0);
+    // Only restrict if there is a positive balance (money we owe them)
+    if (currentBalance > 0 && parseFloat(paymentForm.amount || 0) > currentBalance) {
+      alert(`Invalid Payment: You cannot pay more than the outstanding balance (Rs. ${currentBalance})!`);
+      return;
+    }
     setLoading(true);
     
     let finalPaymentType = selectedBank ? `Bank - ${selectedBank}` : 'Cash';
@@ -607,7 +613,7 @@ export default function Suppliers({ type }) {
               <button className="modal-close" onClick={() => setShowPaymentModal(false)}><X size={20} /></button>
             </div>
             
-            <form onSubmit={handlePayment} className="custom-form">
+            <form onSubmit={handleMakePayment} className="custom-form">
               <div style={{background: '#fff1f2', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between'}}>
                 <span style={{fontWeight: 600, color: '#e11d48'}}>Current Balance:</span>
                 <span style={{fontWeight: 700, color: '#e11d48'}}>Rs. {parseFloat(selectedSupplier.balance).toLocaleString()}</span>

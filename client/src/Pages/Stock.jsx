@@ -124,6 +124,11 @@ export default function Stock({ type }) {
 
   const handleReceiveStock = async (e) => {
     e.preventDefault();
+    const totalCost = parseFloat(receiveForm.quantity || 0) * parseFloat(receiveForm.rate || 0);
+    if (parseFloat(receiveForm.paid_amount || 0) > totalCost) {
+      alert("Invalid Payment: Paid amount cannot exceed total purchase cost!");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(`http://localhost:5000/api/purchases`, {

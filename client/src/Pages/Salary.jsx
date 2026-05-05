@@ -58,6 +58,10 @@ export default function Salary({ type }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (parseFloat(form.advance_salary || 0) > parseFloat(form.amount || 0)) {
+      alert("Invalid Payment: Advance salary cannot be more than the monthly salary!");
+      return;
+    }
     setLoading(true);
     try {
       const method = editId ? "PUT" : "POST";
