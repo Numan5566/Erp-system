@@ -2,7 +2,8 @@ import React, { useState, useEffect, useContext } from "react";
 import { 
   ShoppingCart, Search, Trash2, User, Plus, Minus, 
   Printer, CreditCard, Banknote, Truck, Tag, X, CheckCircle, Pencil,
-  History, ArrowLeft, FileText, Download, Filter, Package, Phone, MapPin
+  History, ArrowLeft, FileText, Download, Filter, Package, Phone, MapPin,
+  ArrowDownCircle, Hash
 } from "lucide-react";
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
@@ -47,7 +48,13 @@ export default function Billing({ type }) {
   const [delivery, setDelivery] = useState(0);
   const [paidAmount, setPaidAmount] = useState(0);
   const [paymentType, setPaymentType] = useState("Cash");
-  const [selectedBank, setSelectedBank] = useState("");
+  const [selectedBank, setSelectedBank] = useState('');
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnBillNo, setReturnBillNo] = useState("");
+  const [returnLoading, setReturnLoading] = useState(false);
+  const [returnStep, setReturnStep] = useState(1);
+  const [returnSaleDetails, setReturnSaleDetails] = useState(null);
+  const [selectedItemsToReturn, setSelectedItemsToReturn] = useState([]);
   const [bankDigits, setBankDigits] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -211,6 +218,64 @@ export default function Billing({ type }) {
   const netTotal = subtotal - parseFloat(discount || 0) + parseFloat(delivery || 0);
   const balance = netTotal - parseFloat(paidAmount || 0);
 
+  const fetchSaleForReturn = async () => {
+    if (!returnBillNo) return;
+    setReturnLoading(true);
+    try {
+      const res = await fetch(`${SALES_API}/${returnBillNo}`, {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReturnSaleDetails(data);
+        setSelectedItemsToReturn(data.items.map(i => ({ ...i, return_qty: i.qty })));
+        setReturnStep(2);
+      } else {
+        alert(data.error || "Sale not found");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error fetching sale details");
+    } finally {
+      setReturnLoading(false);
+    }
+  };
+
+  const handleSaleReturn = async (e) => {
+    e.preventDefault();
+    if (!returnBillNo) return;
+    setReturnLoading(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/sales/return", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ 
+          sale_id: returnBillNo,
+          items_to_return: selectedItemsToReturn
+            .filter(i => i.selected)
+            .map(i => ({ ...i, qty: i.return_qty })) // Use the edited return quantity
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setShowReturnModal(false);
+        setReturnBillNo("");
+        fetchData();
+        alert("Stock successfully returned to inventory!");
+      } else {
+        alert(data.error || "Failed to process return");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error processing return");
+    } finally {
+      setReturnLoading(false);
+    }
+  };
+
   const handleCheckout = async () => {
     if (cart.length === 0) return alert("Cart is empty!");
     
@@ -371,6 +436,11 @@ export default function Billing({ type }) {
             {editId ? <><Pencil size={18}/> Editing Sale #{editId}</> : <><Plus size={18}/> New Sale</>}
           </button>
           <button className={view === 'History' ? 'active' : ''} onClick={() => setView('History')}><History size={18}/> Sales History</button>
+          <button className="btn-secondary" 
+            onClick={() => setShowReturnModal(true)}
+            style={{background: '#fff1f2', color: '#e11d48', borderColor: '#fecdd3'}}>
+            <ArrowDownCircle size={18}/> Return Sale
+          </button>
           {heldBills.length > 0 && (
             <button className="btn-secondary" onClick={() => setShowHoldModal(true)} style={{background: '#fff7ed', color: '#c2410c', borderColor: '#fdba74'}}>
               <History size={18}/> Held Bills ({heldBills.length})
@@ -572,6 +642,11 @@ export default function Billing({ type }) {
             <Column header="Paid" body={(s) => <span className="text-green-600 font-bold">Rs.{s.paid_amount.toLocaleString()}</span>} sortable field="paid_amount" />
             <Column header="Balance" body={(s) => <span className="text-red-600 font-bold">Rs.{s.balance_amount.toLocaleString()}</span>} sortable field="balance_amount" />
             <Column header="Type" body={(s) => <span className={`status-badge ${s.payment_type.toLowerCase()}`} style={{padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700}}>{s.payment_type}</span>} sortable field="payment_type" />
+            <Column header="Status" body={(s) => (
+              <span className={`status-badge ${s.status === 'Returned' ? 'cancelled' : 'paid'}`} style={{padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700}}>
+                {s.status || 'Completed'}
+              </span>
+            )} sortable field="status" />
             <Column header="" body={(s) => (
               <ActionMenu 
                 onEdit={user?.role === 'admin' ? () => {
@@ -945,6 +1020,113 @@ export default function Billing({ type }) {
         </div>
       </Dialog>
 
+      {/* Sale Return Modal */}
+      {showReturnModal && (
+        <div className="modal-overlay" onClick={() => setShowReturnModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+            <div className="modal-header">
+              <div className="header-info">
+                <ArrowDownCircle size={24} color="#e11d48" />
+                <h3>{returnStep === 1 ? 'Fetch Bill for Return' : 'Select Items to Return'}</h3>
+              </div>
+              <button className="modal-close" onClick={() => { setShowReturnModal(false); setReturnStep(1); }}><X size={20} /></button>
+            </div>
+            
+            <div style={{padding: '20px'}}>
+              {returnStep === 1 ? (
+                <div className="custom-form p-fluid">
+                  <div className="field mb-4">
+                    <label className="block mb-2 font-bold" style={{color: '#475569'}}>Bill Number (Sale ID) *</label>
+                    <div className="p-inputgroup">
+                      <span className="p-inputgroup-addon"><Hash size={18} /></span>
+                      <InputText 
+                        type="number" 
+                        required 
+                        value={returnBillNo} 
+                        placeholder="Enter Bill Number e.g. 101"
+                        onChange={e => setReturnBillNo(e.target.value)} 
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-content-end gap-2">
+                    <Button type="button" label="Cancel" onClick={() => setShowReturnModal(false)} className="p-button-text" />
+                    <Button type="button" label={returnLoading ? "Fetching..." : "Fetch Bill"} icon="pi pi-search" onClick={fetchSaleForReturn} disabled={returnLoading} className="p-button-danger" />
+                  </div>
+                </div>
+              ) : (
+                <div className="return-items-selection">
+                  <div className="bill-summary mb-3 p-3" style={{background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0'}}>
+                    <p><strong>Customer:</strong> {returnSaleDetails.customer_name}</p>
+                    <p><strong>Total Bill:</strong> Rs. {returnSaleDetails.net_amount.toLocaleString()}</p>
+                  </div>
+                  
+                  <div className="items-table mb-4" style={{maxHeight: '300px', overflowY: 'auto'}}>
+                    <table className="w-full" style={{borderCollapse: 'collapse'}}>
+                      <thead style={{background: '#f1f5f9', position: 'sticky', top: 0}}>
+                        <tr>
+                          <th className="p-2 text-left" style={{width: '40px'}}></th>
+                          <th className="p-2 text-left">Item Name</th>
+                          <th className="p-2 text-right">Sold</th>
+                          <th className="p-2 text-right">Return Qty</th>
+                          <th className="p-2 text-right">Rate</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedItemsToReturn.map((item, idx) => (
+                          <tr key={idx} style={{borderBottom: '1px solid #f1f5f9'}}>
+                            <td className="p-2">
+                              <input 
+                                type="checkbox" 
+                                checked={item.selected} 
+                                onChange={e => {
+                                  const updated = [...selectedItemsToReturn];
+                                  updated[idx].selected = e.target.checked;
+                                  setSelectedItemsToReturn(updated);
+                                }}
+                              />
+                            </td>
+                            <td className="p-2" style={{fontSize: '0.9rem'}}>{item.product_name}</td>
+                            <td className="p-2 text-right" style={{color: '#64748b'}}>{item.qty}</td>
+                            <td className="p-2 text-right">
+                              <input 
+                                type="number" 
+                                min="1" 
+                                max={item.qty}
+                                value={item.return_qty}
+                                onChange={e => {
+                                  const val = parseFloat(e.target.value);
+                                  if (val > item.qty) return alert(`Cannot return more than sold (${item.qty})`);
+                                  const updated = [...selectedItemsToReturn];
+                                  updated[idx].return_qty = val;
+                                  setSelectedItemsToReturn(updated);
+                                }}
+                                style={{width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1', textAlign: 'right'}}
+                              />
+                            </td>
+                            <td className="p-2 text-right">Rs.{item.rate}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="flex justify-content-between align-items-center">
+                    <Button type="button" label="Back" onClick={() => setReturnStep(1)} className="p-button-text" />
+                    <Button 
+                      type="button" 
+                      label={returnLoading ? "Processing..." : "Process Selected Returns"} 
+                      icon="pi pi-check" 
+                      onClick={handleSaleReturn} 
+                      disabled={returnLoading || !selectedItemsToReturn.some(i => i.selected)} 
+                      className="p-button-danger" 
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -58,8 +58,10 @@ export default function Suppliers({ type }) {
       });
       const data = await res.json();
       setRecords(Array.isArray(data) ? data : []);
+      return data;
     } catch (err) {
       console.error("Failed to fetch suppliers", err);
+      return [];
     }
   };
 
@@ -212,6 +214,33 @@ export default function Suppliers({ type }) {
       console.error("Failed to make payment", err);
     }
     setLoading(false);
+  };
+
+  const handleEntryUpdate = async (purchaseId, newQty, newRate) => {
+    try {
+      const res = await fetch("http://localhost:5000/api/purchases/update-ledger-entry", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ 
+          purchase_id: purchaseId, 
+          new_qty: newQty, 
+          new_rate: newRate 
+        }),
+      });
+      if (res.ok) {
+        const updatedRecords = await fetchRecords(); // Refresh main balances
+        // Find updated supplier and refresh selected state
+        const updatedSup = (updatedRecords || []).find(s => s.id === selectedSupplier.id);
+        if (updatedSup) setSelectedSupplier(updatedSup);
+        
+        openLedger(updatedSup || selectedSupplier, ledgerFrom, ledgerTo, ledgerFilter); // Refresh ledger
+      }
+    } catch (err) {
+      console.error("Failed to update entry", err);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -578,11 +607,41 @@ export default function Suppliers({ type }) {
                                 <strong><Banknote size={14} style={{color:'#10b981', marginRight:'4px'}}/> {row.vehicle_number || 'Payment Sent'}</strong>
                               )}
                             </td>
-                            <td>
-                              {row.product_name ? (
-                                <>{row.quantity} {row.unit} <br/><small style={{color:'#64748b'}}>@ Rs. {row.rate}</small></>
+                            <td style={{padding: '16px'}}>
+                              {parseFloat(row.total_amount) > 0 ? (
+                                <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                  {user?.role === 'admin' ? (
+                                    <>
+                                      <input 
+                                        type="number" 
+                                        defaultValue={row.quantity} 
+                                        style={{width: '60px', padding: '4px', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px'}}
+                                        onBlur={(e) => {
+                                          if (e.target.value !== String(row.quantity)) {
+                                            handleEntryUpdate(row.id, e.target.value, row.rate);
+                                          }
+                                        }}
+                                      />
+                                      <span style={{fontSize: '0.75rem', color: '#64748b'}}>{row.unit} @ Rs.</span>
+                                      <input 
+                                        type="number" 
+                                        defaultValue={row.rate} 
+                                        style={{width: '80px', padding: '4px', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px'}}
+                                        onBlur={(e) => {
+                                          if (e.target.value !== String(row.rate)) {
+                                            handleEntryUpdate(row.id, row.quantity, e.target.value);
+                                          }
+                                        }}
+                                      />
+                                    </>
+                                  ) : (
+                                    <span style={{fontSize: '0.9rem', color: '#1e293b', fontWeight: 600}}>
+                                      {row.quantity} {row.unit} @ Rs. {row.rate}
+                                    </span>
+                                  )}
+                                </div>
                               ) : (
-                                <span style={{color: '#94a3b8'}}>—</span>
+                                <span style={{color: '#64748b', fontSize: '0.9rem'}}>—</span>
                               )}
                             </td>
                             <td className="bold">Rs. {parseFloat(row.total_amount).toLocaleString()}</td>

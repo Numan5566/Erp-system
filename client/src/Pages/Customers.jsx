@@ -59,6 +59,7 @@ export default function Customers({ type }) {
       });
       const data = await res.json();
       setRecords(Array.isArray(data) ? data : []);
+      return data;
 
       const banksRes = await fetch(`http://localhost:5000/api/banks`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
@@ -67,6 +68,7 @@ export default function Customers({ type }) {
       setBankAccounts(Array.isArray(banksData) ? banksData : []);
     } catch (err) {
       console.error("Failed to fetch data", err);
+      return [];
     }
   };
 
@@ -209,6 +211,34 @@ export default function Customers({ type }) {
       console.error("Payment failed", err);
     }
     setLoading(false);
+  };
+
+  const handleItemUpdate = async (saleId, itemId, newQty, newRate) => {
+    try {
+      const res = await fetch("http://localhost:5000/api/sales/update-item", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ 
+          sale_id: saleId, 
+          item_id: itemId, 
+          new_qty: newQty, 
+          new_rate: newRate 
+        }),
+      });
+      if (res.ok) {
+        const updatedRecords = await fetchRecords(); // Make sure fetchRecords returns data or wait for state update
+        // Find updated customer and refresh selected state
+        const updatedCust = (updatedRecords || []).find(c => c.id === selectedCustomer.id);
+        if (updatedCust) setSelectedCustomer(updatedCust);
+        
+        openLedger(updatedCust || selectedCustomer, ledgerFrom, ledgerTo, ledgerFilter); // Refresh ledger
+      }
+    } catch (err) {
+      console.error("Failed to update item", err);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -558,26 +588,57 @@ export default function Customers({ type }) {
                             <td>#SAL-{row.id}</td>
                             <td>
                               {parseFloat(row.total_amount) > 0 ? (
-                                <>
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                                   <strong>Products Sold:</strong>
-                                  <div style={{fontSize: '0.8rem', color: '#64748b'}}>
-                                    {(() => {
-                                      let items = [];
-                                      try {
-                                        items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
-                                      } catch (e) { items = []; }
-                                      
-                                      // Fallback to legacy_items if main items is empty
-                                      if (items.length === 0 && row.legacy_items) {
-                                        items = row.legacy_items;
-                                      }
-
-                                      return items.length > 0 
-                                        ? items.map(i => `${i.brand || ''} ${i.name || ''}`).join(", ") 
-                                        : "Products Sold (Details N/A)";
-                                    })()}
-                                  </div>
-                                </>
+                                  {(() => {
+                                    let items = [];
+                                    try {
+                                      items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
+                                    } catch (e) { items = []; }
+                                    
+                                    return (
+                                      <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                                        {items.map((item, idx) => (
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '4px 8px', borderRadius: '4px', border: '1px solid #e2e8f0'}}>
+                                              <span style={{fontSize: '0.8rem', fontWeight: 600, flex: 1}}>{item.name}</span>
+                                              <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                                                {user?.role === 'admin' ? (
+                                                  <>
+                                                    <input 
+                                                      type="number" 
+                                                      defaultValue={item.qty} 
+                                                      style={{width: '50px', padding: '2px', fontSize: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '4px'}}
+                                                      onBlur={(e) => {
+                                                        if (e.target.value !== String(item.qty)) {
+                                                          handleItemUpdate(row.id, item.id, e.target.value, item.rate);
+                                                        }
+                                                      }}
+                                                    />
+                                                    <span style={{fontSize: '0.75rem'}}>x</span>
+                                                    <input 
+                                                      type="number" 
+                                                      defaultValue={item.rate} 
+                                                      style={{width: '60px', padding: '2px', fontSize: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '4px'}}
+                                                      onBlur={(e) => {
+                                                        if (e.target.value !== String(item.rate)) {
+                                                          handleItemUpdate(row.id, item.id, item.qty, e.target.value);
+                                                        }
+                                                      }}
+                                                    />
+                                                  </>
+                                                ) : (
+                                                  <span style={{fontSize: '0.8rem', color: '#64748b'}}>{item.qty} x {item.rate}</span>
+                                                )}
+                                              </div>
+                                              <span style={{fontSize: '0.8rem', fontWeight: 700, color: '#3b82f6', minWidth: '60px', textAlign: 'right'}}>
+                                                Rs. {(parseFloat(item.qty) * parseFloat(item.rate)).toLocaleString()}
+                                              </span>
+                                            </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
                               ) : (
                                 <strong><Banknote size={14} style={{color:'#10b981', marginRight:'4px'}}/> Payment Received</strong>
                               )}

@@ -63,11 +63,12 @@ router.post('/', auth, async (req, res) => {
     }
 
     // 1. Insert into sales table
+    const vId = vehicle_id && vehicle_id !== '' ? vehicle_id : null;
     const saleResult = await client.query(
       `INSERT INTO sales 
-      (customer_id, customer_name, customer_phone, customer_address, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, sale_type, user_id, vehicle_id, items) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`,
-      [finalCustomerId, customer_name, customer_phone || '', req.body.customer_address || '', total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, finalModule, req.user.id, vehicle_id, JSON.stringify(items)]
+      (customer_id, customer_name, customer_phone, customer_address, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, sale_type, user_id, vehicle_id, items, status) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
+      [finalCustomerId, customer_name, customer_phone || '', req.body.customer_address || '', total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, finalModule, req.user.id, vId, JSON.stringify(items), 'Completed']
     );
     const saleId = saleResult.rows[0].id;
 
@@ -134,11 +135,11 @@ router.get('/ledger/:customerId', auth, async (req, res) => {
     let query = `
       SELECT s.*, 
       (SELECT JSON_AGG(si) FROM (
-        SELECT si.product_name as name, p.brand 
+        SELECT si.id, si.product_id, si.product_name as name, si.qty, si.rate, si.subtotal, p.brand 
         FROM sale_items si 
         LEFT JOIN products p ON si.product_id = p.id 
         WHERE si.sale_id = s.id
-      ) si) as legacy_items
+      ) si) as items
       FROM sales s 
       WHERE s.customer_id = $1`;
     let params = [req.params.customerId];
@@ -279,6 +280,145 @@ router.delete('/:id', auth, async (req, res) => {
     res.json({ message: 'Sale deleted' });
   } catch (err) {
     await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Update a specific item in a sale (from Ledger)
+router.post('/update-item', auth, async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Only admins can edit ledger entries' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { sale_id, item_id, new_qty, new_rate } = req.body;
+
+    // 1. Get original item details
+    const oldItem = await client.query('SELECT * FROM sale_items WHERE id = $1', [item_id]);
+    if (oldItem.rows.length === 0) throw new Error('Item not found');
+    const { qty: old_qty, subtotal: old_subtotal, product_id } = oldItem.rows[0];
+
+    // 2. Calculate new subtotal
+    const n_qty = parseFloat(new_qty);
+    const n_rate = parseFloat(new_rate);
+    const new_subtotal = n_qty * n_rate;
+    const subtotal_diff = new_subtotal - parseFloat(old_subtotal);
+    const qty_diff = n_qty - parseFloat(old_qty);
+
+    // 3. Update sale_items
+    await client.query(
+      'UPDATE sale_items SET qty = $1, rate = $2, subtotal = $3 WHERE id = $4',
+      [n_qty, n_rate, new_subtotal, item_id]
+    );
+
+    // 4. Update sales total and balance_amount
+    await client.query(
+      'UPDATE sales SET total_amount = total_amount + $1, net_amount = net_amount + $1, balance_amount = balance_amount + $1 WHERE id = $2',
+      [subtotal_diff, sale_id]
+    );
+
+    // 5. Update Customer Balance
+    const sale = await client.query('SELECT customer_id FROM sales WHERE id = $1', [sale_id]);
+    const customer_id = sale.rows[0].customer_id;
+    if (customer_id) {
+      await client.query(
+        'UPDATE customers SET balance = balance + $1 WHERE id = $2',
+        [subtotal_diff, customer_id]
+      );
+    }
+
+    // 6. Adjust Product Stock
+    if (product_id) {
+      await client.query(
+        'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+        [qty_diff, product_id]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Process a Sale Return (Full or Partial)
+router.post('/return', auth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { sale_id, items_to_return } = req.body;
+    const sId = parseInt(sale_id);
+    if (isNaN(sId)) throw new Error('Invalid Bill Number');
+
+    // 1. Get sale details
+    const saleRes = await client.query('SELECT * FROM sales WHERE id = $1', [sId]);
+    if (saleRes.rows.length === 0) throw new Error('Sale not found');
+    const sale = saleRes.rows[0];
+
+    // Check if already fully returned
+    if (sale.status === 'Returned') throw new Error('This bill has already been fully returned');
+
+    // 2. Identify items to return
+    let items;
+    if (items_to_return && Array.isArray(items_to_return) && items_to_return.length > 0) {
+      items = items_to_return;
+    } else {
+      // Full return
+      const itemsRes = await client.query('SELECT * FROM sale_items WHERE sale_id = $1', [sId]);
+      items = itemsRes.rows;
+    }
+
+    let totalReturnedValue = 0;
+
+    for (const item of items) {
+      const prodId = item.product_id;
+      const qty = parseFloat(item.qty || 0);
+      const rate = parseFloat(item.rate || 0);
+      
+      if (prodId && qty > 0) {
+        // Restore stock
+        await client.query(
+          'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+          [qty, prodId]
+        );
+        totalReturnedValue += (qty * rate);
+
+        // If partial return, we might want to record that this item was returned
+        // For now, let's just mark the whole sale if it's a full return
+      }
+    }
+
+    // 3. Update Sale status or totals
+    if (!items_to_return) {
+      await client.query('UPDATE sales SET status = $1 WHERE id = $2', ['Returned', sId]);
+    } else {
+      // For partial return, maybe just add a note or leave as Completed but with reduced value?
+      // Usually, it's better to mark as 'Partially Returned'
+      await client.query("UPDATE sales SET status = 'Partially Returned' WHERE id = $1", [sId]);
+    }
+
+    // 4. Adjust Customer Balance
+    if (sale.customer_id) {
+      // We reduce the balance by the value of returned items
+      // (capped by the sale's balance_amount to avoid negative balance if they already paid)
+      const reduction = items_to_return ? totalReturnedValue : sale.balance_amount;
+      
+      await client.query(
+        'UPDATE customers SET balance = balance - $1 WHERE id = $2',
+        [reduction, sale.customer_id]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'Stock returned and balance adjusted' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Return Error:', err);
     res.status(500).json({ error: err.message });
   } finally {
     client.release();

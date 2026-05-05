@@ -29,6 +29,9 @@ export default function Stock({ type }) {
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [activeTab, setActiveTab] = useState(type || (user?.role === 'admin' ? "" : user?.module_type || "Wholesale"));
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnBillNo, setReturnBillNo] = useState("");
+  const [returnLoading, setReturnLoading] = useState(false);
 
   useEffect(() => {
     if (type) {
@@ -159,6 +162,36 @@ export default function Stock({ type }) {
     setLoading(false);
   };
 
+  const handleSaleReturn = async (e) => {
+    e.preventDefault();
+    if (!returnBillNo) return;
+    setReturnLoading(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/sales/return", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ sale_id: returnBillNo })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setShowReturnModal(false);
+        setReturnBillNo("");
+        fetchData();
+        alert("Stock successfully returned to inventory!");
+      } else {
+        alert(data.error || "Failed to process return");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error processing return");
+    } finally {
+      setReturnLoading(false);
+    }
+  };
+
   const filtered = products.filter((p) => {
     const matchCat = !selectedCategory || p.category === selectedCategory;
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -197,6 +230,15 @@ export default function Stock({ type }) {
             <button className={activeTab === 'Retail 2' ? 'active' : ''} onClick={() => setActiveTab('Retail 2')}>Retail 2</button>
           </div>
         )}
+
+        <div className="module-actions" style={{display: 'flex', gap: '10px'}}>
+          <button className="btn-primary" 
+            onClick={() => setShowReturnModal(true)}
+            style={{background: '#f43f5e', border: 'none', color: 'white', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600}}>
+            <ArrowDownCircle size={20} />
+            Sale Return (Bill)
+          </button>
+        </div>
       </div>
 
       <div className="stats-grid-pos">
@@ -505,6 +547,46 @@ export default function Stock({ type }) {
                 <button type="button" className="btn-secondary" onClick={() => setShowReceiveModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={loading}>
                   {loading ? "Processing..." : "Complete Purchase"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Sale Return Modal */}
+      {showReturnModal && (
+        <div className="modal-overlay" onClick={() => setShowReturnModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+            <div className="modal-header">
+              <div className="header-info">
+                <ArrowDownCircle size={24} color="#f43f5e" />
+                <h3>Process Sale Return</h3>
+              </div>
+              <button className="modal-close" onClick={() => setShowReturnModal(false)}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleSaleReturn} className="custom-form p-fluid" style={{padding: '20px'}}>
+              <div className="field mb-4">
+                <label className="block mb-2 font-bold" style={{color: '#475569'}}>Bill Number (Sale ID) *</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon"><Hash size={18} /></span>
+                  <input 
+                    type="number" 
+                    required 
+                    value={returnBillNo} 
+                    placeholder="Enter Bill Number e.g. 101"
+                    className="p-inputtext p-component"
+                    onChange={e => setReturnBillNo(e.target.value)} 
+                  />
+                </div>
+                <p style={{fontSize: '0.75rem', color: '#64748b', marginTop: '8px'}}>
+                  Note: This will return ALL items from this bill back to stock and adjust the customer balance.
+                </p>
+              </div>
+
+              <div className="flex justify-content-end gap-2">
+                <button type="button" className="btn-secondary" onClick={() => setShowReturnModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" style={{background: '#f43f5e'}} disabled={returnLoading}>
+                  {returnLoading ? "Processing..." : "Return to Stock"}
                 </button>
               </div>
             </form>

@@ -5,6 +5,30 @@ const auth = require('../middleware/auth');
 
 const isAdmin = (req) => req.user.role === 'admin';
 
+// Get all purchases/payments for all suppliers (Summary)
+router.get('/ledger/all', auth, async (req, res) => {
+  try {
+    let query = `
+      SELECT p.*, pr.name as product_name, pr.unit, pr.brand, s.name as supplier_name
+      FROM purchases p
+      LEFT JOIN products pr ON p.product_id = pr.id
+      LEFT JOIN suppliers s ON p.supplier_id = s.id
+    `;
+    let params = [];
+
+    if (!isAdmin(req)) {
+      query += ' WHERE p.module_type = $1';
+      params.push(req.user.module_type || 'Retail 1');
+    }
+
+    query += ' ORDER BY p.purchase_date DESC';
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get all purchases for a specific supplier (Ledger)
 router.get('/supplier/:supplierId', auth, async (req, res) => {
   try {
@@ -147,6 +171,58 @@ router.post('/payment', auth, async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Supplier Payment Error:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Update a specific purchase entry (from Ledger)
+router.post('/update-ledger-entry', auth, async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Only admins can edit ledger entries' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { purchase_id, new_qty, new_rate } = req.body;
+
+    // 1. Get original purchase details
+    const oldRes = await client.query('SELECT * FROM purchases WHERE id = $1', [purchase_id]);
+    if (oldRes.rows.length === 0) throw new Error('Purchase not found');
+    const { quantity: old_qty, total_amount: old_total, supplier_id, product_id } = oldRes.rows[0];
+
+    // 2. Calculate new totals
+    const n_qty = parseFloat(new_qty);
+    const n_rate = parseFloat(new_rate);
+    const new_total = n_qty * n_rate;
+    const total_diff = new_total - parseFloat(old_total);
+    const qty_diff = n_qty - parseFloat(old_qty);
+
+    // 3. Update purchases record
+    await client.query(
+      'UPDATE purchases SET quantity = $1, rate = $2, total_amount = $3, balance_amount = balance_amount + $4 WHERE id = $5',
+      [n_qty, n_rate, new_total, total_diff, purchase_id]
+    );
+
+    // 4. Update Supplier Balance
+    if (supplier_id) {
+      await client.query(
+        'UPDATE suppliers SET balance = balance + $1 WHERE id = $2',
+        [total_diff, supplier_id]
+      );
+    }
+
+    // 5. Adjust Product Stock
+    if (product_id) {
+      await client.query(
+        'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+        [qty_diff, product_id]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
   } finally {
     client.release();

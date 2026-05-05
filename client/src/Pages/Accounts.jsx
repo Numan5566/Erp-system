@@ -13,8 +13,9 @@ export default function Accounts() {
 
   // State for bank accounts
   const [accounts, setAccounts] = useState([]);
-  const [form, setForm] = useState({ bank_name: "", account_title: "", account_number: "" });
+  const [form, setForm] = useState({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 });
   const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -103,7 +104,74 @@ export default function Accounts() {
     fetchOthers();
   }, []);
 
-  // Compute totals per payment method (Unified)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const method = editId ? "PUT" : "POST";
+      const url = editId ? `http://localhost:5000/api/banks/${editId}` : 'http://localhost:5000/api/banks';
+      
+      await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(form)
+      });
+      setShowModal(false);
+      setEditId(null);
+      setForm({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 });
+      fetchAccounts();
+    } catch (err) {
+      console.error('Failed to save bank account', err);
+    }
+    setLoading(false);
+  };
+
+  const handleEdit = (acc) => {
+    setEditId(acc.id);
+    setForm({
+      bank_name: acc.bank_name,
+      account_title: acc.account_title,
+      account_number: acc.account_number,
+      opening_balance: acc.opening_balance
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await fetch(`http://localhost:5000/api/banks/${id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      fetchAccounts();
+    } catch (err) {
+      console.error('Failed to delete account', err);
+    }
+  };
+
+  const handleCashOpeningBalance = () => {
+    const cashAcc = accounts.find(a => a.bank_name.toLowerCase() === 'cash' || a.bank_name.toLowerCase() === 'cash account');
+    if (cashAcc) {
+      handleEdit(cashAcc);
+    } else {
+      setEditId(null);
+      setForm({ bank_name: "Cash", account_title: "Main Counter", account_number: "Cash", opening_balance: 0 });
+      setShowModal(true);
+    }
+  };
+
+  const handlePrintLedger = () => {
+    window.print();
+  };
+
+  const handleViewBill = (sale) => {
+    setSelectedBill(sale);
+    setShowBill(true);
+  };
+
   const paymentSummary = [
     ...sales, 
     ...supplierPayments.map(p => ({ ...p, isExpense: true, amount: p.paid_amount })),
@@ -112,7 +180,6 @@ export default function Accounts() {
     ...rents.map(r => ({ ...r, isExpense: true, payment_type: 'Cash' })),
     ...otherExpenses.map(o => ({ ...o, isExpense: true, payment_type: o.payment_method || 'Cash' })),
     ...investments.map(i => ({ ...i, isIncome: true, payment_type: 'Cash' })),
-    // Include delivery charges from purchases as expenses
     ...supplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
       ...p, isExpense: true, amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
       isTransportFare: true 
@@ -130,7 +197,12 @@ export default function Accounts() {
       acc[cleanMethod] += amount;
     }
     return acc;
-  }, {});
+  }, accounts.reduce((acc, b) => {
+    const name = b.bank_name;
+    if (!acc[name]) acc[name] = 0;
+    acc[name] += parseFloat(b.opening_balance) || 0;
+    return acc;
+  }, { 'Cash': 0 }));
 
   const totalCash = paymentSummary['Cash'] || 0;
   const totalBank = Object.entries(paymentSummary)
@@ -175,14 +247,20 @@ export default function Accounts() {
   const summarySection = (
     <div className="payment-overview-cards" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '30px'}}>
       {/* Cash Card */}
-      <div className="stat-card" style={{
-        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', 
-        padding: '24px', borderRadius: '20px', color: '#fff', 
-        boxShadow: '0 10px 20px rgba(16, 185, 129, 0.2)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-      }}>
+      <div className="stat-card" 
+        onClick={handleCashOpeningBalance}
+        style={{
+          background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', 
+          padding: '24px', borderRadius: '20px', color: '#fff', 
+          boxShadow: '0 10px 20px rgba(16, 185, 129, 0.2)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          cursor: 'pointer', transition: 'transform 0.2s'
+        }}
+        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+      >
         <div>
-          <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px'}}>Total Cash Received</p>
+          <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px'}}>Total Cash (Click to Set Opening)</p>
           <h2 style={{margin: '8px 0 0 0', fontSize: '2rem', fontWeight: 800}}>Rs. {totalCash.toLocaleString()}</h2>
         </div>
         <div style={{background: 'rgba(255,255,255,0.2)', padding: '15px', borderRadius: '16px'}}>
@@ -210,53 +288,16 @@ export default function Accounts() {
 
   // Access guard removed - Backend now handles isolation
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await fetch('http://localhost:5000/api/banks', {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(form)
-      });
-      setShowModal(false);
-      setForm({ bank_name: "", account_title: "", account_number: "" });
-      fetchAccounts();
-    } catch (err) {
-      console.error('Failed to add bank account', err);
-    }
-    setLoading(false);
-  };
 
-  const handleDelete = async (id) => {
-    try {
-      await fetch(`http://localhost:5000/api/banks/${id}`, {
-        method: "DELETE",
-        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
-      });
-      fetchAccounts();
-    } catch (err) {
-      console.error('Failed to delete account', err);
-    }
-  };
-
-  const handlePrintLedger = () => {
-    window.print();
-  };
-
-  const handleViewBill = (sale) => {
-    setSelectedBill(sale);
-    setShowBill(true);
-  };
-
-  // Combine Bank Accounts with a virtual "Cash" account
-  const displayAccounts = [
-    { id: 'cash-id', bank_name: 'Cash Account', account_title: 'Main Counter', account_number: 'N/A', isCash: true },
-    ...accounts
-  ];
+  // Combine Bank Accounts with a virtual "Cash" account ONLY if no real Cash account exists
+  const displayAccounts = (() => {
+    const hasRealCash = accounts.some(a => a.bank_name.toLowerCase() === 'cash' || a.bank_name.toLowerCase() === 'cash account');
+    if (hasRealCash) return accounts;
+    return [
+      { id: 'cash-id', bank_name: 'Cash Account', account_title: 'Main Counter', account_number: 'N/A', isCash: true, opening_balance: 0 },
+      ...accounts
+    ];
+  })();
 
   const filtered = displayAccounts.filter(acc => acc.bank_name.toLowerCase().includes(search.toLowerCase()));
 
@@ -298,14 +339,24 @@ export default function Accounts() {
             </div>
           )} sortable />
           <Column field="account_title" header="Account Title" body={acc => acc.account_title || '—'} sortable />
-          <Column field="account_number" header="Account Number" body={acc => (
-            <div style={{display:'flex', alignItems:'center', gap:'6px'}}><Hash size={14} color="#64748b"/> {acc.account_number || '—'}
-            </div>
           )} sortable />
+          <Column field="opening_balance" header="Opening Bal." body={acc => (
+            <div style={{fontWeight: 700, color: '#64748b'}}>Rs. {parseFloat(acc.opening_balance || 0).toLocaleString()}</div>
+          )} sortable />
+          <Column header="Current Bal." body={acc => {
+            const bal = paymentSummary[acc.bank_name.replace(' Account', '')] || 0;
+            return <div style={{fontWeight: 900, color: '#16a34a', fontSize: '1.1rem'}}>Rs. {bal.toLocaleString()}</div>
+          }} />
           <Column header="" body={acc => (
             <ActionMenu 
               onDelete={acc.isCash ? null : () => handleDelete(acc.id)} 
               extraItems={[
+                { 
+                  label: 'Edit Account', 
+                  icon: 'pi pi-pencil', 
+                  command: () => handleEdit(acc),
+                  disabled: acc.isCash
+                },
                 { 
                   label: 'View Ledger', 
                   icon: 'pi pi-book', 
@@ -524,18 +575,18 @@ export default function Accounts() {
               </div>
 
               <div className="field mb-4">
-                <label className="block mb-2 font-bold">Account Number (IBAN/Phone)</label>
+                <label className="block mb-2 font-bold">Opening Balance (PKR) *</label>
                 <div className="p-inputgroup">
-                  <span className="p-inputgroup-addon"><Hash size={18} /></span>
-                  <input type="text" value={form.account_number} placeholder="e.g. PK00MEZN..."
+                  <span className="p-inputgroup-addon">Rs.</span>
+                  <input type="number" required value={form.opening_balance} placeholder="0.00"
                     className="p-inputtext p-component"
-                    onChange={e => setForm({ ...form, account_number: e.target.value })} />
+                    onChange={e => setForm({ ...form, opening_balance: e.target.value })} />
                 </div>
               </div>
 
               <div className="flex justify-content-end gap-2">
-                <Button type="button" label="Cancel" icon="pi pi-times" onClick={() => setShowModal(false)} className="p-button-text" />
-                <Button type="submit" label={loading ? "Saving..." : "Add Bank"} icon="pi pi-check" loading={loading} />
+                <Button type="button" label="Cancel" icon="pi pi-times" onClick={() => {setShowModal(false); setEditId(null);}} className="p-button-text" />
+                <Button type="submit" label={loading ? "Saving..." : (editId ? "Update Account" : "Add Bank")} icon="pi pi-check" loading={loading} />
               </div>
             </form>
           </div>

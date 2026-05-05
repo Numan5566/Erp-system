@@ -25,10 +25,24 @@ router.get('/', auth, async (req, res) => {
 // Add a bank (Allowed for everyone, linked to user_id)
 router.post('/', auth, async (req, res) => {
   try {
-    const { bank_name, account_title, account_number } = req.body;
+    const { bank_name, account_title, account_number, opening_balance } = req.body;
     const result = await pool.query(
-      'INSERT INTO bank_accounts (bank_name, account_title, account_number, user_id) VALUES ($1, $2, $3, $4) RETURNING *',
-      [bank_name, account_title, account_number, req.user.id]
+      'INSERT INTO bank_accounts (bank_name, account_title, account_number, opening_balance, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [bank_name, account_title, account_number, opening_balance || 0, req.user.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update a bank account
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const { bank_name, account_title, account_number, opening_balance } = req.body;
+    const result = await pool.query(
+      'UPDATE bank_accounts SET bank_name=$1, account_title=$2, account_number=$3, opening_balance=$4 WHERE id=$5 AND (user_id=$6 OR $7) RETURNING *',
+      [bank_name, account_title, account_number, opening_balance, req.params.id, req.user.id, isAdmin(req)]
     );
     res.json(result.rows[0]);
   } catch (err) {
