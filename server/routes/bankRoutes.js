@@ -119,8 +119,11 @@ router.get('/', auth, async (req, res) => {
       // Master Admin sees ALL banks
       result = await pool.query('SELECT * FROM bank_accounts ORDER BY id ASC');
     } else {
-      // Everyone else sees ONLY their own banks or those added by Admin for their shop
-      result = await pool.query('SELECT * FROM bank_accounts WHERE user_id = $1 OR module_type = $2 ORDER BY id ASC', [req.user.id, req.user.module_type || 'Retail 1']);
+      // Everyone else sees their own banks, those added for their shop, AND all Admin bank accounts so they can select them as Galla recipients!
+      result = await pool.query(
+        'SELECT * FROM bank_accounts WHERE user_id = $1 OR module_type = $2 OR user_id IN (SELECT id FROM users WHERE role = \'admin\') ORDER BY id ASC',
+        [req.user.id, req.user.module_type || 'Retail 1']
+      );
     }
     res.json(result.rows);
   } catch (err) {
@@ -131,12 +134,23 @@ router.get('/', auth, async (req, res) => {
 // Add a bank
 router.post('/', auth, async (req, res) => {
   try {
-    const { bank_name, account_title, account_number, opening_balance, module_type } = req.body;
+    const { bank_name, account_title, account_number, opening_balance, module_type, is_admin_recipient } = req.body;
     const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
     
+    let targetUserId = req.user.id;
+    let targetModule = finalModule;
+    
+    if (is_admin_recipient) {
+      const adminRes = await pool.query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+      if (adminRes.rows.length > 0) {
+        targetUserId = adminRes.rows[0].id;
+        targetModule = 'Admin Recipient';
+      }
+    }
+
     const result = await pool.query(
       'INSERT INTO bank_accounts (bank_name, account_title, account_number, opening_balance, user_id, module_type) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [bank_name, account_title, account_number, opening_balance || 0, req.user.id, finalModule]
+      [bank_name, account_title, account_number, opening_balance || 0, targetUserId, targetModule]
     );
     res.json(result.rows[0]);
   } catch (err) {

@@ -103,18 +103,46 @@ export default function Accounts() {
   const [closeoutForm, setCloseoutForm] = useState({
     amount_sent_to_admin: "",
     amount_kept_as_opening: "",
+    admin_bank_id: "",
     notes: ""
   });
+  const [showAdminBankModal, setShowAdminBankModal] = useState(false);
+  const [adminBankForm, setAdminBankForm] = useState({ bank_name: "", account_title: "", account_number: "" });
+
+  const handleAdminBankSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch('http://localhost:5000/api/banks', {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ ...adminBankForm, opening_balance: 0, is_admin_recipient: true })
+      });
+      if (res.ok) {
+        setShowAdminBankModal(false);
+        setAdminBankForm({ bank_name: "", account_title: "", account_number: "" });
+        fetchAccounts();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setLoading(false);
+  };
 
 
   const handleOpenCloseout = () => {
     setCloseoutForm({
       amount_sent_to_admin: totalCash,
       amount_kept_as_opening: "",
+      admin_bank_id: "",
       notes: ""
     });
     setShowCloseoutModal(true);
   };
+
 
   const handleCloseoutFieldChange = (field, val) => {
     // Strip leading zeroes from the string (e.g. "04" -> "4", "044" -> "44")
@@ -145,16 +173,27 @@ export default function Accounts() {
 
   const handleCloseoutSubmit = async (e) => {
     e.preventDefault();
+    if (!closeoutForm.admin_bank_id) {
+      alert("Please select the recipient Admin Bank Account!");
+      return;
+    }
     setLoading(true);
     try {
+      const selectedBank = displayAccounts.find(acc => acc.id === closeoutForm.admin_bank_id || String(acc.id) === String(closeoutForm.admin_bank_id));
+      const bankDetailsText = selectedBank ? `Recipient Bank: ${selectedBank.bank_name} (A/C: ${selectedBank.account_number}, Title: ${selectedBank.account_title || 'N/A'})` : '';
+      const submissionData = {
+        ...closeoutForm,
+        notes: bankDetailsText ? `${bankDetailsText}. ${closeoutForm.notes}` : closeoutForm.notes
+      };
       const res = await fetch('http://localhost:5000/api/banks/closeout', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(closeoutForm)
+        body: JSON.stringify(submissionData)
       });
+
       if (res.ok) {
         setShowCloseoutModal(false);
         // Refresh all data
@@ -537,7 +576,7 @@ export default function Accounts() {
           </div>
         </div>
 
-        {user?.role === 'admin' && (
+        {user?.role === 'admin' && user?.email === 'admin@erp.com' && (
           <div className="counter-switcher">
             <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
             <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
@@ -547,6 +586,7 @@ export default function Accounts() {
 
         <div className="module-actions" style={{display: 'flex', gap: '10px'}}>
           <Button label="Galla Closeout" icon="pi pi-lock" onClick={handleOpenCloseout} className="p-button-warning" style={{borderRadius: '12px'}} />
+          <Button label="Add Recipient Bank" icon="pi pi-plus-circle" onClick={() => { setAdminBankForm({ bank_name: "", account_title: "", account_number: "" }); setShowAdminBankModal(true); }} className="p-button-success" style={{borderRadius: '12px'}} />
           <Button label="Add Bank Account" icon="pi pi-plus" onClick={() => { setEditId(null); setForm({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 }); setShowModal(true); }} className="p-button-primary" style={{borderRadius: '12px'}} />
         </div>
 
@@ -1016,6 +1056,51 @@ export default function Accounts() {
               </div>
 
               <div className="field mb-3">
+                <label className="block mb-2 font-bold" style={{color: '#1e293b'}}>Recipient Admin Bank Account *</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon">🏦</span>
+                  <select 
+                    required 
+                    value={closeoutForm.admin_bank_id} 
+                    className="p-inputtext p-component"
+                    style={{borderRadius: '0 8px 8px 0', padding: '10px'}}
+                    onChange={e => setCloseoutForm(prev => ({ ...prev, admin_bank_id: e.target.value }))}
+                  >
+                    <option value="">-- Select Recipient Admin Account --</option>
+                    {displayAccounts.filter(acc => !acc.isCash && acc.bank_name.toLowerCase() !== 'cash' && acc.bank_name.toLowerCase() !== 'cash account' && (user?.role === 'admin' || acc.user_id !== user?.id)).map(acc => (
+                      <option key={acc.id} value={acc.id}>{acc.bank_name} - {acc.account_title}</option>
+                    ))}
+
+                  </select>
+                </div>
+              </div>
+
+              {displayAccounts.find(acc => acc.id === closeoutForm.admin_bank_id || String(acc.id) === String(closeoutForm.admin_bank_id)) && (() => {
+                const selectedRecipientBank = displayAccounts.find(acc => acc.id === closeoutForm.admin_bank_id || String(acc.id) === String(closeoutForm.admin_bank_id));
+                return (
+                  <div style={{
+                    background: '#f8fafc',
+                    padding: '15px',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    marginBottom: '20px',
+                    fontSize: '0.85rem',
+                    color: '#334155'
+                  }}>
+                    <p style={{margin: '0 0 8px 0', fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '5px'}}>
+                      <span>✅ Recipient Account Verified Details:</span>
+                    </p>
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px'}}>
+                      <div><strong>Bank Name:</strong> {selectedRecipientBank.bank_name}</div>
+                      <div><strong>Account Title:</strong> {selectedRecipientBank.account_title || 'N/A'}</div>
+                      <div style={{gridColumn: 'span 2'}}><strong>Account Number:</strong> <span style={{fontFamily: 'monospace', fontSize: '0.95rem', fontWeight: 700, color: '#0f172a'}}>{selectedRecipientBank.account_number || 'N/A'}</span></div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="field mb-3">
+
                 <label className="block mb-2 font-bold" style={{color: '#1e293b'}}>Remaining Kept as Opening Balance *</label>
                 <div className="p-inputgroup">
                   <span className="p-inputgroup-addon">Rs.</span>
@@ -1036,6 +1121,53 @@ export default function Accounts() {
               <div className="flex justify-content-end gap-2">
                 <Button type="button" label="Cancel" icon="pi pi-times" onClick={() => setShowCloseoutModal(false)} className="p-button-text" />
                 <Button type="submit" label={loading ? "Submitting..." : "Submit Handover & Close Register"} icon="pi pi-check" loading={loading} className="p-button-warning" />
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showAdminBankModal && (
+        <div className="modal-overlay" onClick={() => setShowAdminBankModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add Dedicated Admin Recipient Bank</h3>
+              <button className="modal-close" onClick={() => setShowAdminBankModal(false)}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleAdminBankSubmit} className="custom-form p-fluid">
+              <div className="field mb-3">
+                <label className="block mb-2 font-bold">Bank Name *</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon"><Landmark size={18} /></span>
+                  <input type="text" required value={adminBankForm.bank_name} placeholder="e.g. Meezan Bank"
+                    className="p-inputtext p-component"
+                    onChange={e => setAdminBankForm({ ...adminBankForm, bank_name: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="field mb-3">
+                <label className="block mb-2 font-bold">Account Title *</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon"><CreditCard size={18} /></span>
+                  <input type="text" required value={adminBankForm.account_title} placeholder="e.g. Admin Head Office"
+                    className="p-inputtext p-component"
+                    onChange={e => setAdminBankForm({ ...adminBankForm, account_title: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="field mb-3">
+                <label className="block mb-2 font-bold">Account Number *</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon"><Hash size={18} /></span>
+                  <input type="text" required value={adminBankForm.account_number} placeholder="e.g. 0123456789"
+                    className="p-inputtext p-component"
+                    onChange={e => setAdminBankForm({ ...adminBankForm, account_number: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="flex justify-content-end gap-2">
+                <Button type="button" label="Cancel" icon="pi pi-times" onClick={() => setShowAdminBankModal(false)} className="p-button-text" />
+                <Button type="submit" label={loading ? "Saving..." : "Add Recipient Bank"} icon="pi pi-check" loading={loading} />
               </div>
             </form>
           </div>
