@@ -505,7 +505,7 @@ export default function Labours() {
                      required
                    >
                      <option value="Cash">Cash Account (Main Counter)</option>
-                     {banks.map(b => (
+                     {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
                        <option key={b.id} value={`Bank - ${b.bank_name}`}>{b.bank_name} - {b.account_title}</option>
                      ))}
                    </select>

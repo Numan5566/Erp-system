@@ -59,13 +59,13 @@ export default function Customers({ type }) {
       });
       const data = await res.json();
       setRecords(Array.isArray(data) ? data : []);
-      return data;
 
       const banksRes = await fetch(`http://localhost:5000/api/banks`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const banksData = await banksRes.json();
       setBankAccounts(Array.isArray(banksData) ? banksData : []);
+      return data;
     } catch (err) {
       console.error("Failed to fetch data", err);
       return [];
@@ -710,7 +710,7 @@ export default function Customers({ type }) {
                     required
                   >
                     <option value="">-- Select Admin Bank --</option>
-                    {bankAccounts.map(b => {
+                    {bankAccounts.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => {
                       const digits = b.account_number ? b.account_number.slice(-4) : '';
                       return <option key={b.id} value={b.bank_name}>{b.bank_name} {digits ? `(****${digits})` : ''}</option>;
                     })}

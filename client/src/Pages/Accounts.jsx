@@ -780,24 +780,27 @@ export default function Accounts() {
             const bal = paymentSummary[cleanName] || paymentSummary[acc.bank_name] || 0;
             return <div style={{fontWeight: 900, color: '#16a34a', fontSize: '1.1rem'}}>Rs. {bal.toLocaleString()}</div>
           }} />
-          <Column header="" body={acc => (
-            <ActionMenu 
-              onDelete={acc.isCash ? null : () => handleDelete(acc.id)} 
-              extraItems={[
-                { 
-                  label: 'Edit Account', 
-                  icon: 'pi pi-pencil', 
-                  command: () => handleEdit(acc),
-                  disabled: acc.isCash
-                },
-                { 
-                  label: 'View Ledger', 
-                  icon: 'pi pi-book', 
-                  command: () => { setSelectedLedgerAccount(acc); setDateFilter('All'); setShowLedger(true); } 
-                }
-              ]}
-            />
-          )} style={{ textAlign: 'center', width: '60px' }} />
+          <Column header="" body={acc => {
+            const isOwnAccount = user?.role === 'admin' || acc.user_id === user?.id;
+            return (
+              <ActionMenu 
+                onDelete={acc.isCash || !isOwnAccount ? null : () => handleDelete(acc.id)} 
+                extraItems={[
+                  { 
+                    label: 'Edit Account', 
+                    icon: 'pi pi-pencil', 
+                    command: () => handleEdit(acc),
+                    disabled: acc.isCash || !isOwnAccount
+                  },
+                  { 
+                    label: 'View Ledger', 
+                    icon: 'pi pi-book', 
+                    command: () => { setSelectedLedgerAccount(acc); setDateFilter('All'); setShowLedger(true); } 
+                  }
+                ]}
+              />
+            );
+          }} style={{ textAlign: 'center', width: '60px' }} />
         </DataTable>
       </div>
 

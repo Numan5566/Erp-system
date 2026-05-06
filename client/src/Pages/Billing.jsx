@@ -380,7 +380,14 @@ export default function Billing({ type }) {
           saleId: result.saleId,
           date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
           customerName: saleData.customer_name,
+          customerPhone: saleData.customer_phone || '',
+          customerAddress: saleData.customer_address || '',
+          vehicleType: saleData.vehicle_type || '',
+          vehicleId: saleData.vehicle_id || '',
           items: [...cart],
+          subtotal: subtotal,
+          discount: parseFloat(discount || 0),
+          delivery: parseFloat(delivery || 0),
           totalAmount: netTotal,
           paidAmount: saleData.paid_amount,
           previousBalance: prevBal,
@@ -550,10 +557,11 @@ export default function Billing({ type }) {
               <span className="badge p-badge p-badge-info">{cart.length}</span>
             </div>
 
-            <div className="sidebar-content p-fluid">
+            {/* Fixed Customer & Transport Details Area */}
+            <div className="sidebar-customer-transport p-fluid">
               <div className="input-box">
                 <label><User size={14}/> Customer Details</label>
-                <div className="flex flex-column gap-2 mb-3">
+                <div className="flex flex-column gap-2 mb-2">
                   <div className="p-inputgroup">
                     <span className="p-inputgroup-addon"><User size={16} /></span>
                     <InputText placeholder="Customer Name" value={customerName} onChange={(e) => handleCustomerChange(e.target.value)} list="customers-list" />
@@ -577,7 +585,7 @@ export default function Billing({ type }) {
                 )}
               </div>
 
-              <div className="input-box mt-3">
+              <div className="input-box mt-1">
                 <label><Truck size={14}/> Transport Vehicle</label>
                 <div className="flex gap-2">
                   <Dropdown value={transportType} options={[
@@ -594,34 +602,69 @@ export default function Billing({ type }) {
                   )}
                 </div>
               </div>
+            </div>
 
-              <div className="cart-list mt-4">
-                {cart.map(item => (
-                  <div key={item.id} className="cart-item">
-                    <div className="item-top">
-                      <span className="name">{item.name}</span>
-                      <Button icon="pi pi-trash" className="p-button-rounded p-button-danger p-button-text p-button-sm" onClick={() => removeFromCart(item.id)} />
-                    </div>
-                    <div className="item-bottom">
-                      <div className="p-inputgroup" style={{flex: '1', minWidth: '100px', maxWidth: '150px'}}>
-                        <span className="p-inputgroup-addon" style={{fontWeight: '800', color: '#3b82f6', background: '#eff6ff', fontSize: '0.8rem'}}>Rs</span>
-                        <InputText type="number" value={item.price} onChange={(e) => updatePrice(item.id, e.target.value)} 
-                                  className="p-inputtext-sm font-bold" style={{width: '100%'}} />
+            {/* Scrollable Cart Area with Dynamic Scaling based on cart.length! */}
+            <div className="sidebar-cart-scrollable">
+              <div className="cart-list">
+                {cart.map(item => {
+                  let compactClass = "";
+                  if (cart.length >= 5) compactClass = "ultra-compact";
+                  else if (cart.length >= 3) compactClass = "compact-card";
+                  
+                  const qtyStr = String(item.qty);
+                  let qtyFontSize = "0.85rem";
+                  if (qtyStr.length > 8) qtyFontSize = "0.55rem";
+                  else if (qtyStr.length > 5) qtyFontSize = "0.7rem";
+
+                  const priceStr = String(item.price);
+                  let priceFontSize = "0.85rem";
+                  if (priceStr.length > 8) priceFontSize = "0.55rem";
+                  else if (priceStr.length > 5) priceFontSize = "0.7rem";
+
+                  const subtotalStr = `Rs. ${(item.price * item.qty).toLocaleString()}`;
+                  let subtotalFontSize = "0.85rem";
+                  if (subtotalStr.length > 15) subtotalFontSize = "0.55rem";
+                  else if (subtotalStr.length > 10) subtotalFontSize = "0.7rem";
+
+                  return (
+                    <div key={item.id} className={`cart-item ${compactClass}`}>
+                      <div className="item-top">
+                        <span className="name">{item.name}</span>
+                        <button className="cart-delete-btn" onClick={() => removeFromCart(item.id)}><Trash2 size={14} /></button>
                       </div>
-                      <div className="qty-ctrl">
-                        <Button icon="pi pi-minus" className="p-button-rounded p-button-secondary p-button-text p-button-sm" onClick={() => updateQty(item.id, -1)} />
-                        <InputText type="number" value={item.qty} onChange={(e) => setQtyDirect(item.id, e.target.value)} 
-                                  className="p-inputtext-sm text-center font-bold" 
-                                  style={{width: `${Math.max(50, (String(item.qty).length * 12) + 30)}px`, border: 'none', background: 'transparent', transition: 'width 0.2s'}} />
-                        <Button icon="pi pi-plus" className="p-button-rounded p-button-secondary p-button-text p-button-sm" onClick={() => updateQty(item.id, 1)} />
+                      <div className="item-bottom">
+                        <div className="p-inputgroup" style={{flex: '1', minWidth: '85px', maxWidth: '130px'}}>
+                          <span className="p-inputgroup-addon" style={{fontWeight: '800', color: '#3b82f6', background: '#eff6ff', fontSize: '0.75rem', padding: '0 4px'}}>Rs</span>
+                          <InputText type="text" inputMode="numeric" pattern="[0-9]*"
+                                    value={item.price} 
+                                    onChange={(e) => {
+                                      const val = e.target.value.replace(/\D/g, "");
+                                      updatePrice(item.id, val ? parseInt(val) : 0);
+                                    }} 
+                                    className="p-inputtext-sm font-bold text-center" style={{width: '100%', fontSize: priceFontSize}} />
+                        </div>
+                        <div className="qty-ctrl">
+                           <button className="cart-qty-btn" onClick={() => updateQty(item.id, -1)}>−</button>
+                           <InputText type="text" inputMode="numeric" pattern="[0-9]*"
+                                     value={item.qty} 
+                                     onChange={(e) => {
+                                       const val = e.target.value.replace(/\D/g, "");
+                                       setQtyDirect(item.id, val ? parseInt(val) : 0);
+                                     }} 
+                                     className="p-inputtext-sm text-center font-bold" 
+                                     style={{width: `${Math.max(30, (qtyStr.length * 7) + 15)}px`, border: 'none', background: 'transparent', padding: '0', fontSize: qtyFontSize, transition: 'width 0.2s'}} />
+                           <button className="cart-qty-btn" onClick={() => updateQty(item.id, 1)}>+</button>
+                         </div>
+                        <div className="item-subtotal" style={{fontSize: subtotalFontSize}}>{subtotalStr}</div>
                       </div>
-                      <div className="item-subtotal">Rs. {(item.price * item.qty).toLocaleString()}</div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
+            {/* Fixed Footer with Checkout Calculations */}
             <div className="sidebar-footer">
               <div className="calc-grid">
                 <div className="calc-row">
@@ -630,26 +673,41 @@ export default function Billing({ type }) {
                 </div>
                 <div className="calc-row">
                   <span>Discount</span>
-                  <div className="p-inputgroup p-inputgroup-sm" style={{width: '140px'}}>
-                    <span className="p-inputgroup-addon font-bold" style={{color: '#ef4444'}}>Rs</span>
-                    <InputText type="number" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} className="font-bold" />
+                  <div className="p-inputgroup p-inputgroup-sm" style={{width: String(discount || '').length > 5 ? '140px' : '110px', transition: 'width 0.2s'}}>
+                    <span className="p-inputgroup-addon font-bold" style={{color: '#ef4444', fontSize: '0.75rem', padding: '0 4px'}}>Rs</span>
+                    <InputText type="text" inputMode="numeric" pattern="[0-9]*"
+                              value={discount} 
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, "");
+                                setDiscount(val ? parseInt(val) : 0);
+                              }} 
+                              className="font-bold text-center" 
+                              style={{fontSize: String(discount || '').length > 8 ? '0.65rem' : String(discount || '').length > 5 ? '0.75rem' : '0.85rem', transition: 'font-size 0.2s'}} />
                   </div>
                 </div>
                 <div className="calc-row">
                   <span>Delivery</span>
-                  <div className="p-inputgroup p-inputgroup-sm" style={{width: '140px'}}>
-                    <span className="p-inputgroup-addon font-bold" style={{color: '#3b82f6'}}>Rs</span>
-                    <InputText type="number" min="0" value={delivery} onChange={(e) => setDelivery(e.target.value)} className="font-bold" />
+                  <div className="p-inputgroup p-inputgroup-sm" style={{width: String(delivery || '').length > 5 ? '140px' : '110px', transition: 'width 0.2s'}}>
+                    <span className="p-inputgroup-addon font-bold" style={{color: '#3b82f6', fontSize: '0.75rem', padding: '0 4px'}}>Rs</span>
+                    <InputText type="text" inputMode="numeric" pattern="[0-9]*"
+                              value={delivery} 
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, "");
+                                setDelivery(val ? parseInt(val) : 0);
+                              }} 
+                              className="font-bold text-center" 
+                              style={{fontSize: String(delivery || '').length > 8 ? '0.65rem' : String(delivery || '').length > 5 ? '0.75rem' : '0.85rem', transition: 'font-size 0.2s'}} />
                   </div>
                 </div>
                 <div className="grand-total">
                   <span>Total</span>
-                  <span>Rs. {netTotal.toLocaleString()}</span>
+                  <span style={{fontSize: `Rs. ${netTotal.toLocaleString()}`.length > 15 ? '0.95rem' : `Rs. ${netTotal.toLocaleString()}`.length > 10 ? '1.15rem' : '1.4rem', transition: 'font-size 0.2s'}}>{`Rs. ${netTotal.toLocaleString()}`}</span>
                 </div>
                 <div className="flex flex-column gap-2 mt-2">
                   <div className="flex gap-2">
                     <div className="flex flex-1 gap-1">
-                      <InputText type="number" min="0" placeholder="Paid Amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} className="flex-1" />
+                      <InputText type="number" min="0" placeholder="Paid Amount" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} 
+                                className="flex-1 font-bold" style={{fontSize: String(paidAmount || '').length > 8 ? '0.75rem' : String(paidAmount || '').length > 5 ? '0.85rem' : '1rem', transition: 'font-size 0.2s'}} />
                       <Button icon="pi pi-pause" onClick={holdBill} tooltip="Hold Bill" className="hold-bill-btn" />
                     </div>
                     <Dropdown value={paymentType} options={[
@@ -659,7 +717,7 @@ export default function Billing({ type }) {
                     ]} onChange={(e) => setPaymentType(e.value)} className="flex-1" />
                   </div>
                   {paymentType === 'Bank' && (
-                    <Dropdown value={selectedBank} options={bankAccounts.map(b => {
+                    <Dropdown value={selectedBank} options={bankAccounts.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => {
                       const digits = b.account_number ? b.account_number.slice(-4) : '';
                       return {
                         label: `${b.bank_name} ${b.account_title ? `- ${b.account_title}` : ''} ${digits ? `(****${digits})` : ''}`,
@@ -761,13 +819,18 @@ export default function Billing({ type }) {
                         customerName: s.customer_name || 'Walking Customer',
                         customerPhone: s.customer_phone || '',
                         customerAddress: s.customer_address || '',
+                        vehicleType: s.vehicle_type || '',
+                        vehicleId: s.vehicle_id || '',
                         items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []),
                         subtotal: s.total_amount,
                         discount: s.discount,
                         delivery: s.delivery_charges,
-                        total: s.net_amount,
-                        paid: s.paid_amount,
-                        balance: s.balance_amount
+                        totalAmount: s.net_amount,
+                        paidAmount: s.paid_amount,
+                        previousBalance: 0,
+                        newBalance: s.balance_amount,
+                        paymentMethod: s.payment_type,
+                        bankAccount: s.payment_type.includes('Bank') ? s.payment_type.replace('Bank - ', '') : null,
                       });
                       setTimeout(() => window.print(), 500);
                     } 
@@ -831,6 +894,9 @@ export default function Billing({ type }) {
             <div className="info-row"><span>Name</span> <span>: {receiptData.customerName}</span></div>
             {receiptData.customerPhone && <div className="info-row"><span>Phone</span> <span>: {receiptData.customerPhone}</span></div>}
             {receiptData.customerAddress && <div className="info-row"><span>Address</span> <span>: {receiptData.customerAddress}</span></div>}
+            {receiptData.vehicleType && <div className="info-row"><span>Vehicle Type</span> <span>: {receiptData.vehicleType}</span></div>}
+            {receiptData.vehicleId && <div className="info-row"><span>Vehicle No</span> <span>: {receiptData.vehicleId}</span></div>}
+            {receiptData.paymentMethod && <div className="info-row"><span>Payment Type</span> <span>: {receiptData.paymentMethod}</span></div>}
           </div>
           
           <div className="dashed-line"></div>
@@ -858,13 +924,31 @@ export default function Billing({ type }) {
           </table>
           
           <div className="dashed-line mt-10"></div>
+          {receiptData.subtotal > 0 && (
+            <div className="total-row" style={{fontSize: '11px'}}>
+              <span>SUBTOTAL</span>
+              <span>Rs. {receiptData.subtotal.toLocaleString()}/-</span>
+            </div>
+          )}
+          {receiptData.discount > 0 && (
+            <div className="total-row" style={{fontSize: '11px'}}>
+              <span>DISCOUNT</span>
+              <span>Rs. {receiptData.discount.toLocaleString()}/-</span>
+            </div>
+          )}
+          {receiptData.delivery > 0 && (
+            <div className="total-row" style={{fontSize: '11px'}}>
+              <span>DELIVERY</span>
+              <span>Rs. {receiptData.delivery.toLocaleString()}/-</span>
+            </div>
+          )}
           <div className="total-row">
             <span>BILL AMOUNT</span>
-            <span>{receiptData.totalAmount}/-</span>
+            <span>Rs. {receiptData.totalAmount.toLocaleString()}/-</span>
           </div>
           <div className="total-row" style={{fontSize: '12px'}}>
             <span>PAID NOW</span>
-            <span>{receiptData.paidAmount}/-</span>
+            <span>Rs. {receiptData.paidAmount.toLocaleString()}/-</span>
           </div>
           <div className="dashed-line"></div>
           

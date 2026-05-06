@@ -745,7 +745,7 @@ export default function Suppliers({ type }) {
                     required
                   >
                     <option value="">-- Choose Account --</option>
-                    {bankAccounts.map(b => (
+                    {bankAccounts.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
                       <option key={b.id} value={b.bank_name}>{b.bank_name} - {b.account_number}</option>
                     ))}
                   </select>

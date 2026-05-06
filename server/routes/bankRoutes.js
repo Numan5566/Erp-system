@@ -127,12 +127,12 @@ router.get('/', auth, async (req, res) => {
       // Everyone else sees their own banks, those added for their shop
       if (includeRecipients) {
         result = await pool.query(
-          'SELECT * FROM bank_accounts WHERE user_id = $1 OR module_type = $2 OR module_type = \'Admin Recipient\' OR user_id IN (SELECT id FROM users WHERE role = \'admin\') ORDER BY id ASC',
+          'SELECT * FROM bank_accounts WHERE user_id = $1 OR module_type = $2 OR module_type = \'Admin Recipient\' ORDER BY id ASC',
           [req.user.id, req.user.module_type || 'Retail 1']
         );
       } else {
         result = await pool.query(
-          'SELECT * FROM bank_accounts WHERE (user_id = $1 OR module_type = $2 OR user_id IN (SELECT id FROM users WHERE role = \'admin\')) AND (module_type IS NULL OR module_type != \'Admin Recipient\') ORDER BY id ASC',
+          'SELECT * FROM bank_accounts WHERE (user_id = $1 OR module_type = $2) AND (module_type IS NULL OR module_type != \'Admin Recipient\') ORDER BY id ASC',
           [req.user.id, req.user.module_type || 'Retail 1']
         );
       }

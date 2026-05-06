@@ -327,7 +327,7 @@ export default function Expenses({ type }) {
                         onChange={(e) => setForm({...form, bank_name: e.target.value})}
                       >
                         <option value="">Choose Bank...</option>
-                        {banks.map(b => (
+                        {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
                           <option key={b.id} value={b.bank_name}>{b.bank_name}</option>
                         ))}
                       </select>
@@ -399,7 +399,7 @@ export default function Expenses({ type }) {
                     required
                   >
                     <option value="">-- Choose Account --</option>
-                    {banks.map(b => (
+                    {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
                       <option key={b.id} value={b.bank_name}>{b.bank_name} - {b.account_number}</option>
                     ))}
                   </select>
