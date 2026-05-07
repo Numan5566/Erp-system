@@ -44,6 +44,19 @@ const buildSummary = async (fromDate, toDate) => {
     const supply   = await getSum('purchases',      'paid_amount', c, 'module_type',  'purchase_date', fromDate, toDate);
     
     const totalExpenses = expenses + rent + salary + other + supply;
+
+    // Actual Sales Profit (Gross Profit based on product cost price vs sold price)
+    const salesProfitRes = await pool.query(
+      `SELECT COALESCE(SUM(si.subtotal - (si.qty * COALESCE(p.cost_price, 0))), 0) as profit
+       FROM sale_items si
+       JOIN sales s ON s.id = si.sale_id
+       LEFT JOIN products p ON p.id = si.product_id
+       WHERE s.sale_type = $1
+       ${fromDate ? `AND s.created_at >= $2` : ''}
+       ${toDate ? `AND s.created_at <= $${fromDate ? 3 : 2}` : ''}`,
+      [c, ...(fromDate ? [fromDate] : []), ...(toDate ? [toDate] : [])]
+    );
+    const salesProfit = parseFloat(salesProfitRes.rows[0].profit || 0);
     
     summary[c] = { 
       sales, 
@@ -53,7 +66,8 @@ const buildSummary = async (fromDate, toDate) => {
       other, 
       supply, // Added supply chain costs
       totalExpenses, 
-      netProfit: sales - totalExpenses 
+      netProfit: sales - totalExpenses,
+      salesProfit
     };
   }
   return summary;
@@ -83,11 +97,17 @@ router.get('/detail/:counter', auth, async (req, res) => {
     };
 
     // Sales
-    const sf = dateFilter('s.created_at');
     const salesRes = await pool.query(
-      `SELECT id, customer_name, net_amount, paid_amount, balance_amount, payment_type, created_at
-       FROM sales s WHERE sale_type = $1 ${from ? `AND created_at >= $2` : ''} ${to ? `AND created_at <= $${from ? 3 : 2}` : ''}
-       ORDER BY created_at DESC LIMIT 100`,
+      `SELECT s.id, s.customer_name, s.net_amount, s.paid_amount, s.balance_amount, s.payment_type, s.created_at,
+       COALESCE(SUM(si.subtotal - (si.qty * COALESCE(p.cost_price, 0))), 0) as sale_profit
+       FROM sales s
+       LEFT JOIN sale_items si ON si.sale_id = s.id
+       LEFT JOIN products p ON p.id = si.product_id
+       WHERE s.sale_type = $1
+       ${from ? `AND s.created_at >= $2` : ''}
+       ${to ? `AND s.created_at <= $${from ? 3 : 2}` : ''}
+       GROUP BY s.id, s.customer_name, s.net_amount, s.paid_amount, s.balance_amount, s.payment_type, s.created_at
+       ORDER BY s.created_at DESC LIMIT 100`,
       [c, ...(from ? [from] : []), ...(to ? [to] : [])]
     );
 

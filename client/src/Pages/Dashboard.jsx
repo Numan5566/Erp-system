@@ -17,6 +17,15 @@ export default function Dashboard() {
     monthlyExpenses: 0
   });
 
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -49,7 +58,7 @@ export default function Dashboard() {
       }
     };
     fetchStats();
-  }, []);
+  }, [user]);
 
   const modules = [
     { id: "products", name: "Products", path: "/products", icon: <Package size={28} />, desc: "Manage Items", color: "#3b82f6" },
@@ -78,9 +87,22 @@ export default function Dashboard() {
           <h1>Welcome back, <span className="user-name">{user?.name || 'User'}</span> 👋</h1>
           <p className="subtitle">Here's a quick overview of your building materials empire today.</p>
         </div>
-        <div className="current-time">
-          <TrendingUp size={20} color="#10b981" />
-          <span>System Live & Running</span>
+        <div className="current-time" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          background: '#f8fafc',
+          padding: '10px 18px',
+          borderRadius: '12px',
+          fontWeight: 800,
+          color: '#0f172a',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+        }}>
+          <span style={{fontSize: '1.3rem', display: 'inline-block', animation: 'pulse 2s infinite'}}>⏰</span>
+          <span style={{fontSize: '0.95rem', fontFamily: 'monospace', fontWeight: 800}}>
+            {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} | {currentTime.toLocaleTimeString()}
+          </span>
         </div>
       </header>
 

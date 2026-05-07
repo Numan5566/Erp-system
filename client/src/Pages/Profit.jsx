@@ -89,9 +89,10 @@ export default function Profit() {
     </div>
   );
 
-  const totalSales    = Object.values(summary).reduce((s, c) => s + c.sales, 0);
-  const totalExpenses = Object.values(summary).reduce((s, c) => s + c.totalExpenses, 0);
-  const netProfit     = totalSales - totalExpenses;
+  const totalSales       = Object.values(summary).reduce((s, c) => s + c.sales, 0);
+  const totalSalesProfit = Object.values(summary).reduce((s, c) => s + (c.salesProfit || 0), 0);
+  const totalExpenses    = Object.values(summary).reduce((s, c) => s + c.totalExpenses, 0);
+  const netProfit        = totalSales - totalExpenses;
 
   const TABS = [
     { key: 'sales',     label: 'Sales',           icon: <ShoppingBag size={15}/> },
@@ -155,12 +156,19 @@ export default function Profit() {
       </div>
 
       {/* ── Top KPI Strip ── */}
-      <div className="profit-kpi-strip">
+      <div className="profit-kpi-strip" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '25px' }}>
         <div className="kpi-card">
           <div className="kpi-icon blue"><ShoppingBag size={26} /></div>
           <div className="kpi-info">
             <div className="kpi-label">Gross Sales</div>
             <div className="kpi-value">{fmt(totalSales)}</div>
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-icon green"><TrendingUp size={26} /></div>
+          <div className="kpi-info">
+            <div className="kpi-label">Sales Margin Profit</div>
+            <div className="kpi-value">{fmt(totalSalesProfit)}</div>
           </div>
         </div>
         <div className="kpi-card">
@@ -273,10 +281,10 @@ export default function Profit() {
             {summary[selectedCounter] && (
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px', padding: '16px', background: '#f8fafc', borderRadius: '12px' }}>
                 {[
-                  { label: 'Sales',    val: summary[selectedCounter].sales,        color: '#16a34a' },
+                  { label: 'Sales Paid', val: summary[selectedCounter].sales,        color: '#3b82f6' },
+                  { label: 'Sales Profit', val: summary[selectedCounter].salesProfit, color: '#16a34a' },
                   { label: 'Expenses', val: summary[selectedCounter].totalExpenses, color: '#e11d48' },
-                  { label: 'Profit',   val: summary[selectedCounter].netProfit,     color: summary[selectedCounter].netProfit >= 0 ? '#16a34a' : '#e11d48' },
-                  { label: 'Invest.',  val: summary[selectedCounter].investment,    color: '#7c3aed' },
+                  { label: 'Net Profit',   val: summary[selectedCounter].netProfit,     color: summary[selectedCounter].netProfit >= 0 ? '#16a34a' : '#e11d48' },
                 ].map(chip => (
                   <div key={chip.label} style={{ background: 'white', borderRadius: '10px', padding: '10px 18px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', textAlign: 'center' }}>
                     <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>{chip.label}</div>
@@ -306,6 +314,26 @@ export default function Profit() {
                 <Column header="Total"    body={r => <span style={{fontWeight:700,color:'#1e293b'}}>{fmt(r.net_amount)}</span>} sortable field="net_amount" />
                 <Column header="Paid"     body={r => <span style={{color:'#16a34a',fontWeight:700}}>{fmt(r.paid_amount)}</span>} sortable field="paid_amount" />
                 <Column header="Balance"  body={r => <span style={{color: parseFloat(r.balance_amount) > 0 ? '#e11d48' : '#16a34a', fontWeight:700}}>{fmt(r.balance_amount)}</span>} sortable field="balance_amount" />
+                <Column header="Profit / Loss" body={r => {
+                  const profit = parseFloat(r.sale_profit || 0);
+                  const isProfit = profit >= 0;
+                  return (
+                    <span style={{
+                      fontWeight: 800, 
+                      color: isProfit ? '#16a34a' : '#e11d48',
+                      background: isProfit ? '#f0fdf4' : '#fef2f2',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      border: `1px solid ${isProfit ? '#bbf7d0' : '#fecaca'}`,
+                      fontSize: '0.82rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      {isProfit ? '📈 +' : '📉 -'}{fmt(Math.abs(profit))}
+                    </span>
+                  );
+                }} sortable field="sale_profit" />
                 <Column header="Type"     body={r => <span className={`status-badge ${r.payment_type?.toLowerCase()}`} style={{padding:'3px 10px',borderRadius:'20px',fontSize:'0.72rem',fontWeight:700}}>{r.payment_type}</span>} />
               </DataTable>
             )}

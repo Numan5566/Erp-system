@@ -111,10 +111,18 @@ export default function Accounts() {
     amount_sent_to_admin: "",
     amount_kept_as_opening: "",
     admin_bank_id: "",
-    notes: ""
+    notes: "",
+    payment_type: "Cash"
   });
   const [showAdminBankModal, setShowAdminBankModal] = useState(false);
   const [adminBankForm, setAdminBankForm] = useState({ bank_name: "", account_title: "", account_number: "" });
+  const [showBankSelectorModal, setShowBankSelectorModal] = useState(false);
+
+  const getSourceBalance = (method) => {
+    if (method.toLowerCase() === 'cash') return totalCash;
+    const summaryKey = Object.keys(paymentSummary).find(k => k.toLowerCase() === method.toLowerCase());
+    return summaryKey ? paymentSummary[summaryKey] : 0;
+  };
 
   const handleAdminBankSubmit = async (e) => {
     e.preventDefault();
@@ -145,13 +153,25 @@ export default function Accounts() {
       amount_sent_to_admin: totalCash,
       amount_kept_as_opening: "",
       admin_bank_id: "",
-      notes: ""
+      notes: "",
+      payment_type: "Cash"
     });
     setShowCloseoutModal(true);
   };
 
+  const handlePaymentTypeChange = (method) => {
+    const sourceBalance = getSourceBalance(method);
+    setCloseoutForm(prev => ({
+      ...prev,
+      payment_type: method,
+      amount_sent_to_admin: sourceBalance,
+      amount_kept_as_opening: ""
+    }));
+  };
+
 
   const handleCloseoutFieldChange = (field, val) => {
+    const sourceBalance = getSourceBalance(closeoutForm.payment_type);
     // Strip leading zeroes from the string (e.g. "04" -> "4", "044" -> "44")
     let cleanVal = String(val).replace(/^0+(?=\d)/, '');
     if (cleanVal === '0' && val === '0') {
@@ -160,17 +180,17 @@ export default function Accounts() {
       setCloseoutForm(prev => ({
         ...prev,
         [field]: "",
-        ...(field === 'amount_sent_to_admin' ? { amount_kept_as_opening: totalCash } : { amount_sent_to_admin: totalCash })
+        ...(field === 'amount_sent_to_admin' ? { amount_kept_as_opening: sourceBalance } : { amount_sent_to_admin: sourceBalance })
       }));
       return;
     }
 
     const value = parseFloat(cleanVal) || 0;
     if (field === 'amount_sent_to_admin') {
-      const kept = Math.max(0, totalCash - value);
+      const kept = Math.max(0, sourceBalance - value);
       setCloseoutForm(prev => ({ ...prev, amount_sent_to_admin: cleanVal, amount_kept_as_opening: kept === 0 ? "" : kept }));
     } else if (field === 'amount_kept_as_opening') {
-      const sent = Math.max(0, totalCash - value);
+      const sent = Math.max(0, sourceBalance - value);
       setCloseoutForm(prev => ({ ...prev, amount_kept_as_opening: cleanVal, amount_sent_to_admin: sent === 0 ? "" : sent }));
     } else {
       setCloseoutForm(prev => ({ ...prev, [field]: cleanVal }));
@@ -310,6 +330,7 @@ export default function Accounts() {
   };
 
   const handleEdit = (acc) => {
+    if (user?.email !== 'admin@erp.com') return;
     setEditId(acc.id);
     setForm({
       bank_name: acc.bank_name,
@@ -366,19 +387,15 @@ export default function Accounts() {
     return parseFloat(s.paid_amount || 0);
   };
 
+  const filteredCloseouts = useMemo(() => {
+    return filteredGeneralExpenses.filter(e => e.expense_type === 'Galla Closeout');
+  }, [filteredGeneralExpenses]);
+
   const paymentSummary = useMemo(() => {
     return [
       ...filteredSales, 
-      ...filteredSupplierPayments.map(p => ({ ...p, isExpense: true })),
-      ...filteredGeneralExpenses.map(e => ({ ...e, isExpense: true })),
-      ...filteredSalaries.map(s => ({ ...s, isExpense: true, payment_type: 'Cash' })),
-      ...filteredRents.map(r => ({ ...r, isExpense: true, payment_type: 'Cash' })),
-      ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, payment_type: o.payment_method || 'Cash' })),
       ...filteredInvestments.map(i => ({ ...i, isIncome: true, payment_type: 'Cash' })),
-      ...filteredSupplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
-        ...p, isExpense: true, payment_type: p.fare_payment_type || 'Cash', 
-        isTransportFare: true 
-      }))
+      ...filteredCloseouts.map(e => ({ ...e, isExpense: true }))
     ].reduce((acc, s) => {
       const method = s.payment_type || 'Cash';
       let cleanMethod = method.replace('Bank - ', '');
@@ -403,13 +420,13 @@ export default function Accounts() {
       acc[name] += parseFloat(b.opening_balance) || 0;
       return acc;
     }, { 'Cash': 0 }));
-  }, [filteredSales, filteredSupplierPayments, filteredGeneralExpenses, filteredSalaries, filteredRents, filteredOtherExpenses, filteredInvestments, filteredAccounts]);
+  }, [filteredSales, filteredInvestments, filteredCloseouts, filteredAccounts]);
 
 
-  const totalCash = paymentSummary['Cash'] || 0;
-  const totalBank = Object.entries(paymentSummary)
+  const totalCash = Math.max(0, paymentSummary['Cash'] || 0);
+  const totalBank = Math.max(0, Object.entries(paymentSummary)
     .filter(([k]) => k !== 'Cash')
-    .reduce((sum, [, v]) => sum + v, 0);
+    .reduce((sum, [, v]) => sum + v, 0));
 
   // Filter all transactions for the selected ledger account and date range
   const ledgerTransactions = useMemo(() => {
@@ -421,7 +438,7 @@ export default function Accounts() {
         amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
         created_at: p.purchase_date, isTransportFare: true
       })),
-      ...generalExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
+      ...filteredGeneralExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
       ...filteredSalaries.map(s => ({ ...s, isExpense: true, customer_name: `Salary: ${s.employee_name}`, payment_type: 'Cash', created_at: s.payment_date })),
       ...filteredRents.map(r => ({ ...r, isExpense: true, customer_name: `Rent: ${r.property_name}`, payment_type: 'Cash', created_at: r.rent_date })),
       ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, customer_name: `Other: ${o.title}`, payment_type: o.payment_method, created_at: o.date })),
@@ -518,7 +535,7 @@ export default function Accounts() {
         amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
         created_at: p.purchase_date, isTransportFare: true
       })),
-      ...generalExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
+      ...filteredGeneralExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
       ...filteredSalaries.map(s => ({ ...s, isExpense: true, customer_name: `Salary: ${s.employee_name}`, payment_type: 'Cash', created_at: s.payment_date })),
       ...filteredRents.map(r => ({ ...r, isExpense: true, customer_name: `Rent: ${r.property_name}`, payment_type: 'Cash', created_at: r.rent_date })),
       ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, customer_name: `Other: ${o.title}`, payment_type: o.payment_method, created_at: o.date })),
@@ -552,19 +569,33 @@ export default function Accounts() {
     <div className="payment-overview-cards" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '30px'}}>
       {/* Cash Card */}
       <div className="stat-card" 
-        onClick={handleCashOpeningBalance}
+        onClick={() => {
+          if (user?.email === 'admin@erp.com') {
+            handleCashOpeningBalance();
+          }
+        }}
         style={{
           background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)', 
           padding: '24px', borderRadius: '20px', color: '#fff', 
           boxShadow: '0 10px 20px rgba(16, 185, 129, 0.2)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          cursor: 'pointer', transition: 'transform 0.2s'
+          cursor: (user?.email === 'admin@erp.com') ? 'pointer' : 'default', transition: 'transform 0.2s'
         }}
-        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
-        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+        onMouseEnter={e => {
+          if (user?.email === 'admin@erp.com') {
+            e.currentTarget.style.transform = 'scale(1.02)';
+          }
+        }}
+        onMouseLeave={e => {
+          if (user?.email === 'admin@erp.com') {
+            e.currentTarget.style.transform = 'scale(1)';
+          }
+        }}
       >
         <div>
-          <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px'}}>Total Cash (Click to Set Opening)</p>
+          <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px'}}>
+            Total Cash {(user?.email === 'admin@erp.com') && "(Click to Set Opening)"}
+          </p>
           <h2 style={{margin: '8px 0 0 0', fontSize: '2rem', fontWeight: 800}}>Rs. {totalCash.toLocaleString()}</h2>
         </div>
         <div style={{background: 'rgba(255,255,255,0.2)', padding: '15px', borderRadius: '16px'}}>
@@ -573,14 +604,34 @@ export default function Accounts() {
       </div>
 
       {/* Bank Card */}
-      <div className="stat-card" style={{
-        background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)', 
-        padding: '24px', borderRadius: '20px', color: '#fff', 
-        boxShadow: '0 10px 20px rgba(59, 130, 246, 0.2)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-      }}>
+      <div className="stat-card" 
+        onClick={() => {
+          if (user?.email === 'admin@erp.com') {
+            setShowBankSelectorModal(true);
+          }
+        }}
+        style={{
+          background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)', 
+          padding: '24px', borderRadius: '20px', color: '#fff', 
+          boxShadow: '0 10px 20px rgba(59, 130, 246, 0.2)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          cursor: (user?.email === 'admin@erp.com') ? 'pointer' : 'default', transition: 'transform 0.2s'
+        }}
+        onMouseEnter={e => {
+          if (user?.email === 'admin@erp.com') {
+            e.currentTarget.style.transform = 'scale(1.02)';
+          }
+        }}
+        onMouseLeave={e => {
+          if (user?.email === 'admin@erp.com') {
+            e.currentTarget.style.transform = 'scale(1)';
+          }
+        }}
+      >
         <div>
-          <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px'}}>Total Bank Received</p>
+          <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px'}}>
+            Total Bank Received {(user?.email === 'admin@erp.com') && "(Click to Edit Banks)"}
+          </p>
           <h2 style={{margin: '8px 0 0 0', fontSize: '2rem', fontWeight: 800}}>Rs. {totalBank.toLocaleString()}</h2>
         </div>
         <div style={{background: 'rgba(255,255,255,0.2)', padding: '15px', borderRadius: '16px'}}>
@@ -627,8 +678,12 @@ export default function Accounts() {
 
         <div className="module-actions" style={{display: 'flex', gap: '10px'}}>
           <Button label="Galla Closeout" icon="pi pi-lock" onClick={handleOpenCloseout} className="p-button-warning" style={{borderRadius: '12px'}} />
-          <Button label="Add Recipient Bank" icon="pi pi-plus-circle" onClick={() => { setAdminBankForm({ bank_name: "", account_title: "", account_number: "" }); setShowAdminBankModal(true); }} className="p-button-success" style={{borderRadius: '12px'}} />
-          <Button label="Add Bank Account" icon="pi pi-plus" onClick={() => { setEditId(null); setForm({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 }); setShowModal(true); }} className="p-button-primary" style={{borderRadius: '12px'}} />
+          {user?.email === 'admin@erp.com' && (
+            <>
+              <Button label="Add Recipient Bank" icon="pi pi-plus-circle" onClick={() => { setAdminBankForm({ bank_name: "", account_title: "", account_number: "" }); setShowAdminBankModal(true); }} className="p-button-success" style={{borderRadius: '12px'}} />
+              <Button label="Add Bank Account" icon="pi pi-plus" onClick={() => { setEditId(null); setForm({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 }); setShowModal(true); }} className="p-button-primary" style={{borderRadius: '12px'}} />
+            </>
+          )}
         </div>
 
       </div>
@@ -647,7 +702,8 @@ export default function Accounts() {
         }}>
           {displayAccounts.map(acc => {
             const cleanName = acc.bank_name.replace(' Account', '');
-            let bal = paymentSummary[cleanName] || paymentSummary[acc.bank_name] || 0;
+            const summaryKey = Object.keys(paymentSummary).find(k => k.toLowerCase() === cleanName.toLowerCase() || k.toLowerCase() === acc.bank_name.toLowerCase());
+            let bal = summaryKey ? paymentSummary[summaryKey] : 0;
             
             if (acc.module_type === 'Admin Recipient') {
               bal = filteredGeneralExpenses
@@ -656,6 +712,10 @@ export default function Accounts() {
             }
             const recent = getRecentTransactionsForAccount(acc);
             const isAdminRecipient = acc.module_type === 'Admin Recipient';
+            
+            if (!isAdminRecipient && bal < 0) {
+              bal = 0;
+            }
 
             return (
               <div key={acc.id} 
@@ -777,7 +837,11 @@ export default function Accounts() {
           )} sortable />
           <Column header="Current Bal." body={acc => {
             const cleanName = acc.bank_name.replace(' Account', '');
-            const bal = paymentSummary[cleanName] || paymentSummary[acc.bank_name] || 0;
+            const summaryKey = Object.keys(paymentSummary).find(k => k.toLowerCase() === cleanName.toLowerCase() || k.toLowerCase() === acc.bank_name.toLowerCase());
+            let bal = summaryKey ? paymentSummary[summaryKey] : 0;
+            if (acc.module_type !== 'Admin Recipient' && bal < 0) {
+              bal = 0;
+            }
             return <div style={{fontWeight: 900, color: '#16a34a', fontSize: '1.1rem'}}>Rs. {bal.toLocaleString()}</div>
           }} />
           <Column header="" body={acc => {
@@ -790,7 +854,7 @@ export default function Accounts() {
                     label: 'Edit Account', 
                     icon: 'pi pi-pencil', 
                     command: () => handleEdit(acc),
-                    disabled: acc.isCash || !isOwnAccount
+                    disabled: acc.isCash || user?.email !== 'admin@erp.com'
                   },
                   { 
                     label: 'View Ledger', 
@@ -1024,7 +1088,62 @@ export default function Accounts() {
         }
         .print-only { display: none; }
         @media print { .print-only { display: block; } }
+        .bank-item-hover:hover {
+          transform: translateY(-2px);
+          background-color: #e2e8f0 !important;
+          border-color: #cbd5e1 !important;
+          box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important;
+        }
       `}</style>
+
+      {/* Modal for selecting a Bank to edit opening balance */}
+      <Dialog 
+        header="Select Bank Account to Edit" 
+        visible={showBankSelectorModal} 
+        style={{ width: '450px', borderRadius: '16px' }} 
+        modal 
+        onHide={() => setShowBankSelectorModal(false)}
+        className="premium-dialog"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '8px' }}>
+          {displayAccounts
+            .filter(acc => acc.bank_name.toLowerCase() !== 'cash' && acc.bank_name.toLowerCase() !== 'cash account' && acc.module_type !== 'Admin Recipient')
+            .map(acc => (
+              <div 
+                key={acc.id} 
+                onClick={() => {
+                  setShowBankSelectorModal(false);
+                  handleEdit(acc);
+                }}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'all 0.2s ease-in-out',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.01)'
+                }}
+                className="bank-item-hover"
+              >
+                <div>
+                  <h4 style={{ margin: 0, fontWeight: 700, color: '#1e293b', fontSize: '1.05rem' }}>{acc.bank_name}</h4>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>{acc.account_title || 'Bank Account'} - {acc.account_number}</p>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <span style={{ fontWeight: 800, color: '#2563eb', fontSize: '1rem' }}>Rs. {parseFloat(acc.opening_balance || 0).toLocaleString()}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>Opening Balance</span>
+                </div>
+              </div>
+            ))}
+          {displayAccounts.filter(acc => acc.bank_name.toLowerCase() !== 'cash' && acc.bank_name.toLowerCase() !== 'cash account' && acc.module_type !== 'Admin Recipient').length === 0 && (
+            <p style={{ textAlign: 'center', color: '#64748b', padding: '20px 0' }}>No bank accounts found.</p>
+          )}
+        </div>
+      </Dialog>
 
       {/* Modal for adding Bank Account */}
       {showModal && (
@@ -1065,15 +1184,17 @@ export default function Accounts() {
                 </div>
               </div>
 
-              <div className="field mb-4">
-                <label className="block mb-2 font-bold">Opening Balance (PKR) *</label>
-                <div className="p-inputgroup">
-                  <span className="p-inputgroup-addon">Rs.</span>
-                  <input type="number" required value={form.opening_balance} placeholder="0.00"
-                    className="p-inputtext p-component"
-                    onChange={e => setForm({ ...form, opening_balance: e.target.value })} />
+              {user?.email === 'admin@erp.com' && (
+                <div className="field mb-4">
+                  <label className="block mb-2 font-bold">Opening Balance (PKR) *</label>
+                  <div className="p-inputgroup">
+                    <span className="p-inputgroup-addon">Rs.</span>
+                    <input type="number" required value={form.opening_balance} placeholder="0.00"
+                      className="p-inputtext p-component"
+                      onChange={e => setForm({ ...form, opening_balance: e.target.value })} />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex justify-content-end gap-2">
                 <Button type="button" label="Cancel" icon="pi pi-times" onClick={() => {setShowModal(false); setEditId(null);}} className="p-button-text" />
@@ -1092,6 +1213,33 @@ export default function Accounts() {
               <button className="modal-close" onClick={() => setShowCloseoutModal(false)}><X size={20} /></button>
             </div>
             <form onSubmit={handleCloseoutSubmit} className="custom-form p-fluid">
+              <div className="field mb-3">
+                <label className="block mb-2 font-bold" style={{color: '#1e293b'}}>Send From (My Account/Cash) *</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon">💸</span>
+                  <select 
+                    required 
+                    value={closeoutForm.payment_type} 
+                    className="p-inputtext p-component"
+                    style={{borderRadius: '0 8px 8px 0', padding: '10px'}}
+                    onChange={e => handlePaymentTypeChange(e.target.value)}
+                  >
+                    <option value="Cash">Cash Account (Rs. {totalCash.toLocaleString()})</option>
+                    {displayAccounts.filter(acc => acc.module_type !== 'Admin Recipient').map(acc => {
+                      const cleanName = acc.bank_name.replace(' Account', '');
+                      if (cleanName.toLowerCase() === 'cash') return null;
+                      const summaryKey = Object.keys(paymentSummary).find(k => k.toLowerCase() === cleanName.toLowerCase() || k.toLowerCase() === acc.bank_name.toLowerCase());
+                      const bal = summaryKey ? paymentSummary[summaryKey] : 0;
+                      return (
+                        <option key={acc.id} value={acc.bank_name}>
+                          {acc.bank_name} - {acc.account_title || 'Bank'} (Rs. {bal.toLocaleString()})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
+
               <div style={{
                 background: '#f0fdf4',
                 padding: '15px',
@@ -1104,8 +1252,10 @@ export default function Accounts() {
                 alignItems: 'center'
               }}>
                 <div>
-                  <p style={{margin: 0, fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase'}}>Total Cash in Register</p>
-                  <h3 style={{margin: '5px 0 0 0', fontSize: '1.5rem', fontWeight: 800}}>Rs. {totalCash.toLocaleString()}</h3>
+                  <p style={{margin: 0, fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase'}}>Selected Account Balance</p>
+                  <h3 style={{margin: '5px 0 0 0', fontSize: '1.5rem', fontWeight: 800}}>
+                    Rs. {getSourceBalance(closeoutForm.payment_type).toLocaleString()}
+                  </h3>
                 </div>
                 <div style={{fontSize: '1.8rem'}}>💰</div>
               </div>

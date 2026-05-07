@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const auth = require('../middleware/auth');
 
 const isAdmin = (req) => req.user.role === 'admin';
+const isMasterAdmin = (req) => req.user.role === 'admin' && req.user.email === 'admin@erp.com';
 
 // Get real-time balances for all accounts
 router.get('/balances', auth, async (req, res) => {
@@ -160,9 +161,11 @@ router.post('/', auth, async (req, res) => {
       }
     }
 
+    const finalOpeningBalance = isAdmin(req) ? (opening_balance || 0) : 0;
+
     const result = await pool.query(
       'INSERT INTO bank_accounts (bank_name, account_title, account_number, opening_balance, user_id, module_type) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [bank_name, account_title, account_number, opening_balance || 0, targetUserId, targetModule]
+      [bank_name, account_title, account_number, finalOpeningBalance, targetUserId, targetModule]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -173,11 +176,19 @@ router.post('/', auth, async (req, res) => {
 // Update a bank account
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { bank_name, account_title, account_number, opening_balance } = req.body;
-    const result = await pool.query(
-      'UPDATE bank_accounts SET bank_name=$1, account_title=$2, account_number=$3, opening_balance=$4 WHERE id=$5 AND (user_id=$6 OR $7) RETURNING *',
-      [bank_name, account_title, account_number, opening_balance, req.params.id, req.user.id, isAdmin(req)]
-    );
+    const { bank_name, account_title, account_number, opening_balance, module_type } = req.body;
+    let result;
+    if (isAdmin(req)) {
+      result = await pool.query(
+        'UPDATE bank_accounts SET bank_name=$1, account_title=$2, account_number=$3, opening_balance=$4, module_type=$5 WHERE id=$6 RETURNING *',
+        [bank_name, account_title, account_number, opening_balance || 0, module_type || 'Wholesale', req.params.id]
+      );
+    } else {
+      result = await pool.query(
+        'UPDATE bank_accounts SET bank_name=$1, account_title=$2, account_number=$3 WHERE id=$4 AND user_id=$5 RETURNING *',
+        [bank_name, account_title, account_number, req.params.id, req.user.id]
+      );
+    }
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -278,11 +289,11 @@ router.get('/balance/:method', auth, async (req, res) => {
 // Register Closeout / Galla Transfer
 router.post('/closeout', auth, async (req, res) => {
   try {
-    const { amount_sent_to_admin, amount_kept_as_opening, notes } = req.body;
+    const { amount_sent_to_admin, amount_kept_as_opening, notes, payment_type } = req.body;
     const userId = req.user.id;
     const moduleType = req.user.module_type || 'Retail 1';
 
-    // Insert closeout expense to deduct cash balance by the amount sent to Admin
+    // Insert closeout expense to deduct balance by the amount sent to Admin
     const result = await pool.query(
       `INSERT INTO expenses (description, expense_type, category, amount, payment_type, expense_date, notes, user_id, module_type) 
        VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, $7, $8) RETURNING *`,
@@ -291,7 +302,7 @@ router.post('/closeout', auth, async (req, res) => {
         'Galla Closeout',
         'Handover',
         amount_sent_to_admin,
-        'Cash',
+        payment_type || 'Cash',
         notes || `Galla cleared. Opening balance Rs. ${amount_kept_as_opening} kept for tomorrow.`,
         userId,
         moduleType

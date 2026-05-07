@@ -384,6 +384,7 @@ export default function Billing({ type }) {
           customerAddress: saleData.customer_address || '',
           vehicleType: saleData.vehicle_type || '',
           vehicleId: saleData.vehicle_id || '',
+          selectedLabourGroup: selectedLabourGroup,
           items: [...cart],
           subtotal: subtotal,
           discount: parseFloat(discount || 0),
@@ -394,6 +395,7 @@ export default function Billing({ type }) {
           newBalance: finalBal,
           paymentMethod: finalPaymentType,
           bankAccount: paymentType === 'Bank' ? selectedBank : null,
+          saleType: activeTab,
         });
         setShowSuccess(true);
         setCart([]);
@@ -831,6 +833,7 @@ export default function Billing({ type }) {
                         newBalance: s.balance_amount,
                         paymentMethod: s.payment_type,
                         bankAccount: s.payment_type.includes('Bank') ? s.payment_type.replace('Bank - ', '') : null,
+                        saleType: s.sale_type,
                       });
                       setTimeout(() => window.print(), 500);
                     } 
@@ -874,15 +877,33 @@ export default function Billing({ type }) {
         <div className="thermal-receipt print-only">
           <div className="receipt-header">
             <h2>DATA WALEY</h2>
-            <h2 style={{ fontSize: '15px', fontWeight: 'normal', margin: '2px 0 8px 0' }}>CEMENT DEALER</h2>
-            <div className="contact-info">
-              <p>Name 1: 0300-0000000</p>
-              <p>Name 2: 0300-0000000</p>
-            </div>
-            <p className="address">
-              12- Kachehri Main Larhoor Jathuwad Road,<br/>
-              Daska - Tehsil & District Sialkot.
-            </p>
+            {receiptData.saleType === 'Retail 2' ? (
+              <>
+                <h2 style={{ fontSize: '15px', fontWeight: 'normal', margin: '2px 0 8px 0' }}>RETAIL 2</h2>
+                <div className="contact-info">
+                  <p>Waqar Butt: 0311-4105840</p>
+                  <p>Mhd Aiss: 0335-1430216</p>
+                  <p>Saifullah: 0333-4714628</p>
+                </div>
+                <p className="address">
+                  Ada Treadywali Stop Main Jaranwala Road,<br/>
+                  District Sheikupura.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 style={{ fontSize: '15px', fontWeight: 'normal', margin: '2px 0 8px 0' }}>CEMENT DEALER</h2>
+                <div className="contact-info">
+                  <p>Mian Shehroz: 0335-4294300</p>
+                  <p>Ziaullah: 0322-4295106</p>
+                  <p>Tariq Mehmood: 0300-4269347</p>
+                </div>
+                <p className="address">
+                  12-KM Main Lahore Sheikhupura Road,<br/>
+                  Ada Kot Abdul Malik.
+                </p>
+              </>
+            )}
           </div>
           
           <div className="dashed-line"></div>
@@ -896,6 +917,7 @@ export default function Billing({ type }) {
             {receiptData.customerAddress && <div className="info-row"><span>Address</span> <span>: {receiptData.customerAddress}</span></div>}
             {receiptData.vehicleType && <div className="info-row"><span>Vehicle Type</span> <span>: {receiptData.vehicleType}</span></div>}
             {receiptData.vehicleId && <div className="info-row"><span>Vehicle No</span> <span>: {receiptData.vehicleId}</span></div>}
+            {receiptData.selectedLabourGroup && <div className="info-row"><span>Labour Group</span> <span>: {receiptData.selectedLabourGroup}</span></div>}
             {receiptData.paymentMethod && <div className="info-row"><span>Payment Type</span> <span>: {receiptData.paymentMethod}</span></div>}
           </div>
           
@@ -904,9 +926,9 @@ export default function Billing({ type }) {
           <table className="items-table">
             <thead>
               <tr>
+                <th className="desc">DESCRIPTION</th>
                 <th className="qty">QTY</th>
                 <th className="rate">RATE</th>
-                <th className="desc">DESCRIPTION</th>
                 <th className="amt">AMOUNT</th>
               </tr>
             </thead>
@@ -914,9 +936,9 @@ export default function Billing({ type }) {
               <tr><td colSpan="4" className="dashed-cell"></td></tr>
               {receiptData.items.map((item, idx) => (
                 <tr key={idx}>
+                  <td className="desc">{item.name}</td>
                   <td className="qty">{item.qty}</td>
                   <td className="rate">{item.price}</td>
-                  <td className="desc">{item.name}</td>
                   <td className="amt">{item.subtotal}</td>
                 </tr>
               ))}
@@ -969,10 +991,10 @@ export default function Billing({ type }) {
           
           <div className="receipt-footer">
             <p>For Any Query:</p>
-            <p>0327-4938957</p>
+            <p>{receiptData.saleType === 'Retail 2' ? '0311-4105840' : '0322-4295106'}</p>
             <div className="dashed-line mt-10"></div>
-            <p className="terms">Check the goods before payment.</p>
-            <p className="terms">No claim will be accepted after payment.</p>
+            <p className="terms" style={{fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', marginTop: '5px'}}>Thank you for coming</p>
+            <p className="terms" style={{fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase'}}>have a good day sir</p>
             <div className="dashed-line"></div>
           </div>
         </div>
