@@ -377,7 +377,15 @@ export default function Accounts() {
     return [
       ...filteredSales, 
       ...filteredInvestments.map(i => ({ ...i, isIncome: true, payment_type: 'Cash' })),
-      ...filteredCloseouts.map(e => ({ ...e, isExpense: true }))
+      ...filteredCloseouts.map(e => ({ ...e, isExpense: true })),
+      ...filteredSupplierPayments.map(p => ({ ...p, isExpense: true, amount: p.paid_amount })),
+      ...filteredSupplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
+        ...p, isExpense: true, isTransportFare: true, amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash'
+      })),
+      ...filteredGeneralExpenses.filter(e => e.expense_type !== 'Galla Closeout').map(e => ({ ...e, isExpense: true })),
+      ...filteredSalaries.map(s => ({ ...s, isExpense: true, payment_type: 'Cash' })),
+      ...filteredRents.map(r => ({ ...r, isExpense: true, payment_type: 'Cash' })),
+      ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, payment_type: o.payment_method }))
     ].reduce((acc, s) => {
       const method = s.payment_type || 'Cash';
       let cleanMethod = method.replace('Bank - ', '');
@@ -402,13 +410,19 @@ export default function Accounts() {
       acc[name] += parseFloat(b.opening_balance) || 0;
       return acc;
     }, { 'Cash': 0 }));
-  }, [filteredSales, filteredInvestments, filteredCloseouts, filteredAccounts]);
+  }, [filteredSales, filteredInvestments, filteredCloseouts, filteredSupplierPayments, filteredGeneralExpenses, filteredSalaries, filteredRents, filteredOtherExpenses, filteredAccounts]);
 
 
   const totalCash = Math.max(0, paymentSummary['Cash'] || 0);
   const totalBank = Math.max(0, Object.entries(paymentSummary)
     .filter(([k]) => k !== 'Cash')
     .reduce((sum, [, v]) => sum + v, 0));
+
+  const totalAdminReceived = useMemo(() => {
+    return generalExpenses
+      .filter(e => e.expense_type === 'Galla Closeout' || e.title === 'Galla Closeout' || e.description?.includes('Galla Closeout') || e.notes?.includes('Recipient Bank'))
+      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+  }, [generalExpenses]);
 
   // Filter all transactions for the selected ledger account and date range
   const ledgerTransactions = useMemo(() => {
@@ -620,6 +634,29 @@ export default function Accounts() {
           <Landmark size={32} />
         </div>
       </div>
+
+      {/* Admin Received Card (Only visible to Admin) */}
+      {user?.email === 'admin@erp.com' && (
+        <div className="stat-card" 
+          style={{
+            background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', 
+            padding: '24px', borderRadius: '20px', color: '#fff', 
+            boxShadow: '0 10px 20px rgba(245, 158, 11, 0.2)',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            transition: 'transform 0.2s'
+          }}
+        >
+          <div>
+            <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px'}}>
+              Received by Admin (All Users)
+            </p>
+            <h2 style={{margin: '8px 0 0 0', fontSize: '2rem', fontWeight: 800}}>Rs. {totalAdminReceived.toLocaleString()}</h2>
+          </div>
+          <div style={{background: 'rgba(255,255,255,0.2)', padding: '15px', borderRadius: '16px'}}>
+            <Landmark size={32} />
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -686,7 +723,7 @@ export default function Accounts() {
             let bal = summaryKey ? paymentSummary[summaryKey] : 0;
             
             if (acc.module_type === 'Admin Recipient') {
-              bal = filteredGeneralExpenses
+              bal = generalExpenses
                 .filter(e => (e.title === 'Galla Closeout' || e.description?.includes('Galla Closeout') || e.notes?.includes('Recipient Bank')) && e.notes?.includes(acc.bank_name) && e.notes?.includes(acc.account_number))
                 .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
             }
