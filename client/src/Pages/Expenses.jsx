@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from "react";
 import { 
   Receipt, Plus, Pencil, Trash2, X, Search, 
   Home, Building2, Coffee, Zap, UserMinus, Wallet,
-  Calendar, Tag, FileText, CircleDollarSign, ChevronLeft
+  Calendar, Tag, FileText, CircleDollarSign, ChevronLeft, Truck
 } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
 import ActionMenu from '../components/ActionMenu';
@@ -41,6 +41,7 @@ export default function Expenses({ type }) {
   const [selectedExpForPay, setSelectedExpForPay] = useState(null);
   const [payForm, setPayForm] = useState({ source: 'Cash', bank: '' });
   const [liveBalances, setLiveBalances] = useState({});
+  const [personalVehicles, setPersonalVehicles] = useState([]);
 
   useEffect(() => {
     if (showModal) {
@@ -88,9 +89,20 @@ export default function Expenses({ type }) {
     } catch (err) { console.error(err); }
   };
 
+  const fetchPersonalVehicles = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/transport?ownership_type=Personal&type=${activeTab}`, {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      setPersonalVehicles(Array.isArray(data) ? data : []);
+    } catch (err) { console.error(err); }
+  };
+
   useEffect(() => { 
     fetchRecords();
     fetchBanks();
+    fetchPersonalVehicles();
   }, [activeTab]);
 
   const handleSubmit = async (e) => {
@@ -171,7 +183,7 @@ export default function Expenses({ type }) {
         </button>
       </div>
 
-      <div className="stats-grid-pos">
+      <div className="stats-grid-pos" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
         <div className="pos-stat-card">
           <div className="icon blue"><Building2 size={24} /></div>
           <div className="info">
@@ -184,6 +196,13 @@ export default function Expenses({ type }) {
           <div className="info">
             <span className="label">House Total</span>
             <span className="value">Rs. {records.filter(r => r.expense_type === "House").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+          </div>
+        </div>
+        <div className="pos-stat-card">
+          <div className="icon blue" style={{ background: '#ecfeff', color: '#0891b2' }}><Truck size={24} /></div>
+          <div className="info">
+            <span className="label">Vehicle Total</span>
+            <span className="value">Rs. {records.filter(r => r.expense_type === "Personal Vehicle").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
@@ -201,7 +220,7 @@ export default function Expenses({ type }) {
           <input type="text" placeholder="Search expenses..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div className="filter-group">
-           {["All", "Office", "House"].map(t => (
+           {["All", "Office", "House", "Personal Vehicle"].map(t => (
              <button key={t} className={`tab-btn ${filterType === t ? 'active' : ''}`} onClick={() => setFilterType(t)}>{t}</button>
            ))}
         </div>
@@ -270,9 +289,19 @@ export default function Expenses({ type }) {
                   <label>Expense Type</label>
                   <div className="input-wrapper">
                     <Tag size={18} />
-                    <select value={form.expense_type} onChange={(e) => setForm({...form, expense_type: e.target.value, category: CATEGORIES[e.target.value][0]})}>
+                    <select value={form.expense_type} onChange={(e) => {
+                      const nextType = e.target.value;
+                      let nextCat = "General";
+                      if (nextType === "Personal Vehicle") {
+                        nextCat = personalVehicles[0] ? `${personalVehicles[0].vehicle_number} (${personalVehicles[0].driver_name})` : "None";
+                      } else {
+                        nextCat = CATEGORIES[nextType] ? CATEGORIES[nextType][0] : "General";
+                      }
+                      setForm({...form, expense_type: nextType, category: nextCat});
+                    }}>
                       <option value="Office">Office Expense</option>
                       <option value="House">House Expense</option>
+                      <option value="Personal Vehicle">Personal Vehicle</option>
                     </select>
                   </div>
                 </div>
@@ -281,7 +310,15 @@ export default function Expenses({ type }) {
                   <div className="input-wrapper">
                     <FileText size={18} />
                     <select value={form.category} onChange={(e) => setForm({...form, category: e.target.value})}>
-                      {CATEGORIES[form.expense_type].map(c => <option key={c} value={c}>{c}</option>)}
+                      {form.expense_type === "Personal Vehicle" ? (
+                        personalVehicles.map(v => (
+                          <option key={v.id} value={`${v.vehicle_number} (${v.driver_name})`}>
+                            {v.vehicle_number} ({v.driver_name})
+                          </option>
+                        ))
+                      ) : (
+                        CATEGORIES[form.expense_type]?.map(c => <option key={c} value={c}>{c}</option>)
+                      )}
                     </select>
                   </div>
                 </div>

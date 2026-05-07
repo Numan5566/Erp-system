@@ -753,6 +753,32 @@ export default function Billing({ type }) {
         </div>
       ) : (
         <div className="history-container" style={{padding: '20px', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+          
+          {/* ── Sales History Total Summary Strip ── */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '16px',
+            marginBottom: '20px',
+            padding: '16px',
+            background: '#f8fafc',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0'
+          }} className="no-print">
+            <div style={{ background: 'white', padding: '12px 20px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', borderLeft: '4px solid #3b82f6' }}>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Total Sales Value</div>
+              <div style={{ fontSize: '1.25rem', color: '#1e293b', fontWeight: 800 }}>Rs. {sales.reduce((sum, s) => sum + parseFloat(s.net_amount || 0), 0).toLocaleString()}</div>
+            </div>
+            <div style={{ background: 'white', padding: '12px 20px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', borderLeft: '4px solid #16a34a' }}>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Total Paid/Collected</div>
+              <div style={{ fontSize: '1.25rem', color: '#16a34a', fontWeight: 800 }}>Rs. {sales.reduce((sum, s) => sum + parseFloat(s.paid_amount || 0), 0).toLocaleString()}</div>
+            </div>
+            <div style={{ background: 'white', padding: '12px 20px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', borderLeft: '4px solid #ef4444' }}>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Total Remaining Balance</div>
+              <div style={{ fontSize: '1.25rem', color: '#ef4444', fontWeight: 800 }}>Rs. {sales.reduce((sum, s) => sum + parseFloat(s.balance_amount || 0), 0).toLocaleString()}</div>
+            </div>
+          </div>
+
           <DataTable value={sales} paginator rows={10} rowsPerPageOptions={[10, 25, 50]} className="p-datatable-sm" stripedRows responsiveLayout="scroll">
             <Column header="Date" body={(s) => new Date(s.created_at).toLocaleDateString()} sortable field="created_at" />
             <Column header="Bill No" body={(s) => `#SAL-${s.id}`} sortable field="id" />
