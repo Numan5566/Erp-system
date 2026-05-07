@@ -34,65 +34,46 @@ export default function Accounts() {
 
   const filteredAccounts = useMemo(() => {
     const recipientAccounts = accounts.filter(a => a.module_type === 'Admin Recipient');
-    if (user?.role === 'admin') {
-      return [
-        ...accounts.filter(a => (a.module_type || 'Wholesale') === activeTab && a.module_type !== 'Admin Recipient'),
-        ...recipientAccounts
-      ];
-    }
+    const targetModule = user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale');
     return [
-      ...accounts.filter(a => a.module_type !== 'Admin Recipient'),
+      ...accounts.filter(a => (a.module_type || 'Wholesale') === targetModule && a.module_type !== 'Admin Recipient'),
       ...recipientAccounts
     ];
   }, [accounts, activeTab, user]);
 
   const filteredSales = useMemo(() => {
-    if (user?.role === 'admin') {
-      return sales.filter(s => (s.sale_type || s.module_type || 'Wholesale') === activeTab);
-    }
-    return sales;
+    const targetModule = user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale');
+    return sales.filter(s => (s.sale_type || s.module_type || 'Wholesale') === targetModule);
   }, [sales, activeTab, user]);
 
   const filteredSupplierPayments = useMemo(() => {
-    if (user?.role === 'admin') {
-      return supplierPayments.filter(p => (p.module_type || 'Wholesale') === activeTab);
-    }
-    return supplierPayments;
+    const targetModule = user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale');
+    return supplierPayments.filter(p => (p.module_type || 'Wholesale') === targetModule);
   }, [supplierPayments, activeTab, user]);
 
   const filteredGeneralExpenses = useMemo(() => {
-    if (user?.role === 'admin') {
-      return generalExpenses.filter(e => (e.module_type || 'Wholesale') === activeTab);
-    }
-    return generalExpenses;
+    const targetModule = user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale');
+    return generalExpenses.filter(e => (e.module_type || 'Wholesale') === targetModule);
   }, [generalExpenses, activeTab, user]);
 
   const filteredSalaries = useMemo(() => {
-    if (user?.role === 'admin') {
-      return salaries.filter(s => (s.module_type || 'Wholesale') === activeTab);
-    }
-    return salaries;
+    const targetModule = user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale');
+    return salaries.filter(s => (s.module_type || 'Wholesale') === targetModule);
   }, [salaries, activeTab, user]);
 
   const filteredRents = useMemo(() => {
-    if (user?.role === 'admin') {
-      return rents.filter(r => (r.module_type || 'Wholesale') === activeTab);
-    }
-    return rents;
+    const targetModule = user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale');
+    return rents.filter(r => (r.module_type || 'Wholesale') === targetModule);
   }, [rents, activeTab, user]);
 
   const filteredInvestments = useMemo(() => {
-    if (user?.role === 'admin') {
-      return investments.filter(i => (i.module_type || 'Wholesale') === activeTab);
-    }
-    return investments;
+    const targetModule = user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale');
+    return investments.filter(i => (i.module_type || 'Wholesale') === targetModule);
   }, [investments, activeTab, user]);
 
   const filteredOtherExpenses = useMemo(() => {
-    if (user?.role === 'admin') {
-      return otherExpenses.filter(o => (o.module_type || 'Wholesale') === activeTab);
-    }
-    return otherExpenses;
+    const targetModule = user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale');
+    return otherExpenses.filter(o => (o.module_type || 'Wholesale') === targetModule);
   }, [otherExpenses, activeTab, user]);
 
 
@@ -210,6 +191,7 @@ export default function Accounts() {
       const bankDetailsText = selectedBank ? `Recipient Bank: ${selectedBank.bank_name} (A/C: ${selectedBank.account_number}, Title: ${selectedBank.account_title || 'N/A'})` : '';
       const submissionData = {
         ...closeoutForm,
+        module_type: user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale'),
         notes: bankDetailsText ? `${bankDetailsText}. ${closeoutForm.notes}` : closeoutForm.notes
       };
       const res = await fetch('http://localhost:5000/api/banks/closeout', {
@@ -646,7 +628,7 @@ export default function Accounts() {
 
   // Combine Bank Accounts with a virtual "Cash" account ONLY if no real Cash account exists
   const displayAccounts = useMemo(() => {
-    const hasRealCash = filteredAccounts.some(a => a.bank_name.toLowerCase() === 'cash' || a.bank_name.toLowerCase() === 'cash account');
+    const hasRealCash = filteredAccounts.some(a => (a.bank_name.toLowerCase() === 'cash' || a.bank_name.toLowerCase() === 'cash account') && a.module_type !== 'Admin Recipient');
     if (hasRealCash) return filteredAccounts;
     return [
       { id: 'cash-id', bank_name: 'Cash Account', account_title: 'Main Counter', account_number: 'N/A', isCash: true, opening_balance: 0 },
@@ -679,11 +661,9 @@ export default function Accounts() {
         <div className="module-actions" style={{display: 'flex', gap: '10px'}}>
           <Button label="Galla Closeout" icon="pi pi-lock" onClick={handleOpenCloseout} className="p-button-warning" style={{borderRadius: '12px'}} />
           {user?.email === 'admin@erp.com' && (
-            <>
-              <Button label="Add Recipient Bank" icon="pi pi-plus-circle" onClick={() => { setAdminBankForm({ bank_name: "", account_title: "", account_number: "" }); setShowAdminBankModal(true); }} className="p-button-success" style={{borderRadius: '12px'}} />
-              <Button label="Add Bank Account" icon="pi pi-plus" onClick={() => { setEditId(null); setForm({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 }); setShowModal(true); }} className="p-button-primary" style={{borderRadius: '12px'}} />
-            </>
+            <Button label="Add Recipient Bank" icon="pi pi-plus-circle" onClick={() => { setAdminBankForm({ bank_name: "", account_title: "", account_number: "" }); setShowAdminBankModal(true); }} className="p-button-success" style={{borderRadius: '12px'}} />
           )}
+          <Button label="Add Bank Account" icon="pi pi-plus" onClick={() => { setEditId(null); setForm({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 }); setShowModal(true); }} className="p-button-primary" style={{borderRadius: '12px'}} />
         </div>
 
       </div>

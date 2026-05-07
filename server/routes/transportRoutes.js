@@ -80,7 +80,7 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 // Delete vehicle
-// Get Vehicle Ledger (Combined Sales & Purchases)
+// Get Vehicle Ledger (Combined Sales & Purchases & Payments)
 router.get('/ledger/:id', auth, async (req, res) => {
   try {
     const vId = req.params.id;
@@ -99,9 +99,57 @@ router.get('/ledger/:id', auth, async (req, res) => {
        WHERE p.vehicle_id = $1`, [vId]
     );
 
-    const combined = [...salesTrips.rows, ...purchaseTrips.rows].sort((a, b) => new Date(b.date) - new Date(a.date));
+    // 3. Payments made to Vehicle
+    const payments = await pool.query(
+      `SELECT id, 'Payment Sent' as party_name, amount, expense_date as date, 'Payment' as trip_type, payment_type
+       FROM expenses WHERE vehicle_id = $1`, [vId]
+    );
+
+    const combined = [...salesTrips.rows, ...purchaseTrips.rows, ...payments.rows].sort((a, b) => new Date(b.date) - new Date(a.date));
     res.json(combined);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Record payment to vehicle
+router.post('/payment', auth, async (req, res) => {
+  try {
+    const { vehicle_id, paid_amount, notes, payment_type, module_type } = req.body;
+    const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
+
+    // 1. Fetch vehicle info
+    const vehicleRes = await pool.query('SELECT * FROM vehicles WHERE id = $1', [vehicle_id]);
+    if (vehicleRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+    const vehicle = vehicleRes.rows[0];
+
+    // 2. Insert into expenses table
+    await pool.query(
+      `INSERT INTO expenses (description, amount, expense_type, category, payment_type, notes, user_id, module_type, vehicle_id, expense_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_DATE)`,
+      [
+        `Payment to Vehicle: ${vehicle.vehicle_number} - ${vehicle.driver_name}`,
+        paid_amount,
+        'Transport',
+        'Fare Payment',
+        payment_type,
+        notes || 'Payment Sent',
+        req.user.id,
+        finalModule,
+        vehicle_id
+      ]
+    );
+
+    // 3. Update vehicle total_earnings (subtraction)
+    const updateRes = await pool.query(
+      `UPDATE vehicles SET total_earnings = total_earnings - $1 WHERE id = $2 RETURNING *`,
+      [paid_amount, vehicle_id]
+    );
+
+    res.json(updateRes.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.delete('/:id', auth, async (req, res) => {

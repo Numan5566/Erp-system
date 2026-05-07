@@ -40,6 +40,97 @@ export default function Transport({ type }) {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({ amount: "", notes: "Payment Sent" });
+  const [paymentSource, setPaymentSource] = useState("Cash");
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [selectedBank, setSelectedBank] = useState("");
+  const [liveBalances, setLiveBalances] = useState({});
+
+  useEffect(() => {
+    if (showPaymentModal) {
+      const fetchLiveBalances = async () => {
+        try {
+          const res = await fetch('http://localhost:5000/api/banks/balances', {
+            headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setLiveBalances(data);
+          }
+        } catch (e) { console.error(e); }
+      };
+      fetchLiveBalances();
+    }
+  }, [showPaymentModal]);
+
+  const fetchBanks = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/banks', {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      setBankAccounts(Array.isArray(data) ? data : []);
+    } catch (err) { console.error(err); }
+  };
+
+  useEffect(() => {
+    fetchBanks();
+  }, []);
+
+  const openPayment = (vehicle) => {
+    setSelectedVehicle(vehicle);
+    setPaymentForm({ amount: "", notes: "Payment Sent" });
+    setSelectedBank("");
+    setPaymentSource("Cash");
+    fetchBanks();
+    setShowPaymentModal(true);
+  };
+
+  const handleMakePayment = async (e) => {
+    e.preventDefault();
+    const currentEarnings = parseFloat(selectedVehicle.total_earnings || 0);
+    const amt = parseFloat(paymentForm.amount || 0);
+
+    if (currentEarnings > 0 && amt > currentEarnings) {
+      alert(`Invalid Payment: You cannot pay more than the outstanding fare earnings (Rs. ${currentEarnings})!`);
+      return;
+    }
+    setLoading(true);
+
+    let finalPaymentType = selectedBank ? `Bank - ${selectedBank}` : 'Cash';
+    const targetAccountName = selectedBank || 'Cash';
+    const currentAvailable = liveBalances[targetAccountName] || 0;
+
+    if (amt > currentAvailable) {
+      alert(`Insufficient balance in ${targetAccountName}! Available: Rs. ${currentAvailable.toLocaleString()}`);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/transport/payment`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          vehicle_id: selectedVehicle.id,
+          paid_amount: paymentForm.amount,
+          notes: paymentForm.notes,
+          payment_type: finalPaymentType,
+          module_type: activeCounter
+        })
+      });
+      if (res.ok) {
+        setShowPaymentModal(false);
+        fetchRecords();
+      }
+    } catch (err) { console.error(err); }
+    setLoading(false);
+  };
+
   const fetchRecords = async () => {
     if (!activeCounter) return;
     try {
@@ -198,7 +289,8 @@ export default function Transport({ type }) {
                       onEdit={() => openEdit(rec)} 
                       onDelete={() => handleDelete(rec.id)} 
                       extraItems={[
-                        { label: 'View Ledger', icon: 'pi pi-book', command: () => openLedger(rec) }
+                        { label: 'View Ledger', icon: 'pi pi-book', command: () => openLedger(rec) },
+                        ...(activeTab === 'Rent' ? [{ label: 'Make Payment', icon: 'pi pi-money-bill', command: () => openPayment(rec) }] : [])
                       ]}
                     />
                 </td>
@@ -389,7 +481,91 @@ export default function Transport({ type }) {
             </div>
           </div>
         </div>
-      )}
+      {showPaymentModal && selectedVehicle && (() => {
+        const targetAccount = paymentSource === "Bank" ? selectedBank : "Cash";
+        const availableBal = liveBalances[targetAccount] || 0;
+        const isInsufficient = parseFloat(paymentForm.amount || 0) > availableBal;
+        return (
+          <div className="modal-overlay" onClick={() => setShowPaymentModal(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+              <div className="modal-header">
+                <h3>Make Payment to {selectedVehicle.vehicle_number}</h3>
+                <button className="modal-close" onClick={() => setShowPaymentModal(false)}><X size={20} /></button>
+              </div>
+              
+              <form onSubmit={handleMakePayment} className="custom-form">
+                <div style={{background: '#fff1f2', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between'}}>
+                  <span style={{fontWeight: 600, color: '#e11d48'}}>Fare Accrued (Owed):</span>
+                  <span style={{fontWeight: 700, color: '#e11d48'}}>Rs. {parseFloat(selectedVehicle.total_earnings || 0).toLocaleString()}</span>
+                </div>
+
+                <div className="form-group" style={{marginBottom: '15px'}}>
+                  <label>Amount Paid (Rs.) *</label>
+                  <div className="input-wrapper">
+                    <Hash size={18} />
+                    <input type="number" step="0.01" required value={paymentForm.amount} placeholder="e.g. 50000"
+                      onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{marginBottom: '15px'}}>
+                  <label>Payment Source *</label>
+                  <select 
+                    value={paymentSource}
+                    style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none'}}
+                    onChange={(e) => {
+                      setPaymentSource(e.target.value);
+                      if (e.target.value === "Cash") setSelectedBank("");
+                    }}
+                  >
+                    <option value="Cash">Main Cash (Counter)</option>
+                    <option value="Bank">Bank / Online Account</option>
+                  </select>
+                </div>
+
+                {paymentSource === "Bank" && (
+                  <div className="form-group" style={{marginBottom: '15px'}}>
+                    <label>Select Sending Bank *</label>
+                    <select 
+                      value={selectedBank} 
+                      onChange={(e) => setSelectedBank(e.target.value)} 
+                      style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', background: '#f0f9ff', borderColor: '#3b82f6'}}
+                      required
+                    >
+                      <option value="">-- Choose Account --</option>
+                      {bankAccounts.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
+                        <option key={b.id} value={b.bank_name}>{b.bank_name} - {b.account_number}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                
+                {isInsufficient && (
+                  <div style={{ color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '10px 14px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
+                    ⚠️ Insufficient Balance! Available: Rs. {availableBal.toLocaleString()}
+                  </div>
+                )}
+                
+                <div className="form-group" style={{marginBottom: '20px'}}>
+                  <label>Payment Notes / Reference</label>
+                  <div className="input-wrapper">
+                    <User size={18} />
+                    <input type="text" value={paymentForm.notes} placeholder="e.g. Paid via Cash" required
+                      onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="form-actions" style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-primary" style={{background: '#10b981', borderColor: '#10b981'}} disabled={loading || isInsufficient}>
+                    {loading ? "Processing..." : "Confirm Payment"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

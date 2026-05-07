@@ -13,8 +13,8 @@ router.get('/', auth, async (req, res) => {
     let params = [];
 
     if (!isAdmin(req)) {
-      query += ' WHERE sale_type=$1 AND user_id=$2';
-      params.push(req.user.module_type || 'Retail 1', req.user.id);
+      query += ' WHERE sale_type=$1';
+      params.push(req.user.module_type || 'Retail 1');
     } else if (type) {
       query += ' WHERE sale_type=$1';
       params.push(type);

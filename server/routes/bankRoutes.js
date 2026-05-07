@@ -12,12 +12,14 @@ router.get('/balances', auth, async (req, res) => {
     const userId = req.user.id;
     const isAdminUser = req.user.role === 'admin';
 
+    const targetModule = req.user.module_type || 'Retail 1';
+
     // 1. Fetch bank accounts opening balances
     let accountsQ = 'SELECT bank_name, opening_balance FROM bank_accounts';
     let params = [];
     if (!isAdminUser) {
-      accountsQ += ' WHERE user_id = $1';
-      params.push(userId);
+      accountsQ += ' WHERE user_id = $1 OR module_type = $2';
+      params.push(userId, targetModule);
     }
     const accountsRes = await pool.query(accountsQ, params);
     
@@ -32,8 +34,8 @@ router.get('/balances', auth, async (req, res) => {
     let salesQ = 'SELECT net_amount, paid_amount, payment_type FROM sales';
     let salesParams = [];
     if (!isAdminUser) {
-      salesQ += ' WHERE user_id = $1';
-      salesParams.push(userId);
+      salesQ += ' WHERE user_id = $1 OR sale_type = $2';
+      salesParams.push(userId, targetModule);
     }
     const salesRes = await pool.query(salesQ, salesParams);
     salesRes.rows.forEach(s => {
@@ -50,8 +52,8 @@ router.get('/balances', auth, async (req, res) => {
     let purchasesQ = 'SELECT paid_amount, payment_type FROM purchases';
     let purchasesParams = [];
     if (!isAdminUser) {
-      purchasesQ += ' WHERE user_id = $1';
-      purchasesParams.push(userId);
+      purchasesQ += ' WHERE user_id = $1 OR module_type = $2';
+      purchasesParams.push(userId, targetModule);
     }
     const purchasesRes = await pool.query(purchasesQ, purchasesParams);
     purchasesRes.rows.forEach(p => {
@@ -68,8 +70,8 @@ router.get('/balances', auth, async (req, res) => {
     let expensesQ = 'SELECT amount, payment_type FROM expenses';
     let expensesParams = [];
     if (!isAdminUser) {
-      expensesQ += ' WHERE user_id = $1';
-      expensesParams.push(userId);
+      expensesQ += ' WHERE user_id = $1 OR module_type = $2';
+      expensesParams.push(userId, targetModule);
     }
     const expensesRes = await pool.query(expensesQ, expensesParams);
     expensesRes.rows.forEach(e => {
@@ -86,8 +88,8 @@ router.get('/balances', auth, async (req, res) => {
     let salariesQ = 'SELECT amount FROM salary';
     let salariesParams = [];
     if (!isAdminUser) {
-      salariesQ += ' WHERE user_id = $1';
-      salariesParams.push(userId);
+      salariesQ += ' WHERE user_id = $1 OR module_type = $2';
+      salariesParams.push(userId, targetModule);
     }
     const salariesRes = await pool.query(salariesQ, salariesParams);
     salariesRes.rows.forEach(s => {
@@ -98,8 +100,8 @@ router.get('/balances', auth, async (req, res) => {
     let rentsQ = 'SELECT amount FROM rent';
     let rentsParams = [];
     if (!isAdminUser) {
-      rentsQ += ' WHERE user_id = $1';
-      rentsParams.push(userId);
+      rentsQ += ' WHERE user_id = $1 OR module_type = $2';
+      rentsParams.push(userId, targetModule);
     }
     const rentsRes = await pool.query(rentsQ, rentsParams);
     rentsRes.rows.forEach(r => {
@@ -289,9 +291,9 @@ router.get('/balance/:method', auth, async (req, res) => {
 // Register Closeout / Galla Transfer
 router.post('/closeout', auth, async (req, res) => {
   try {
-    const { amount_sent_to_admin, amount_kept_as_opening, notes, payment_type } = req.body;
+    const { amount_sent_to_admin, amount_kept_as_opening, notes, payment_type, module_type } = req.body;
     const userId = req.user.id;
-    const moduleType = req.user.module_type || 'Retail 1';
+    const moduleType = module_type || req.user.module_type || 'Retail 1';
 
     // Insert closeout expense to deduct balance by the amount sent to Admin
     const result = await pool.query(
