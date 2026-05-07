@@ -945,7 +945,7 @@ export default function Billing({ type }) {
             {receiptData.customerAddress && <div className="info-row"><span>Address</span> <span>: {receiptData.customerAddress}</span></div>}
             {receiptData.vehicleType && <div className="info-row"><span>Vehicle Type</span> <span>: {receiptData.vehicleType}</span></div>}
             {receiptData.vehicleId && <div className="info-row"><span>Vehicle No</span> <span>: {receiptData.vehicleId}</span></div>}
-            {receiptData.selectedLabourGroup && <div className="info-row"><span>Labour Group</span> <span>: {receiptData.selectedLabourGroup}</span></div>}
+            <div className="info-row"><span>Labour Group</span> <span>: {receiptData.selectedLabourGroup || "No"}</span></div>
             {receiptData.paymentMethod && <div className="info-row"><span>Payment Type</span> <span>: {receiptData.paymentMethod}</span></div>}
           </div>
           
