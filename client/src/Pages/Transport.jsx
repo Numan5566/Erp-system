@@ -481,91 +481,87 @@ export default function Transport({ type }) {
             </div>
           </div>
         </div>
-      {showPaymentModal && selectedVehicle && (() => {
-        const targetAccount = paymentSource === "Bank" ? selectedBank : "Cash";
-        const availableBal = liveBalances[targetAccount] || 0;
-        const isInsufficient = parseFloat(paymentForm.amount || 0) > availableBal;
-        return (
-          <div className="modal-overlay" onClick={() => setShowPaymentModal(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-              <div className="modal-header">
-                <h3>Make Payment to {selectedVehicle.vehicle_number}</h3>
-                <button className="modal-close" onClick={() => setShowPaymentModal(false)}><X size={20} /></button>
+      )}
+      {showPaymentModal && selectedVehicle && (
+        <div className="modal-overlay" onClick={() => setShowPaymentModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3>Make Payment to {selectedVehicle.vehicle_number}</h3>
+              <button className="modal-close" onClick={() => setShowPaymentModal(false)}><X size={20} /></button>
+            </div>
+            
+            <form onSubmit={handleMakePayment} className="custom-form">
+              <div style={{background: '#fff1f2', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between'}}>
+                <span style={{fontWeight: 600, color: '#e11d48'}}>Fare Accrued (Owed):</span>
+                <span style={{fontWeight: 700, color: '#e11d48'}}>Rs. {parseFloat(selectedVehicle.total_earnings || 0).toLocaleString()}</span>
               </div>
-              
-              <form onSubmit={handleMakePayment} className="custom-form">
-                <div style={{background: '#fff1f2', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between'}}>
-                  <span style={{fontWeight: 600, color: '#e11d48'}}>Fare Accrued (Owed):</span>
-                  <span style={{fontWeight: 700, color: '#e11d48'}}>Rs. {parseFloat(selectedVehicle.total_earnings || 0).toLocaleString()}</span>
-                </div>
 
-                <div className="form-group" style={{marginBottom: '15px'}}>
-                  <label>Amount Paid (Rs.) *</label>
-                  <div className="input-wrapper">
-                    <Hash size={18} />
-                    <input type="number" step="0.01" required value={paymentForm.amount} placeholder="e.g. 50000"
-                      onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
-                  </div>
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Amount Paid (Rs.) *</label>
+                <div className="input-wrapper">
+                  <Hash size={18} />
+                  <input type="number" step="0.01" required value={paymentForm.amount} placeholder="e.g. 50000"
+                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
                 </div>
+              </div>
 
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Payment Source *</label>
+                <select 
+                  value={paymentSource}
+                  style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none'}}
+                  onChange={(e) => {
+                    setPaymentSource(e.target.value);
+                    if (e.target.value === "Cash") setSelectedBank("");
+                  }}
+                >
+                  <option value="Cash">Main Cash (Counter)</option>
+                  <option value="Bank">Bank / Online Account</option>
+                </select>
+              </div>
+
+              {paymentSource === "Bank" && (
                 <div className="form-group" style={{marginBottom: '15px'}}>
-                  <label>Payment Source *</label>
+                  <label>Select Sending Bank *</label>
                   <select 
-                    value={paymentSource}
-                    style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none'}}
-                    onChange={(e) => {
-                      setPaymentSource(e.target.value);
-                      if (e.target.value === "Cash") setSelectedBank("");
-                    }}
+                    value={selectedBank} 
+                    onChange={(e) => setSelectedBank(e.target.value)} 
+                    style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', background: '#f0f9ff', borderColor: '#3b82f6'}}
+                    required
                   >
-                    <option value="Cash">Main Cash (Counter)</option>
-                    <option value="Bank">Bank / Online Account</option>
+                    <option value="">-- Choose Account --</option>
+                    {bankAccounts.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
+                      <option key={b.id} value={b.bank_name}>{b.bank_name} - {b.account_number}</option>
+                    ))}
                   </select>
                 </div>
-
-                {paymentSource === "Bank" && (
-                  <div className="form-group" style={{marginBottom: '15px'}}>
-                    <label>Select Sending Bank *</label>
-                    <select 
-                      value={selectedBank} 
-                      onChange={(e) => setSelectedBank(e.target.value)} 
-                      style={{width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', background: '#f0f9ff', borderColor: '#3b82f6'}}
-                      required
-                    >
-                      <option value="">-- Choose Account --</option>
-                      {bankAccounts.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
-                        <option key={b.id} value={b.bank_name}>{b.bank_name} - {b.account_number}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                
-                {isInsufficient && (
-                  <div style={{ color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '10px 14px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
-                    ⚠️ Insufficient Balance! Available: Rs. {availableBal.toLocaleString()}
-                  </div>
-                )}
-                
-                <div className="form-group" style={{marginBottom: '20px'}}>
-                  <label>Payment Notes / Reference</label>
-                  <div className="input-wrapper">
-                    <User size={18} />
-                    <input type="text" value={paymentForm.notes} placeholder="e.g. Paid via Cash" required
-                      onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} />
-                  </div>
+              )}
+              
+              {parseFloat(paymentForm.amount || 0) > (liveBalances[paymentSource === "Bank" ? selectedBank : "Cash"] || 0) && (
+                <div style={{ color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '10px 14px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
+                  ⚠️ Insufficient Balance! Available: Rs. {(liveBalances[paymentSource === "Bank" ? selectedBank : "Cash"] || 0).toLocaleString()}
                 </div>
-
-                <div className="form-actions" style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
-                  <button type="button" className="btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
-                  <button type="submit" className="btn-primary" style={{background: '#10b981', borderColor: '#10b981'}} disabled={loading || isInsufficient}>
-                    {loading ? "Processing..." : "Confirm Payment"}
-                  </button>
+              )}
+              
+              <div className="form-group" style={{marginBottom: '20px'}}>
+                <label>Payment Notes / Reference</label>
+                <div className="input-wrapper">
+                  <User size={18} />
+                  <input type="text" value={paymentForm.notes} placeholder="e.g. Paid via Cash" required
+                    onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} />
                 </div>
-              </form>
-            </div>
+              </div>
+
+              <div className="form-actions" style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                <button type="button" className="btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" style={{background: '#10b981', borderColor: '#10b981'}} disabled={loading || (parseFloat(paymentForm.amount || 0) > (liveBalances[paymentSource === "Bank" ? selectedBank : "Cash"] || 0))}>
+                  {loading ? "Processing..." : "Confirm Payment"}
+                </button>
+              </div>
+            </form>
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
   );
 }

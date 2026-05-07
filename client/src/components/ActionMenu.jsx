@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useContext } from 'react';
 import { Menu } from 'primereact/menu';
 import { Button } from 'primereact/button';
+import { AuthContext } from '../context/AuthContext';
 
 /**
  * Reusable 3-dot kebab action menu for DataTable rows.
@@ -11,18 +12,27 @@ import { Button } from 'primereact/button';
  */
 export default function ActionMenu({ onEdit, onDelete, extraItems = [] }) {
   const menuRef = useRef(null);
+  const { user } = useContext(AuthContext);
+
+  const isAdmin = user?.role === 'admin' || user?.email === 'admin@erp.com';
 
   const items = [
     ...(onEdit ? [{
       label: 'Edit',
       icon: 'pi pi-pencil',
       command: (e) => onEdit(e.originalEvent),
+      disabled: !isAdmin,
     }] : []),
     ...(onDelete ? [{
       label: 'Delete',
       icon: 'pi pi-trash',
-      command: (e) => onDelete(e.originalEvent),
-      style: { color: '#e11d48' },
+      command: (e) => {
+        if (window.confirm("Are you sure you want to delete this record?")) {
+          onDelete(e.originalEvent);
+        }
+      },
+      style: { color: isAdmin ? '#e11d48' : '#cbd5e1' },
+      disabled: !isAdmin,
     }] : []),
     ...extraItems,
   ];
