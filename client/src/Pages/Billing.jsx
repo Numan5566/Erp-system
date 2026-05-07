@@ -337,7 +337,8 @@ export default function Billing({ type }) {
         balance_amount: balance,
         payment_type: finalPaymentType,
         sale_type: activeTab,
-        items: cart
+        items: cart,
+        labour_group: selectedLabourGroup
       };
 
       const url = editId ? `${SALES_API}/${editId}` : SALES_API;
@@ -860,6 +861,7 @@ export default function Billing({ type }) {
                         paymentMethod: s.payment_type,
                         bankAccount: s.payment_type.includes('Bank') ? s.payment_type.replace('Bank - ', '') : null,
                         saleType: s.sale_type,
+                        selectedLabourGroup: s.labour_group,
                       });
                       setTimeout(() => window.print(), 500);
                     } 

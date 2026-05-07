@@ -9,8 +9,13 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'erp_db'
 });
 
-pool.on('connect', () => {
+pool.on('connect', async () => {
   console.log('Connected to PostgreSQL Database.');
+  try {
+    await pool.query('ALTER TABLE sales ADD COLUMN IF NOT EXISTS labour_group VARCHAR(100);');
+  } catch (err) {
+    console.error('Migration failed:', err);
+  }
 });
 
 pool.on('error', (err) => {

@@ -35,7 +35,7 @@ router.post('/', auth, async (req, res) => {
     const { 
       customer_name, customer_phone, total_amount, discount, 
       delivery_charges, net_amount, paid_amount, balance_amount, 
-      payment_type, items, sale_type, vehicle_type, vehicle_id 
+      payment_type, items, sale_type, vehicle_type, vehicle_id, labour_group 
     } = req.body;
 
     const finalModule = isAdmin(req) ? (sale_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
@@ -66,9 +66,9 @@ router.post('/', auth, async (req, res) => {
     const vId = vehicle_id && vehicle_id !== '' ? vehicle_id : null;
     const saleResult = await client.query(
       `INSERT INTO sales 
-      (customer_id, customer_name, customer_phone, customer_address, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, sale_type, user_id, vehicle_id, items, status) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
-      [finalCustomerId, customer_name, customer_phone || '', req.body.customer_address || '', total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, finalModule, req.user.id, vId, JSON.stringify(items), 'Completed']
+      (customer_id, customer_name, customer_phone, customer_address, total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, sale_type, user_id, vehicle_id, items, status, labour_group) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
+      [finalCustomerId, customer_name, customer_phone || '', req.body.customer_address || '', total_amount, discount, delivery_charges, net_amount, paid_amount, balance_amount, payment_type, finalModule, req.user.id, vId, JSON.stringify(items), 'Completed', labour_group || null]
     );
     const saleId = saleResult.rows[0].id;
 

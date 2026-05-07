@@ -85,19 +85,19 @@ router.post('/work-history', auth, async (req, res) => {
 
 // 7. POST pay group wages
 router.post('/pay', auth, async (req, res) => {
-  const { group_name, amount, notes, payment_type } = req.body;
+  const { group_name, bill_id, amount, notes, payment_type } = req.body;
   const finalPaymentType = payment_type || 'Cash';
   try {
     // Log payment into work history
     await pool.query(
-      'INSERT INTO labour_work_history (group_name, description, amount, status, user_id) VALUES ($1, $2, $3, $4, $5)',
-      [group_name, notes || `Paid wages to ${group_name}`, amount, 'Paid', req.user.id]
+      'INSERT INTO labour_work_history (group_name, bill_id, description, amount, status, user_id) VALUES ($1, $2, $3, $4, $5, $6)',
+      [group_name, bill_id || null, notes || `Paid wages to ${group_name} (Bill #${bill_id || 'N/A'})`, amount, 'Paid', req.user.id]
     );
 
     // Record as an expense to deduct from the selected Cash/Bank account
     await pool.query(
       'INSERT INTO expenses (description, expense_type, category, amount, user_id, module_type, payment_type) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [`Labour Wage: ${group_name} (${notes || 'Wages Paid'})`, 'Office', 'Labour Charges', amount, req.user.id, req.user.module_type || 'Retail 1', finalPaymentType]
+      [`Labour Wage: ${group_name} (Bill #${bill_id || 'N/A'}, Notes: ${notes || 'Wages Paid'})`, 'Office', 'Labour Charges', amount, req.user.id, req.user.module_type || 'Retail 1', finalPaymentType]
     );
 
     res.json({ message: 'Wage payment successfully processed!' });

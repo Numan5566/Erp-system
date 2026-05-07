@@ -33,6 +33,63 @@ export default function Labours() {
   const [isNewGroup, setIsNewGroup] = useState(false);
   const [customGroup, setCustomGroup] = useState("");
 
+  // Global payment modal states
+  const [showGlobalPayModal, setShowGlobalPayModal] = useState(false);
+  const [globalPayForm, setGlobalPayForm] = useState({ group_name: "", bill_id: "", amount: "", notes: "", payment_type: "Cash" });
+
+  const handleGlobalPayWages = async (e) => {
+    e.preventDefault();
+    const amt = parseFloat(globalPayForm.amount || 0);
+    const getSelectedGlobalPaymentBalance = () => {
+      if (globalPayForm.payment_type === 'Cash') return liveBalances['Cash'] || 0;
+      const cleanBank = globalPayForm.payment_type.replace('Bank - ', '');
+      return liveBalances[cleanBank] || 0;
+    };
+    const availableBalance = getSelectedGlobalPaymentBalance();
+
+    if (amt > availableBalance) {
+      alert("Insufficient Balance in selected account!");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/pay`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          group_name: globalPayForm.group_name,
+          bill_id: globalPayForm.bill_id,
+          amount: amt,
+          notes: globalPayForm.notes || `Paid wages to ${globalPayForm.group_name} (Bill #${globalPayForm.bill_id || 'N/A'})`,
+          payment_type: globalPayForm.payment_type
+        })
+      });
+
+      if (res.ok) {
+        setShowGlobalPayModal(false);
+        setGlobalPayForm({ group_name: "", bill_id: "", amount: "", notes: "", payment_type: "Cash" });
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBillIdChange = (val) => {
+    const foundEntry = workHistory.find(h => h.bill_id && String(h.bill_id) === String(val));
+    setGlobalPayForm(prev => ({
+      ...prev,
+      bill_id: val,
+      group_name: foundEntry ? foundEntry.group_name : ""
+    }));
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -227,6 +284,14 @@ export default function Labours() {
   const cashAvailable = getSelectedPaymentBalance();
   const isWagePayInsufficient = parseFloat(payForm.amount || 0) > cashAvailable;
 
+  const getSelectedGlobalPaymentBalance = () => {
+    if (globalPayForm.payment_type === 'Cash') return liveBalances['Cash'] || 0;
+    const cleanBank = globalPayForm.payment_type.replace('Bank - ', '');
+    return liveBalances[cleanBank] || 0;
+  };
+  const globalCashAvailable = getSelectedGlobalPaymentBalance();
+  const isGlobalWagePayInsufficient = parseFloat(globalPayForm.amount || 0) > globalCashAvailable;
+
   return (
     <div className="module-page">
       <div className="module-header">
@@ -243,9 +308,16 @@ export default function Labours() {
           </div>
         </div>
 
-        <button className="btn-primary" onClick={() => { setForm(emptyForm); setEditId(null); setIsNewGroup(false); setShowModal(true); }}>
-          <Plus size={18} /> Add New Labour
-        </button>
+        <div style={{display: 'flex', gap: '10px'}}>
+          {!selectedGroup && (
+            <button className="btn-primary" style={{background: '#10b981', borderColor: '#10b981', display: 'flex', alignItems: 'center', gap: '6px'}} onClick={() => { setGlobalPayForm({ group_name: "", bill_id: "", amount: "", notes: "", payment_type: "Cash" }); setShowGlobalPayModal(true); }}>
+              <Coins size={18} /> Send Labour Payment
+            </button>
+          )}
+          <button className="btn-primary" style={{display: 'flex', alignItems: 'center', gap: '6px'}} onClick={() => { setForm(emptyForm); setEditId(null); setIsNewGroup(false); setShowModal(true); }}>
+            <Plus size={18} /> Add New Labour
+          </button>
+        </div>
       </div>
 
       {/* Top Stats Cards */}
@@ -335,20 +407,18 @@ export default function Labours() {
                   <th>Labour Name</th>
                   <th>CNIC Number</th>
                   <th>Contact Number</th>
-                  <th>Daily Wage Rate</th>
                   <th style={{textAlign: 'center'}}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {selectedGroupLabours.length === 0 ? (
-                  <tr><td colSpan="5" className="empty-msg">No labors found inside this group.</td></tr>
+                  <tr><td colSpan="4" className="empty-msg">No labors found inside this group.</td></tr>
                 ) : (
                   selectedGroupLabours.map(l => (
                     <tr key={l.id}>
                       <td style={{fontWeight: 600, color: '#1e293b'}}>{l.name}</td>
                       <td>{l.cnic || "N/A"}</td>
                       <td>{l.contact || "N/A"}</td>
-                      <td style={{fontWeight: 700, color: '#0f766e'}}>Rs. {parseFloat(l.rate_per_day || 0).toLocaleString()}</td>
                       <td style={{textAlign: 'center'}}>
                         <ActionMenu 
                           onEdit={() => handleEdit(l)} 
@@ -433,13 +503,7 @@ export default function Labours() {
                 </div>
               </div>
 
-              <div className="form-group" style={{marginBottom: '15px'}}>
-                <label>Daily Wage Rate (Rs. / Day) *</label>
-                <div className="input-wrapper">
-                  <Hash size={18} />
-                  <input type="number" required placeholder="e.g. 1500" value={form.rate_per_day} onChange={(e) => setForm({ ...form, rate_per_day: e.target.value })} />
-                </div>
-              </div>
+
 
               <div className="form-group" style={{marginBottom: '20px'}}>
                 <label>Labour Group / Team *</label>
@@ -580,6 +644,95 @@ export default function Labours() {
                 <button type="button" className="btn-secondary" onClick={() => setShowWorkModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" style={{background: '#0f766e', borderColor: '#0f766e'}} disabled={loading}>
                   {loading ? "Processing..." : "Save Work Entry"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Modal: Send Labour Payment (Global) */}
+      {showGlobalPayModal && (
+        <div className="modal-overlay" onClick={() => setShowGlobalPayModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3>Send Labour Payment</h3>
+              <button className="modal-close" onClick={() => setShowGlobalPayModal(false)}><X size={20} /></button>
+            </div>
+
+            <form onSubmit={handleGlobalPayWages} className="custom-form">
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Bill / Invoice Number *</label>
+                <div className="input-wrapper">
+                  <Hash size={18} />
+                  <input type="text" required placeholder="e.g. 10452" value={globalPayForm.bill_id} onChange={(e) => handleBillIdChange(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Select Labour Group *</label>
+                <div className="input-wrapper">
+                  <Users size={18} />
+                  <select 
+                    value={globalPayForm.group_name} 
+                    onChange={(e) => setGlobalPayForm({ ...globalPayForm, group_name: e.target.value })}
+                    style={{width: '100%', padding: '12px 10px', borderRadius: '8px', border: 'none', outline: 'none', background: 'transparent'}}
+                    required
+                  >
+                    <option value="">{globalPayForm.group_name ? `Auto-selected: ${globalPayForm.group_name}` : "-- Choose Team / Group --"}</option>
+                    {existingGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Payment Method / Account *</label>
+                <div className="input-wrapper">
+                  <CreditCard size={18} />
+                  <select 
+                    value={globalPayForm.payment_type} 
+                    onChange={(e) => setGlobalPayForm({ ...globalPayForm, payment_type: e.target.value })}
+                    style={{width: '100%', padding: '12px 10px', borderRadius: '8px', border: 'none', outline: 'none', background: 'transparent'}}
+                    required
+                  >
+                    <option value="Cash">Cash Account (Main Counter)</option>
+                    {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
+                      <option key={b.id} value={`Bank - ${b.bank_name}`}>{b.bank_name} - {b.account_title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{background: '#f0fdf4', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between'}}>
+                <span style={{fontWeight: 600, color: '#15803d'}}>Available Balance:</span>
+                <span style={{fontWeight: 700, color: '#15803d'}}>Rs. {globalCashAvailable.toLocaleString()}</span>
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Amount Paid (Rs.) *</label>
+                <div className="input-wrapper">
+                  <Coins size={18} />
+                  <input type="number" required placeholder="0.00" value={globalPayForm.amount} onChange={(e) => setGlobalPayForm({ ...globalPayForm, amount: e.target.value })} />
+                </div>
+              </div>
+
+              {isGlobalWagePayInsufficient && (
+                <div style={{ color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '10px 14px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
+                  ⚠️ Insufficient Balance! Available: Rs. {globalCashAvailable.toLocaleString()}
+                </div>
+              )}
+
+              <div className="form-group" style={{marginBottom: '20px'}}>
+                <label>Notes / References *</label>
+                <div className="input-wrapper">
+                  <ArrowUpCircle size={18} />
+                  <input type="text" required placeholder="e.g. Paid Loading Charges" value={globalPayForm.notes} onChange={(e) => setGlobalPayForm({ ...globalPayForm, notes: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="form-actions" style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                <button type="button" className="btn-secondary" onClick={() => setShowGlobalPayModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" style={{background: '#10b981', borderColor: '#10b981'}} disabled={loading || isGlobalWagePayInsufficient}>
+                  {loading ? "Processing..." : "Confirm Payment"}
                 </button>
               </div>
             </form>
