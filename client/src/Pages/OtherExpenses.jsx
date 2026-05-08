@@ -212,8 +212,8 @@ export default function OtherExpenses({ type }) {
           
           <Column header="" body={(r) => (
             <ActionMenu
-              onEdit={() => { setForm(r); setEditId(r.id); setShowModal(true); }}
-              onDelete={() => handleDelete(r.id)}
+              onEdit={user?.email === 'admin@erp.com' ? () => { setForm(r); setEditId(r.id); setShowModal(true); } : null}
+              onDelete={user?.email === 'admin@erp.com' ? () => handleDelete(r.id) : null}
             />
           )} style={{ textAlign: 'center', width: '60px' }} />
         </DataTable>

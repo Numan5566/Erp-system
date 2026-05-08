@@ -10,11 +10,11 @@ import { AuthContext } from '../context/AuthContext';
  *   onDelete  — callback for delete action
  *   extraItems — (optional) additional menu items array
  */
-export default function ActionMenu({ onEdit, onDelete, extraItems = [] }) {
+export default function ActionMenu({ onEdit, onDelete, extraItems = [], bypassConfirm }) {
   const menuRef = useRef(null);
   const { user } = useContext(AuthContext);
 
-  const isAdmin = user?.role === 'admin' || user?.email === 'admin@erp.com';
+  const isAdmin = user?.email === 'admin@erp.com';
 
   const items = [
     ...(onEdit ? [{
@@ -27,7 +27,9 @@ export default function ActionMenu({ onEdit, onDelete, extraItems = [] }) {
       label: 'Delete',
       icon: 'pi pi-trash',
       command: (e) => {
-        if (window.confirm("Are you sure you want to delete this record?")) {
+        if (bypassConfirm) {
+          onDelete(e.originalEvent);
+        } else if (window.confirm("Are you sure you want to delete this record?")) {
           onDelete(e.originalEvent);
         }
       },

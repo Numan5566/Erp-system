@@ -51,7 +51,7 @@ export default function Transport({ type }) {
     if (showPaymentModal) {
       const fetchLiveBalances = async () => {
         try {
-          const res = await fetch('http://localhost:5000/api/banks/balances', {
+          const res = await fetch(`http://localhost:5000/api/banks/balances?type=${activeCounter}`, {
             headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
           });
           if (res.ok) {

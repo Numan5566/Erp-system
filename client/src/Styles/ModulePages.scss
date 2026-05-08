@@ -1566,12 +1566,12 @@
           }
 
           .cart-delete-btn {
-            background: transparent;
-            border: none;
-            color: #94a3b8;
+            background: #fee2e2;
+            border: 1px solid #fecdd3;
+            color: #ef4444;
             cursor: pointer;
-            width: 24px;
-            height: 24px;
+            width: 26px;
+            height: 26px;
             border-radius: 6px;
             display: flex;
             align-items: center;
@@ -1579,8 +1579,9 @@
             transition: all 0.2s ease;
 
             &:hover {
-              color: #ef4444;
-              background: #fef2f2;
+              color: #ffffff;
+              background: #dc2626;
+              border-color: #dc2626;
             }
           }
         }

@@ -99,6 +99,11 @@ router.get('/detail/:counter', auth, async (req, res) => {
     // Sales
     const salesRes = await pool.query(
       `SELECT s.id, s.customer_name, s.net_amount, s.paid_amount, s.balance_amount, s.payment_type, s.created_at,
+       (SELECT JSON_AGG(si) FROM (
+         SELECT si.id, si.product_id, si.product_name as name, si.qty, si.rate, si.subtotal
+         FROM sale_items si 
+         WHERE si.sale_id = s.id
+       ) si) as items,
        COALESCE(SUM(si.subtotal - (si.qty * COALESCE(p.cost_price, 0))), 0) as sale_profit
        FROM sales s
        LEFT JOIN sale_items si ON si.sale_id = s.id

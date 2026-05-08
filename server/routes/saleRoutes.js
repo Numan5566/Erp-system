@@ -364,7 +364,7 @@ router.post('/return', auth, async (req, res) => {
       const finalModule = isAdmin(req) ? (sale.sale_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
 
       const salesSum = await client.query("SELECT SUM(paid_amount) FROM sales WHERE payment_type LIKE $1 AND sale_type = $2", [searchPattern, finalModule]);
-      const expSum = await client.query("SELECT SUM(amount) FROM expenses WHERE payment_type LIKE $1 AND module_type = $2", [searchPattern, finalModule]);
+      const expSum = await client.query("SELECT SUM(CASE WHEN expense_type = 'Admin Payment' THEN -amount ELSE amount END) FROM expenses WHERE payment_type LIKE $1 AND module_type = $2", [searchPattern, finalModule]);
       
       // Purchases table filtering by module_type
       let supPaid = 0;

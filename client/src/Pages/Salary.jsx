@@ -251,8 +251,8 @@ export default function Salary({ type }) {
                   <td><span className={`status-badge ${r.status.toLowerCase()}`}>{r.status}</span></td>
                   <td style={{ textAlign: 'center' }}>
                     <ActionMenu
-                      onEdit={() => openEdit(r)}
-                      onDelete={() => handleDelete(r.id)}
+                      onEdit={user?.email === 'admin@erp.com' ? () => openEdit(r) : null}
+                      onDelete={user?.email === 'admin@erp.com' ? () => handleDelete(r.id) : null}
                       extraItems={[
                         { label: 'View Ledger', icon: 'pi pi-book', command: () => openLedger(r) }
                       ]}

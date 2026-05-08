@@ -99,9 +99,11 @@ router.get('/ledger/:id', auth, async (req, res) => {
        WHERE p.vehicle_id = $1`, [vId]
     );
 
-    // 3. Payments made to Vehicle
+    // 3. Payments/Expenses made to Vehicle
     const payments = await pool.query(
-      `SELECT id, 'Payment Sent' as party_name, amount, expense_date as date, 'Payment' as trip_type, payment_type
+      `SELECT id, description as party_name, amount, expense_date as date, 
+              CASE WHEN category = 'Fare Payment' THEN 'Payment' ELSE 'Expense (Deduction)' END as trip_type, 
+              payment_type
        FROM expenses WHERE vehicle_id = $1`, [vId]
     );
 

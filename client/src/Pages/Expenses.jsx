@@ -47,7 +47,7 @@ export default function Expenses({ type }) {
     if (showModal) {
       const fetchLiveBalances = async () => {
         try {
-          const res = await fetch('http://localhost:5000/api/banks/balances', {
+          const res = await fetch(`http://localhost:5000/api/banks/balances?type=${activeTab}`, {
             headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
           });
           if (res.ok) {
@@ -128,7 +128,7 @@ export default function Expenses({ type }) {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ ...form, payment_type: finalPaymentType, module_type: activeTab }),
+        body: JSON.stringify({ ...form, payment_type: finalPaymentType, module_type: activeTab, vehicle_id: form.expense_type === "Personal Vehicle" ? form.vehicle_id : null }),
       });
       if (res.ok) {
         setShowModal(false);
@@ -157,7 +157,8 @@ export default function Expenses({ type }) {
 
   const targetAccountName = form.payment_source === 'Bank' ? form.bank_name : 'Cash';
   const availableBal = liveBalances[targetAccountName] || 0;
-  const isInsufficient = parseFloat(form.amount || 0) > availableBal;
+  const isInsufficient = form.payment_source === 'Bank' && parseFloat(form.amount || 0) > availableBal;
+  const isCashInsufficient = form.payment_source !== 'Bank' && parseFloat(form.amount || 0) > availableBal;
 
   return (
     <div className="module-page">
@@ -261,8 +262,8 @@ export default function Expenses({ type }) {
                   <td className="bold text-red">Rs. {parseFloat(r.amount).toLocaleString()}</td>
                   <td style={{ textAlign: 'center' }}>
                     <ActionMenu 
-                      onEdit={() => { setForm(r); setEditId(r.id); setShowModal(true); }}
-                      onDelete={() => handleDelete(r.id)}
+                      onEdit={user?.email === 'admin@erp.com' ? () => { setForm(r); setEditId(r.id); setShowModal(true); } : null}
+                      onDelete={user?.email === 'admin@erp.com' ? () => handleDelete(r.id) : null}
                       extraItems={r.payment_type === 'Pending' ? [
                         { label: 'Payable', icon: 'pi pi-wallet', command: () => { setSelectedExpForPay(r); setShowPayModal(true); } }
                       ] : []}
@@ -292,12 +293,15 @@ export default function Expenses({ type }) {
                     <select value={form.expense_type} onChange={(e) => {
                       const nextType = e.target.value;
                       let nextCat = "General";
+                      let nextVehId = null;
                       if (nextType === "Personal Vehicle") {
-                        nextCat = personalVehicles[0] ? `${personalVehicles[0].vehicle_number} (${personalVehicles[0].driver_name})` : "None";
+                        const firstVeh = personalVehicles[0];
+                        nextCat = firstVeh ? `${firstVeh.vehicle_number} (${firstVeh.driver_name})` : "None";
+                        nextVehId = firstVeh ? firstVeh.id : null;
                       } else {
                         nextCat = CATEGORIES[nextType] ? CATEGORIES[nextType][0] : "General";
                       }
-                      setForm({...form, expense_type: nextType, category: nextCat});
+                      setForm({...form, expense_type: nextType, category: nextCat, vehicle_id: nextVehId});
                     }}>
                       <option value="Office">Office Expense</option>
                       <option value="House">House Expense</option>
@@ -309,7 +313,15 @@ export default function Expenses({ type }) {
                   <label>Category</label>
                   <div className="input-wrapper">
                     <FileText size={18} />
-                    <select value={form.category} onChange={(e) => setForm({...form, category: e.target.value})}>
+                    <select value={form.category} onChange={(e) => {
+                      const catVal = e.target.value;
+                      if (form.expense_type === "Personal Vehicle") {
+                        const matchedVeh = personalVehicles.find(v => `${v.vehicle_number} (${v.driver_name})` === catVal);
+                        setForm({...form, category: catVal, vehicle_id: matchedVeh ? matchedVeh.id : null});
+                      } else {
+                        setForm({...form, category: catVal, vehicle_id: null});
+                      }
+                    }}>
                       {form.expense_type === "Personal Vehicle" ? (
                         personalVehicles.map(v => (
                           <option key={v.id} value={`${v.vehicle_number} (${v.driver_name})`}>
@@ -375,6 +387,11 @@ export default function Expenses({ type }) {
               {isInsufficient && (
                 <div style={{ color: '#ef4444', background: '#fef2f2', border: '1px solid #fee2e2', padding: '10px 14px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
                   ⚠️ Insufficient Balance! Available: Rs. {availableBal.toLocaleString()}
+                </div>
+              )}
+              {isCashInsufficient && (
+                <div style={{ color: '#ca8a04', background: '#fef9c3', border: '1px solid #fef08a', padding: '10px 14px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                  ⚠️ Negative Cash Balance Warning! Available: Rs. {availableBal.toLocaleString()} (Saving is allowed)
                 </div>
               )}
 

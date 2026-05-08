@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import { 
   ShoppingCart, Search, Trash2, User, Plus, Minus, 
   Printer, CreditCard, Banknote, Truck, Tag, X, CheckCircle, Pencil,
@@ -74,6 +74,17 @@ export default function Billing({ type }) {
   const [editId, setEditId] = useState(null);
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [ledgerData, setLedgerData] = useState([]);
+  const calculatedLedgerData = useMemo(() => {
+    let currentBal = 0;
+    const sortedAsc = [...ledgerData].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const withRunning = sortedAsc.map(row => {
+      const debit = parseFloat(row.net_amount || 0);
+      const credit = parseFloat(row.paid_amount || 0);
+      currentBal += (debit - credit);
+      return { ...row, running_balance: currentBal };
+    });
+    return withRunning.reverse();
+  }, [ledgerData]);
   const [ledgerFrom, setLedgerFrom] = useState("");
   const [ledgerTo, setLedgerTo] = useState("");
   const [ledgerFilter, setLedgerFilter] = useState("all");
@@ -1054,27 +1065,34 @@ export default function Billing({ type }) {
                   <span><strong>Date:</strong> {new Date().toLocaleDateString()}</span>
                 </div>
               </div>
-
               <table style={{width: '100%', borderCollapse: 'collapse', marginTop: '10px'}}>
                 <thead>
                   <tr style={{background: '#f1f5f9'}}>
                     <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Date</th>
                     <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Bill No / Items</th>
-                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Total Amount</th>
-                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Paid</th>
-                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Balance Impact</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Debit (+)</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Credit (-)</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Balance</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ledgerData.map(row => (
+                  {calculatedLedgerData.map(row => (
                     <tr key={row.id}>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.created_at).toLocaleDateString()}</td>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>
-                        #{row.id} - {typeof row.items === 'string' ? JSON.parse(row.items).map(i => i.name).join(", ") : (row.items || []).map(i => i.name).join(", ")}
+                        {parseFloat(row.net_amount) > 0 ? (
+                          (() => {
+                            let items = [];
+                            try {
+                              items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
+                            } catch (e) { items = []; }
+                            return `#SAL-${row.id} - ` + items.map(i => `${i.name} (${i.qty} x Rs.${i.rate})`).join(', ');
+                          })()
+                        ) : `#PAY-${row.id} - Payment Received (${row.payment_type || 'Cash'})`}
                       </td>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.net_amount).toLocaleString()}</td>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.paid_amount).toLocaleString()}</td>
-                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.balance_amount).toLocaleString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.running_balance).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1138,29 +1156,57 @@ export default function Billing({ type }) {
                     <tr>
                       <th>Date</th>
                       <th>Bill Details</th>
-                      <th>Total Amount</th>
-                      <th>Paid Now</th>
-                      <th>Balance Impact</th>
+                      <th>Debit (+)</th>
+                      <th>Credit (-)</th>
+                      <th>Balance</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {ledgerData.length === 0 ? (
+                    {calculatedLedgerData.length === 0 ? (
                       <tr><td colSpan="5" className="empty-msg">No sales history found for this customer.</td></tr>
                     ) : (
-                      ledgerData.map((row) => (
+                      calculatedLedgerData.map((row) => (
                         <tr key={row.id}>
                           <td>{new Date(row.created_at).toLocaleDateString()}</td>
                           <td>
-                            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                              <strong>Invoice #SAL-{row.id}</strong>
-                              {row.status === 'Returned' && <span style={{fontSize: '10px', background: '#fee2e2', color: '#b91c1c', padding: '2px 6px', borderRadius: '4px', fontWeight: 800}}>RETURNED</span>}
-                              {row.status === 'Partially Returned' && <span style={{fontSize: '10px', background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: '4px', fontWeight: 800}}>PARTIAL</span>}
-                            </div>
-                            <br/><small style={{color:'#64748b'}}>{typeof row.items === 'string' ? JSON.parse(row.items).map(i => i.name).join(", ") : (row.items || []).map(i => i.name).join(", ")}</small>
+                            {parseFloat(row.net_amount) > 0 ? (
+                              <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                                <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                  <strong>Invoice #SAL-{row.id}</strong>
+                                  {row.status === 'Returned' && <span style={{fontSize: '10px', background: '#fee2e2', color: '#b91c1c', padding: '2px 6px', borderRadius: '4px', fontWeight: 800}}>RETURNED</span>}
+                                  {row.status === 'Partially Returned' && <span style={{fontSize: '10px', background: '#fef3c7', color: '#92400e', padding: '2px 6px', borderRadius: '4px', fontWeight: 800}}>PARTIAL</span>}
+                                </div>
+                                {(() => {
+                                  let items = [];
+                                  try {
+                                    items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
+                                  } catch (e) { items = []; }
+                                  
+                                  return (
+                                    <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                                      {items.map((item, idx) => (
+                                          <div key={idx} style={{display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '4px 8px', borderRadius: '4px', border: '1px solid #e2e8f0'}}>
+                                            <span style={{fontSize: '0.8rem', fontWeight: 600, flex: 1}}>{item.name}</span>
+                                            <span style={{fontSize: '0.8rem', color: '#64748b'}}>{item.qty} x Rs.{item.rate}</span>
+                                            <span style={{fontSize: '0.8rem', fontWeight: 700, color: '#3b82f6', minWidth: '60px', textAlign: 'right'}}>
+                                              Rs. {(parseFloat(item.qty) * parseFloat(item.rate)).toLocaleString()}
+                                            </span>
+                                          </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            ) : (
+                              <div>
+                                <strong>Payment Received</strong>
+                                <br/><small style={{color:'#64748b'}}>{row.payment_type || 'Cash'}</small>
+                              </div>
+                            )}
                           </td>
                           <td className="bold">Rs. {parseFloat(row.net_amount).toLocaleString()}</td>
                           <td className="text-green">Rs. {parseFloat(row.paid_amount).toLocaleString()}</td>
-                          <td className="text-red">Rs. {parseFloat(row.balance_amount).toLocaleString()}</td>
+                          <td className="bold">Rs. {parseFloat(row.running_balance).toLocaleString()}</td>
                         </tr>
                       ))
                     )}

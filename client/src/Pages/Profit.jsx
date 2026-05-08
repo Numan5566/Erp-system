@@ -310,7 +310,21 @@ export default function Profit() {
             {activeTab === 'sales' && (
               <DataTable value={detail.sales} paginator rows={10} className="p-datatable-sm" stripedRows emptyMessage="No sales found.">
                 <Column header="Date"     body={r => fmtDate(r.created_at)} sortable field="created_at" />
-                <Column header="Customer" field="customer_name" sortable />
+                <Column header="Customer / Details" body={r => (
+                  <div>
+                    <strong style={{fontSize: '0.9rem', color: '#1e293b'}}>{r.customer_name}</strong>
+                    {r.items && (
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px'}}>
+                        {(typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || [])).map((item, idx) => (
+                          <div key={idx} style={{fontSize: '0.75rem', color: '#475569', background: '#f8fafc', padding: '2px 6px', borderRadius: '4px', border: '1px solid #e2e8f0', display: 'inline-flex', gap: '8px', width: 'fit-content', alignItems: 'center'}}>
+                            <span style={{fontWeight: 600}}>{item.name}</span>
+                            <span style={{color: '#64748b'}}>{item.qty} x Rs.{item.rate}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )} sortable field="customer_name" />
                 <Column header="Total"    body={r => <span style={{fontWeight:700,color:'#1e293b'}}>{fmt(r.net_amount)}</span>} sortable field="net_amount" />
                 <Column header="Paid"     body={r => <span style={{color:'#16a34a',fontWeight:700}}>{fmt(r.paid_amount)}</span>} sortable field="paid_amount" />
                 <Column header="Balance"  body={r => <span style={{color: parseFloat(r.balance_amount) > 0 ? '#e11d48' : '#16a34a', fontWeight:700}}>{fmt(r.balance_amount)}</span>} sortable field="balance_amount" />

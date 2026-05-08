@@ -97,7 +97,27 @@ export default function Accounts() {
   });
   const [showAdminBankModal, setShowAdminBankModal] = useState(false);
   const [adminBankForm, setAdminBankForm] = useState({ bank_name: "", account_title: "", account_number: "" });
+  const [showDeleteWarning, setShowDeleteWarning] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [showBankSelectorModal, setShowBankSelectorModal] = useState(false);
+
+  const [showAdminPaymentModal, setShowAdminPaymentModal] = useState(false);
+  const [adminPaymentForm, setAdminPaymentForm] = useState({
+    amount: "",
+    admin_bank_id: "",
+    payment_type: "Cash",
+    notes: ""
+  });
+
+  const getAdminBankBalance = (acc) => {
+    const received = generalExpenses
+      .filter(e => (e.expense_type === 'Galla Closeout' || e.title === 'Galla Closeout' || e.description?.includes('Galla Closeout') || e.notes?.includes('Recipient Bank')) && e.notes?.includes(acc.bank_name) && e.notes?.includes(acc.account_number))
+      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+    const paid = generalExpenses
+      .filter(e => e.expense_type === 'Admin Payment' && e.notes?.includes(acc.bank_name) && e.notes?.includes(acc.account_number))
+      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+    return received - paid;
+  };
 
   const getSourceBalance = (method) => {
     if (method.toLowerCase() === 'cash') return totalCash;
@@ -217,6 +237,45 @@ export default function Accounts() {
     setLoading(false);
   };
 
+  const handleAdminPaymentSubmit = async (e) => {
+    e.preventDefault();
+    if (!adminPaymentForm.admin_bank_id) {
+      alert("Please select the source Admin Bank Account!");
+      return;
+    }
+    setLoading(true);
+    try {
+      const selectedBank = displayAccounts.find(acc => acc.id === adminPaymentForm.admin_bank_id || String(acc.id) === String(adminPaymentForm.admin_bank_id));
+      const bankDetailsText = selectedBank ? `Admin Bank: ${selectedBank.bank_name} (A/C: ${selectedBank.account_number}, Title: ${selectedBank.account_title || 'N/A'})` : '';
+      const submissionData = {
+        amount: parseFloat(adminPaymentForm.amount) || 0,
+        payment_type: adminPaymentForm.payment_type,
+        module_type: user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale'),
+        notes: bankDetailsText ? `${bankDetailsText}. ${adminPaymentForm.notes}` : adminPaymentForm.notes
+      };
+      const res = await fetch('http://localhost:5000/api/banks/admin-payment', {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(submissionData)
+      });
+
+      if (res.ok) {
+        setShowAdminPaymentModal(false);
+        setAdminPaymentForm({ amount: "", admin_bank_id: "", payment_type: "Cash", notes: "" });
+        fetchAccounts();
+        fetchSales();
+        fetchSupplierPayments();
+        fetchOthers();
+      }
+    } catch (err) {
+      console.error('Failed to submit admin payment', err);
+    }
+    setLoading(false);
+  };
+
 
   // Fetch bank accounts
   const fetchAccounts = async () => {
@@ -261,20 +320,31 @@ export default function Accounts() {
   // Fetch all other modules
   const fetchOthers = async () => {
     const h = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
+    
     try {
-      const [salRes, rentRes, invRes, othRes, expRes] = await Promise.all([
-        fetch('http://localhost:5000/api/salary', { headers: h }),
-        fetch('http://localhost:5000/api/rent', { headers: h }),
-        fetch('http://localhost:5000/api/investments', { headers: h }),
-        fetch('http://localhost:5000/api/other-expenses', { headers: h }),
-        fetch('http://localhost:5000/api/expenses', { headers: h })
-      ]);
-      setSalaries(await salRes.json());
-      setRents(await rentRes.json());
-      setInvestments(await invRes.json());
-      setOtherExpenses(await othRes.json());
-      setGeneralExpenses(await expRes.json());
-    } catch (err) { console.error(err); }
+      const res = await fetch('http://localhost:5000/api/salary', { headers: h });
+      if (res.ok) setSalaries(await res.json());
+    } catch (err) { console.error("Failed to fetch salaries:", err); }
+
+    try {
+      const res = await fetch('http://localhost:5000/api/rent', { headers: h });
+      if (res.ok) setRents(await res.json());
+    } catch (err) { console.error("Failed to fetch rents:", err); }
+
+    try {
+      const res = await fetch('http://localhost:5000/api/investments', { headers: h });
+      if (res.ok) setInvestments(await res.json());
+    } catch (err) { console.error("Failed to fetch investments:", err); }
+
+    try {
+      const res = await fetch('http://localhost:5000/api/other-expenses', { headers: h });
+      if (res.ok) setOtherExpenses(await res.json());
+    } catch (err) { console.error("Failed to fetch other expenses:", err); }
+
+    try {
+      const res = await fetch('http://localhost:5000/api/expenses', { headers: h });
+      if (res.ok) setGeneralExpenses(await res.json());
+    } catch (err) { console.error("Failed to fetch general expenses:", err); }
   };
 
   // Initialise data on mount
@@ -292,13 +362,14 @@ export default function Accounts() {
       const method = editId ? "PUT" : "POST";
       const url = editId ? `http://localhost:5000/api/banks/${editId}` : 'http://localhost:5000/api/banks';
       
+      const module_type = user?.email === 'admin@erp.com' ? activeTab : (user?.module_type || 'Wholesale');
       await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ ...form, module_type: activeTab })
+        body: JSON.stringify({ ...form, module_type })
       });
 
       setShowModal(false);
@@ -369,12 +440,27 @@ export default function Accounts() {
     return parseFloat(s.paid_amount || 0);
   };
 
+  const getAmountKeptAsOpening = (closeout) => {
+    if (!closeout) return 0;
+    const match = closeout.notes?.match(/Opening balance Rs\.\s*([\d.]+)/);
+    return match ? parseFloat(match[1]) : 0;
+  };
+
   const filteredCloseouts = useMemo(() => {
     return filteredGeneralExpenses.filter(e => e.expense_type === 'Galla Closeout');
   }, [filteredGeneralExpenses]);
 
+  const latestCloseout = useMemo(() => {
+    if (filteredCloseouts.length === 0) return null;
+    return [...filteredCloseouts].sort((a, b) => new Date(a.created_at || a.expense_date || a.date) - new Date(b.created_at || b.expense_date || b.date))[0];
+  }, [filteredCloseouts]);
+
+  const latestCloseoutDate = useMemo(() => {
+    return latestCloseout ? new Date(latestCloseout.created_at || latestCloseout.expense_date || latestCloseout.date) : null;
+  }, [latestCloseout]);
+
   const paymentSummary = useMemo(() => {
-    return [
+    const resSummary = [
       ...filteredSales, 
       ...filteredInvestments.map(i => ({ ...i, isIncome: true, payment_type: 'Cash' })),
       ...filteredCloseouts.map(e => ({ ...e, isExpense: true })),
@@ -382,11 +468,13 @@ export default function Accounts() {
       ...filteredSupplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
         ...p, isExpense: true, isTransportFare: true, amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash'
       })),
-      ...filteredGeneralExpenses.filter(e => e.expense_type !== 'Galla Closeout').map(e => ({ ...e, isExpense: true })),
+      ...filteredGeneralExpenses.filter(e => e.expense_type !== 'Galla Closeout' && e.expense_type !== 'Admin Payment').map(e => ({ ...e, isExpense: true })),
+      ...filteredGeneralExpenses.filter(e => e.expense_type === 'Admin Payment').map(e => ({ ...e, isIncome: true, payment_type: e.payment_type })),
       ...filteredSalaries.map(s => ({ ...s, isExpense: true, payment_type: 'Cash' })),
       ...filteredRents.map(r => ({ ...r, isExpense: true, payment_type: 'Cash' })),
       ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, payment_type: o.payment_method }))
-    ].reduce((acc, s) => {
+    ].sort((a, b) => new Date(a.created_at || a.expense_date || a.purchase_date || a.date) - new Date(b.created_at || b.expense_date || b.purchase_date || b.date))
+    .reduce((acc, s) => {
       const method = s.payment_type || 'Cash';
       let cleanMethod = method.replace('Bank - ', '');
       if (cleanMethod === 'Cash Account' || cleanMethod.toLowerCase() === 'cash') {
@@ -399,29 +487,42 @@ export default function Accounts() {
       
       if (s.isExpense) {
         acc[cleanMethod] -= amount;
+        if (acc[cleanMethod] < 0) {
+          acc[cleanMethod] = 0;
+        }
       } else {
         acc[cleanMethod] += amount;
       }
       return acc;
-    }, filteredAccounts.reduce((acc, b) => {
+    }, filteredAccounts.filter(b => b.module_type !== 'Admin Recipient').reduce((acc, b) => {
       let name = b.bank_name.replace(' Account', '');
       if (name.toLowerCase() === 'cash') name = 'Cash';
       if (!acc[name]) acc[name] = 0;
       acc[name] += parseFloat(b.opening_balance) || 0;
       return acc;
     }, { 'Cash': 0 }));
+
+    console.log("=== Accounts Debug ===");
+    console.log("activeTab:", activeTab);
+    console.log("filteredGeneralExpenses:", filteredGeneralExpenses);
+    console.log("calculated summary:", resSummary);
+    return resSummary;
   }, [filteredSales, filteredInvestments, filteredCloseouts, filteredSupplierPayments, filteredGeneralExpenses, filteredSalaries, filteredRents, filteredOtherExpenses, filteredAccounts]);
 
 
-  const totalCash = Math.max(0, paymentSummary['Cash'] || 0);
-  const totalBank = Math.max(0, Object.entries(paymentSummary)
+  const totalCash = paymentSummary['Cash'] || 0;
+  const totalBank = Object.entries(paymentSummary)
     .filter(([k]) => k !== 'Cash')
-    .reduce((sum, [, v]) => sum + v, 0));
+    .reduce((sum, [, v]) => sum + v, 0);
 
   const totalAdminReceived = useMemo(() => {
-    return generalExpenses
+    const received = generalExpenses
       .filter(e => e.expense_type === 'Galla Closeout' || e.title === 'Galla Closeout' || e.description?.includes('Galla Closeout') || e.notes?.includes('Recipient Bank'))
       .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+    const paid = generalExpenses
+      .filter(e => e.expense_type === 'Admin Payment')
+      .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+    return received - paid;
   }, [generalExpenses]);
 
   // Filter all transactions for the selected ledger account and date range
@@ -430,17 +531,41 @@ export default function Accounts() {
       ...filteredSales, 
       ...filteredSupplierPayments.map(p => ({ ...p, isExpense: true, customer_name: p.supplier_name || 'Supplier', amount: p.paid_amount, created_at: p.purchase_date })),
       ...filteredSupplierPayments.filter(p => parseFloat(p.delivery_charges) > 0).map(p => ({
-        ...p, isExpense: true, customer_name: `Fare: ${p.vehicle_number || 'Vehicle'}`, 
-        amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
+        ...p, isExpense: true, isTransportFare: true, amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
         created_at: p.purchase_date, isTransportFare: true
       })),
-      ...filteredGeneralExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
+      ...filteredGeneralExpenses.map(e => {
+        if (e.expense_type === 'Admin Payment') {
+          return {
+            ...e,
+            isExpense: false,
+            isIncome: true,
+            customer_name: e.description || `Received Admin Payment`,
+            created_at: e.expense_date
+          };
+        }
+        return {
+          ...e,
+          isExpense: true,
+          customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`,
+          created_at: e.expense_date
+        };
+      }),
       ...filteredSalaries.map(s => ({ ...s, isExpense: true, customer_name: `Salary: ${s.employee_name}`, payment_type: 'Cash', created_at: s.payment_date })),
       ...filteredRents.map(r => ({ ...r, isExpense: true, customer_name: `Rent: ${r.property_name}`, payment_type: 'Cash', created_at: r.rent_date })),
       ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, customer_name: `Other: ${o.title}`, payment_type: o.payment_method, created_at: o.date })),
       ...filteredInvestments.map(i => ({ ...i, isIncome: true, customer_name: `Invest: ${i.investor}`, payment_type: 'Cash', created_at: i.date }))
     ].map(s => {
         if (selectedLedgerAccount?.module_type === 'Admin Recipient') {
+          const isAdminPayment = s.expense_type === 'Admin Payment' || s.title?.includes('Admin Payment') || s.customer_name?.includes('Admin Payment');
+          if (isAdminPayment && s.notes?.includes(selectedLedgerAccount.bank_name) && s.notes?.includes(selectedLedgerAccount.account_number)) {
+            return {
+              ...s,
+              isExpense: true,
+              isIncome: false,
+              customer_name: `Sent Admin Payment`
+            };
+          }
           const isGallaCloseout = s.customer_name?.includes('Galla Closeout') || s.title?.includes('Galla Closeout') || s.notes?.includes('Recipient Bank') || String(s.notes).includes(selectedLedgerAccount.bank_name);
           if (isGallaCloseout && s.notes?.includes(selectedLedgerAccount.bank_name) && s.notes?.includes(selectedLedgerAccount.account_number)) {
             return {
@@ -463,7 +588,7 @@ export default function Accounts() {
         const isAccCash = selectedLedgerAccount.isCash || selectedLedgerAccount.bank_name.toLowerCase() === 'cash' || selectedLedgerAccount.bank_name.toLowerCase() === 'cash account';
         
         if (selectedLedgerAccount.module_type === 'Admin Recipient') {
-          return s.customer_name === 'Received Galla Handover' && s.notes?.includes(selectedLedgerAccount.bank_name) && s.notes?.includes(selectedLedgerAccount.account_number);
+          return (s.customer_name === 'Received Galla Handover' || s.customer_name === 'Sent Admin Payment') && s.notes?.includes(selectedLedgerAccount.bank_name) && s.notes?.includes(selectedLedgerAccount.account_number);
         }
 
         let accountMatch = isAccCash ? method === 'Cash' : method === selectedLedgerAccount.bank_name;
@@ -488,10 +613,15 @@ export default function Accounts() {
   const calculatedTransactions = useMemo(() => {
     const sortedAsc = [...ledgerTransactions].sort((a, b) => new Date(a.created_at || a.purchase_date || a.date || a.created_at) - new Date(b.created_at || b.purchase_date || b.date || b.created_at));
     let currentBal = parseFloat(selectedLedgerAccount?.opening_balance || 0);
+    const isCashAcc = selectedLedgerAccount?.isCash || selectedLedgerAccount?.bank_name.toLowerCase() === 'cash' || selectedLedgerAccount?.bank_name.toLowerCase() === 'cash account';
+    
     const withRunning = sortedAsc.map(t => {
       const amt = getTransactionAmount(t);
       if (t.isExpense) {
         currentBal -= amt;
+        if (selectedLedgerAccount?.module_type !== 'Admin Recipient' && currentBal < 0) {
+          currentBal = 0;
+        }
       } else {
         currentBal += amt;
       }
@@ -513,13 +643,14 @@ export default function Accounts() {
       }
     });
     const opening = parseFloat(selectedLedgerAccount?.opening_balance || 0);
+    const closing = calculatedTransactions.length > 0 ? calculatedTransactions[0].running_balance : opening;
     return {
       opening,
       totalIn,
       totalOut,
-      closing: opening + totalIn - totalOut
+      closing
     };
-  }, [ledgerTransactions, selectedLedgerAccount]);
+  }, [ledgerTransactions, selectedLedgerAccount, calculatedTransactions]);
 
   const getRecentTransactionsForAccount = (acc) => {
     const isCash = acc.isCash || acc.bank_name.toLowerCase() === 'cash' || acc.bank_name.toLowerCase() === 'cash account';
@@ -531,7 +662,23 @@ export default function Accounts() {
         amount: p.delivery_charges, payment_type: p.fare_payment_type || 'Cash', 
         created_at: p.purchase_date, isTransportFare: true
       })),
-      ...filteredGeneralExpenses.map(e => ({ ...e, isExpense: true, customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`, created_at: e.expense_date })),
+      ...filteredGeneralExpenses.map(e => {
+        if (e.expense_type === 'Admin Payment') {
+          return {
+            ...e,
+            isExpense: false,
+            isIncome: true,
+            customer_name: e.description || `Received Admin Payment`,
+            created_at: e.expense_date
+          };
+        }
+        return {
+          ...e,
+          isExpense: true,
+          customer_name: `General Expense: ${e.title || e.description || 'Office Expense'}`,
+          created_at: e.expense_date
+        };
+      }),
       ...filteredSalaries.map(s => ({ ...s, isExpense: true, customer_name: `Salary: ${s.employee_name}`, payment_type: 'Cash', created_at: s.payment_date })),
       ...filteredRents.map(r => ({ ...r, isExpense: true, customer_name: `Rent: ${r.property_name}`, payment_type: 'Cash', created_at: r.rent_date })),
       ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, customer_name: `Other: ${o.title}`, payment_type: o.payment_method, created_at: o.date })),
@@ -547,11 +694,20 @@ export default function Accounts() {
             customer_name: `Received Galla Handover`
           };
         }
+        const isAdminPayment = s.expense_type === 'Admin Payment';
+        if (isAdminPayment && s.notes?.includes(acc.bank_name) && s.notes?.includes(acc.account_number)) {
+          return {
+            ...s,
+            isExpense: true,
+            isIncome: false,
+            customer_name: `Sent Admin Payment`
+          };
+        }
       }
       return s;
     }).filter(s => {
       if (acc.module_type === 'Admin Recipient') {
-        return s.customer_name === 'Received Galla Handover' && s.notes?.includes(acc.bank_name) && s.notes?.includes(acc.account_number);
+        return (s.customer_name === 'Received Galla Handover' || s.customer_name === 'Sent Admin Payment') && s.notes?.includes(acc.bank_name) && s.notes?.includes(acc.account_number);
       }
       const payType = (s.payment_type || 'Cash').replace('Bank - ', '');
       return isCash ? (payType === 'Cash' || payType === 'Cash Account') : payType === acc.bank_name;
@@ -698,6 +854,12 @@ export default function Accounts() {
         <div className="module-actions" style={{display: 'flex', gap: '10px'}}>
           <Button label="Galla Closeout" icon="pi pi-lock" onClick={handleOpenCloseout} className="p-button-warning" style={{borderRadius: '12px'}} />
           {user?.email === 'admin@erp.com' && (
+            <Button label="Send Admin Payment" icon="pi pi-download" onClick={() => {
+              setAdminPaymentForm({ amount: "", admin_bank_id: "", payment_type: "Cash", notes: "" });
+              setShowAdminPaymentModal(true);
+            }} className="p-button-info" style={{borderRadius: '12px'}} />
+          )}
+          {user?.email === 'admin@erp.com' && (
             <Button label="Add Recipient Bank" icon="pi pi-plus-circle" onClick={() => { setAdminBankForm({ bank_name: "", account_title: "", account_number: "" }); setShowAdminBankModal(true); }} className="p-button-success" style={{borderRadius: '12px'}} />
           )}
           <Button label="Add Bank Account" icon="pi pi-plus" onClick={() => { setEditId(null); setForm({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 }); setShowModal(true); }} className="p-button-primary" style={{borderRadius: '12px'}} />
@@ -723,16 +885,14 @@ export default function Accounts() {
             let bal = summaryKey ? paymentSummary[summaryKey] : 0;
             
             if (acc.module_type === 'Admin Recipient') {
-              bal = generalExpenses
-                .filter(e => (e.title === 'Galla Closeout' || e.description?.includes('Galla Closeout') || e.notes?.includes('Recipient Bank')) && e.notes?.includes(acc.bank_name) && e.notes?.includes(acc.account_number))
-                .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+              bal = getAdminBankBalance(acc);
+            } else if (bal < 0) {
+              bal = 0;
             }
             const recent = getRecentTransactionsForAccount(acc);
             const isAdminRecipient = acc.module_type === 'Admin Recipient';
             
-            if (!isAdminRecipient && bal < 0) {
-              bal = 0;
-            }
+
 
             return (
               <div key={acc.id} 
@@ -856,23 +1016,21 @@ export default function Accounts() {
             const cleanName = acc.bank_name.replace(' Account', '');
             const summaryKey = Object.keys(paymentSummary).find(k => k.toLowerCase() === cleanName.toLowerCase() || k.toLowerCase() === acc.bank_name.toLowerCase());
             let bal = summaryKey ? paymentSummary[summaryKey] : 0;
-            if (acc.module_type !== 'Admin Recipient' && bal < 0) {
+            if (acc.module_type === 'Admin Recipient') {
+              bal = getAdminBankBalance(acc);
+            } else if (bal < 0) {
               bal = 0;
             }
             return <div style={{fontWeight: 900, color: '#16a34a', fontSize: '1.1rem'}}>Rs. {bal.toLocaleString()}</div>
           }} />
           <Column header="" body={acc => {
-            const isOwnAccount = user?.role === 'admin' || acc.user_id === user?.id;
+            const isAdmin = user?.email === 'admin@erp.com';
             return (
               <ActionMenu 
-                onDelete={acc.isCash || !isOwnAccount ? null : () => handleDelete(acc.id)} 
+                onEdit={acc.isCash || !isAdmin ? null : () => handleEdit(acc)}
+                onDelete={null}
+                bypassConfirm={true}
                 extraItems={[
-                  { 
-                    label: 'Edit Account', 
-                    icon: 'pi pi-pencil', 
-                    command: () => handleEdit(acc),
-                    disabled: acc.isCash || user?.email !== 'admin@erp.com'
-                  },
                   { 
                     label: 'View Ledger', 
                     icon: 'pi pi-book', 
@@ -1359,6 +1517,119 @@ export default function Accounts() {
         </div>
       )}
 
+      {showAdminPaymentModal && (
+        <div className="modal-overlay" onClick={() => setShowAdminPaymentModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Send Admin Payment to Shop</h3>
+              <button className="modal-close" onClick={() => setShowAdminPaymentModal(false)}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleAdminPaymentSubmit} className="custom-form p-fluid">
+              <div className="field mb-3">
+                <label className="block mb-2 font-bold" style={{color: '#1e293b'}}>Admin Bank Account (Source) *</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon">🏦</span>
+                  <select 
+                    required 
+                    value={adminPaymentForm.admin_bank_id} 
+                    className="p-inputtext p-component"
+                    style={{borderRadius: '0 8px 8px 0', padding: '10px'}}
+                    onChange={e => setAdminPaymentForm(prev => ({ ...prev, admin_bank_id: e.target.value }))}
+                  >
+                    <option value="">-- Select Source Admin Bank --</option>
+                    {displayAccounts.filter(acc => acc.module_type === 'Admin Recipient').map(acc => {
+                      const balance = getAdminBankBalance(acc);
+                      return (
+                        <option key={acc.id} value={acc.id}>{acc.bank_name} - {acc.account_title} (Rs. {balance.toLocaleString()})</option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
+
+              {displayAccounts.find(acc => acc.id === adminPaymentForm.admin_bank_id || String(acc.id) === String(adminPaymentForm.admin_bank_id)) && (() => {
+                const selectedSourceBank = displayAccounts.find(acc => acc.id === adminPaymentForm.admin_bank_id || String(acc.id) === String(adminPaymentForm.admin_bank_id));
+                const balance = getAdminBankBalance(selectedSourceBank);
+                return (
+                  <div style={{
+                    background: '#eff6ff',
+                    padding: '15px',
+                    borderRadius: '12px',
+                    border: '1px solid #bfdbfe',
+                    color: '#1e40af',
+                    marginBottom: '20px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <p style={{margin: 0, fontSize: '0.85rem', fontWeight: 600, textTransform: 'uppercase'}}>Source Bank Balance</p>
+                      <h3 style={{margin: '5px 0 0 0', fontSize: '1.5rem', fontWeight: 800}}>
+                        Rs. {balance.toLocaleString()}
+                      </h3>
+                    </div>
+                    <div style={{fontSize: '1.8rem'}}>💳</div>
+                  </div>
+                );
+              })()}
+
+              <div className="field mb-3">
+                <label className="block mb-2 font-bold" style={{color: '#1e293b'}}>Receive To (My Account/Cash) *</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon">💸</span>
+                  <select 
+                    required 
+                    value={adminPaymentForm.payment_type} 
+                    className="p-inputtext p-component"
+                    style={{borderRadius: '0 8px 8px 0', padding: '10px'}}
+                    onChange={e => setAdminPaymentForm(prev => ({ ...prev, payment_type: e.target.value }))}
+                  >
+                    <option value="Cash">Cash Account (Rs. {totalCash.toLocaleString()})</option>
+                    {displayAccounts.filter(acc => acc.module_type !== 'Admin Recipient').map(acc => {
+                      const cleanName = acc.bank_name.replace(' Account', '');
+                      if (cleanName.toLowerCase() === 'cash') return null;
+                      const summaryKey = Object.keys(paymentSummary).find(k => k.toLowerCase() === cleanName.toLowerCase() || k.toLowerCase() === acc.bank_name.toLowerCase());
+                      const bal = summaryKey ? paymentSummary[summaryKey] : 0;
+                      return (
+                        <option key={acc.id} value={acc.bank_name}>
+                          {acc.bank_name} - {acc.account_title || 'Bank'} (Rs. {bal.toLocaleString()})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
+
+              <div className="field mb-3">
+                <label className="block mb-2 font-bold" style={{color: '#1e293b'}}>Amount to Receive *</label>
+                <div className="p-inputgroup">
+                  <span className="p-inputgroup-addon">Rs.</span>
+                  <input type="number" required value={adminPaymentForm.amount} placeholder="0.00"
+                    className="p-inputtext p-component"
+                    onChange={e => {
+                      const val = e.target.value;
+                      let cleanVal = String(val).replace(/^0+(?=\d)/, '');
+                      setAdminPaymentForm(prev => ({ ...prev, amount: cleanVal }));
+                    }} />
+                </div>
+              </div>
+
+              <div className="field mb-4">
+                <label className="block mb-2 font-bold" style={{color: '#1e293b'}}>Notes / Remarks</label>
+                <textarea rows="2" value={adminPaymentForm.notes} placeholder="e.g. Received for short-balance/change..."
+                  className="p-inputtext p-component" style={{borderRadius: '8px', padding: '10px'}}
+                  onChange={e => setAdminPaymentForm(prev => ({ ...prev, notes: e.target.value }))} />
+              </div>
+
+              <div className="flex justify-content-end gap-2">
+                <Button type="button" label="Cancel" icon="pi pi-times" onClick={() => setShowAdminPaymentModal(false)} className="p-button-text" />
+                <Button type="submit" label={loading ? "Processing..." : "Receive Admin Payment"} icon="pi pi-check" loading={loading} className="p-button-info" />
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showAdminBankModal && (
         <div className="modal-overlay" onClick={() => setShowAdminBankModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -1405,6 +1676,31 @@ export default function Accounts() {
           </div>
         </div>
       )}
+
+      {/* Delete Warning Dialog */}
+      <Dialog 
+        header={<div style={{color: '#dc2626', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 800}}><span style={{fontSize: '1.2rem'}}>⚠️</span> CRITICAL WARNING</div>} 
+        visible={showDeleteWarning} 
+        style={{ width: '450px' }} 
+        onHide={() => setShowDeleteWarning(false)}
+        footer={
+          <div style={{display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '10px 0'}}>
+            <Button label="Cancel" icon="pi pi-times" onClick={() => setShowDeleteWarning(false)} className="p-button-text p-button-secondary" />
+            <Button label="YES, DELETE FOREVER" icon="pi pi-trash" onClick={() => {
+              handleDelete(deleteTargetId);
+              setShowDeleteWarning(false);
+            }} className="p-button-danger" style={{borderRadius: '12px', background: '#dc2626', borderColor: '#dc2626', padding: '10px 18px', fontWeight: 700}} />
+          </div>
+        }
+      >
+        <div style={{textAlign: 'center', padding: '20px 0 10px 0'}}>
+          <div style={{fontSize: '4.5rem', color: '#dc2626', marginBottom: '15px'}}>⚠️</div>
+          <h3 style={{margin: '0 0 10px 0', fontWeight: 800, color: '#1e293b', fontSize: '1.3rem'}}>Are you absolutely sure?</h3>
+          <p style={{color: '#64748b', fontSize: '0.95rem', lineHeight: '1.6', margin: 0, padding: '0 10px'}}>
+            This action is **irreversible**. Deleting this account will permanently erase its history and ledger transactions from the database. This permission is restricted strictly to the Master Admin.
+          </p>
+        </div>
+      </Dialog>
     </div>
   );
 }

@@ -11,8 +11,7 @@ router.get('/balances', auth, async (req, res) => {
   try {
     const userId = req.user.id;
     const isAdminUser = req.user.role === 'admin';
-
-    const targetModule = req.user.module_type || 'Retail 1';
+    const targetModule = req.query.type || req.user.module_type || 'Wholesale';
 
     // 1. Fetch bank accounts opening balances
     let accountsQ = 'SELECT bank_name, opening_balance FROM bank_accounts';
@@ -20,6 +19,9 @@ router.get('/balances', auth, async (req, res) => {
     if (!isAdminUser) {
       accountsQ += ' WHERE user_id = $1 OR module_type = $2';
       params.push(userId, targetModule);
+    } else {
+      accountsQ += ' WHERE module_type = $1';
+      params.push(targetModule);
     }
     const accountsRes = await pool.query(accountsQ, params);
     
@@ -31,13 +33,8 @@ router.get('/balances', auth, async (req, res) => {
     });
 
     // 2. Fetch sales
-    let salesQ = 'SELECT net_amount, paid_amount, payment_type FROM sales';
-    let salesParams = [];
-    if (!isAdminUser) {
-      salesQ += ' WHERE user_id = $1 OR sale_type = $2';
-      salesParams.push(userId, targetModule);
-    }
-    const salesRes = await pool.query(salesQ, salesParams);
+    let salesQ = 'SELECT net_amount, paid_amount, payment_type FROM sales WHERE sale_type = $1';
+    const salesRes = await pool.query(salesQ, [targetModule]);
     salesRes.rows.forEach(s => {
       let method = s.payment_type || 'Cash';
       let cleanMethod = method.replace('Bank - ', '');
@@ -49,13 +46,8 @@ router.get('/balances', auth, async (req, res) => {
     });
 
     // 3. Fetch purchases & supplier payments
-    let purchasesQ = 'SELECT paid_amount, payment_type FROM purchases';
-    let purchasesParams = [];
-    if (!isAdminUser) {
-      purchasesQ += ' WHERE user_id = $1 OR module_type = $2';
-      purchasesParams.push(userId, targetModule);
-    }
-    const purchasesRes = await pool.query(purchasesQ, purchasesParams);
+    let purchasesQ = 'SELECT paid_amount, payment_type FROM purchases WHERE module_type = $1';
+    const purchasesRes = await pool.query(purchasesQ, [targetModule]);
     purchasesRes.rows.forEach(p => {
       let method = p.payment_type || 'Cash';
       let cleanMethod = method.replace('Bank - ', '');
@@ -67,13 +59,8 @@ router.get('/balances', auth, async (req, res) => {
     });
 
     // 4. Fetch expenses
-    let expensesQ = 'SELECT amount, payment_type FROM expenses';
-    let expensesParams = [];
-    if (!isAdminUser) {
-      expensesQ += ' WHERE user_id = $1 OR module_type = $2';
-      expensesParams.push(userId, targetModule);
-    }
-    const expensesRes = await pool.query(expensesQ, expensesParams);
+    let expensesQ = 'SELECT amount, payment_type, expense_type FROM expenses WHERE module_type = $1';
+    const expensesRes = await pool.query(expensesQ, [targetModule]);
     expensesRes.rows.forEach(e => {
       let method = e.payment_type || 'Cash';
       let cleanMethod = method.replace('Bank - ', '');
@@ -81,29 +68,23 @@ router.get('/balances', auth, async (req, res) => {
         cleanMethod = 'Cash';
       }
       if (!balances[cleanMethod]) balances[cleanMethod] = 0;
-      balances[cleanMethod] -= parseFloat(e.amount) || 0;
+      if (e.expense_type === 'Admin Payment') {
+        balances[cleanMethod] += parseFloat(e.amount) || 0;
+      } else {
+        balances[cleanMethod] -= parseFloat(e.amount) || 0;
+      }
     });
 
     // 5. Fetch salaries
-    let salariesQ = 'SELECT amount FROM salary';
-    let salariesParams = [];
-    if (!isAdminUser) {
-      salariesQ += ' WHERE user_id = $1 OR module_type = $2';
-      salariesParams.push(userId, targetModule);
-    }
-    const salariesRes = await pool.query(salariesQ, salariesParams);
+    let salariesQ = 'SELECT amount FROM salary WHERE module_type = $1';
+    const salariesRes = await pool.query(salariesQ, [targetModule]);
     salariesRes.rows.forEach(s => {
       balances['Cash'] -= parseFloat(s.amount) || 0;
     });
 
     // 6. Fetch rents
-    let rentsQ = 'SELECT amount FROM rent';
-    let rentsParams = [];
-    if (!isAdminUser) {
-      rentsQ += ' WHERE user_id = $1 OR module_type = $2';
-      rentsParams.push(userId, targetModule);
-    }
-    const rentsRes = await pool.query(rentsQ, rentsParams);
+    let rentsQ = 'SELECT amount FROM rent WHERE module_type = $1';
+    const rentsRes = await pool.query(rentsQ, [targetModule]);
     rentsRes.rows.forEach(r => {
       balances['Cash'] -= parseFloat(r.amount) || 0;
     });
@@ -229,7 +210,7 @@ router.get('/balance/:method', auth, async (req, res) => {
     }
     const salesSum = await pool.query(salesQ, salesParams);
 
-    let expQ = "SELECT SUM(amount) FROM expenses WHERE payment_type LIKE $1 AND module_type = $2";
+    let expQ = "SELECT SUM(CASE WHEN expense_type = 'Admin Payment' THEN -amount ELSE amount END) FROM expenses WHERE payment_type LIKE $1 AND module_type = $2";
     let expParams = [searchPattern, finalModule];
     if (!isAdminUser) {
       expQ += " AND user_id = $3";
@@ -312,6 +293,34 @@ router.post('/closeout', auth, async (req, res) => {
     );
 
     res.json({ message: 'Register closed out successfully!', record: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Send Admin Payment to Shop
+router.post('/admin-payment', auth, async (req, res) => {
+  try {
+    const { amount, notes, payment_type, module_type } = req.body;
+    const userId = req.user.id;
+    const moduleType = module_type || req.user.module_type || 'Retail 1';
+
+    const result = await pool.query(
+      `INSERT INTO expenses (description, expense_type, category, amount, payment_type, expense_date, notes, user_id, module_type) 
+       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, $7, $8) RETURNING *`,
+      [
+        `Received Admin Payment`,
+        'Admin Payment',
+        'Income',
+        amount,
+        payment_type || 'Cash',
+        notes || `Received payment from Admin bank.`,
+        userId,
+        moduleType
+      ]
+    );
+
+    res.json({ message: 'Admin payment sent/received successfully!', record: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
