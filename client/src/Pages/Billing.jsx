@@ -91,6 +91,25 @@ export default function Billing({ type }) {
   const [selectedCustForLedger, setSelectedCustForLedger] = useState(null);
   const [heldBills, setHeldBills] = useState(() => JSON.parse(localStorage.getItem('heldBills') || '[]'));
   const [showHoldModal, setShowHoldModal] = useState(false);
+  const [salesDateFilter, setSalesDateFilter] = useState("Today");
+
+  const filteredSales = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    return sales.filter(s => {
+      const saleDateStr = s.created_at ? s.created_at.split('T')[0] : '';
+      if (salesDateFilter === "Today") {
+        return saleDateStr === todayStr;
+      }
+      if (salesDateFilter === "Yesterday") {
+        return saleDateStr === yesterdayStr;
+      }
+      return true; // "All Time"
+    });
+  }, [sales, salesDateFilter]);
 
   useEffect(() => {
     localStorage.setItem('heldBills', JSON.stringify(heldBills));
@@ -776,6 +795,33 @@ export default function Billing({ type }) {
       ) : (
         <div className="history-container" style={{padding: '20px', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}}>
           
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }} className="no-print">
+            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>Sales Log</h2>
+            <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
+               {["Today", "Yesterday", "All Time"].map(d => (
+                 <button 
+                   type="button"
+                   key={d} 
+                   className={`tab-btn ${salesDateFilter === d ? 'active' : ''}`} 
+                   onClick={() => setSalesDateFilter(d)}
+                   style={{
+                     padding: '6px 16px',
+                     borderRadius: '8px',
+                     fontSize: '0.85rem',
+                     fontWeight: 700,
+                     background: salesDateFilter === d ? '#3b82f6' : 'transparent',
+                     color: salesDateFilter === d ? 'white' : '#64748b',
+                     border: 'none',
+                     cursor: 'pointer',
+                     transition: 'all 0.2s'
+                   }}
+                 >
+                   {d}
+                 </button>
+               ))}
+            </div>
+          </div>
+
           {/* ── Sales History Total Summary Strip ── */}
           <div style={{
             display: 'grid',
@@ -789,28 +835,34 @@ export default function Billing({ type }) {
           }} className="no-print">
             <div style={{ background: 'white', padding: '12px 20px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', borderLeft: '4px solid #3b82f6' }}>
               <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Total Sales Value</div>
-              <div style={{ fontSize: '1.25rem', color: '#1e293b', fontWeight: 800 }}>Rs. {sales.reduce((sum, s) => sum + parseFloat(s.net_amount || 0), 0).toLocaleString()}</div>
+              <div style={{ fontSize: '1.25rem', color: '#1e293b', fontWeight: 800 }}>Rs. {filteredSales.reduce((sum, s) => sum + parseFloat(s.net_amount || 0), 0).toLocaleString()}</div>
             </div>
             <div style={{ background: 'white', padding: '12px 20px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', borderLeft: '4px solid #16a34a' }}>
               <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Total Paid/Collected</div>
-              <div style={{ fontSize: '1.25rem', color: '#16a34a', fontWeight: 800 }}>Rs. {sales.reduce((sum, s) => sum + parseFloat(s.paid_amount || 0), 0).toLocaleString()}</div>
+              <div style={{ fontSize: '1.25rem', color: '#16a34a', fontWeight: 800 }}>Rs. {filteredSales.reduce((sum, s) => sum + parseFloat(s.paid_amount || 0), 0).toLocaleString()}</div>
             </div>
             <div style={{ background: 'white', padding: '12px 20px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', borderLeft: '4px solid #ef4444' }}>
               <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Total Remaining Balance</div>
-              <div style={{ fontSize: '1.25rem', color: '#ef4444', fontWeight: 800 }}>Rs. {sales.reduce((sum, s) => sum + parseFloat(s.balance_amount || 0), 0).toLocaleString()}</div>
+              <div style={{ fontSize: '1.25rem', color: '#ef4444', fontWeight: 800 }}>Rs. {filteredSales.reduce((sum, s) => sum + parseFloat(s.balance_amount || 0), 0).toLocaleString()}</div>
             </div>
           </div>
 
-          <DataTable value={sales} paginator rows={10} rowsPerPageOptions={[10, 25, 50]} className="p-datatable-sm" stripedRows responsiveLayout="scroll">
+          <DataTable value={filteredSales} paginator rows={10} rowsPerPageOptions={[10, 25, 50]} className="p-datatable-sm" stripedRows responsiveLayout="scroll">
             <Column header="Date" body={(s) => new Date(s.created_at).toLocaleDateString()} sortable field="created_at" />
             <Column header="Bill No" body={(s) => `#SAL-${s.id}`} sortable field="id" />
             <Column header="Customer" field="customer_name" sortable />
             <Column header="Phone" body={(s) => s.customer_phone || "—"} />
             <Column header="Items Sold" body={(s) => {
               const items = typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []);
+              const formattedList = items.map(i => {
+                const qtyVal = parseFloat(i.qty || 0);
+                const brandStr = i.brand && i.brand !== 'undefined' ? `${i.brand} ` : '';
+                const nameStr = i.name || i.product_name || '';
+                return `${qtyVal} x ${brandStr}${nameStr}`;
+              }).join(", ");
               return (
-                <div style={{fontSize: '0.85rem', color: '#475569', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}} title={items.map(i => `${i.brand} ${i.name}`).join(", ")}>
-                  {items.length > 0 ? items.map(i => `${i.brand} ${i.name}`).join(", ") : "—"}
+                <div style={{fontSize: '0.85rem', color: '#475569', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}} title={formattedList}>
+                  {items.length > 0 ? formattedList : "—"}
                 </div>
               );
             }} />

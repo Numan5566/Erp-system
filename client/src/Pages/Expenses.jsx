@@ -42,6 +42,7 @@ export default function Expenses({ type }) {
   const [payForm, setPayForm] = useState({ source: 'Cash', bank: '' });
   const [liveBalances, setLiveBalances] = useState({});
   const [personalVehicles, setPersonalVehicles] = useState([]);
+  const [dateFilter, setDateFilter] = useState("Today");
 
   useEffect(() => {
     if (showModal) {
@@ -152,7 +153,21 @@ export default function Expenses({ type }) {
     const matchType = filterType === "All" || r.expense_type === filterType;
     const matchSearch = r.title.toLowerCase().includes(search.toLowerCase()) || 
                         (r.category || "").toLowerCase().includes(search.toLowerCase());
-    return matchType && matchSearch;
+    
+    let matchDate = true;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const recDateStr = r.expense_date ? r.expense_date.split('T')[0] : '';
+    
+    if (dateFilter === "Today") {
+      matchDate = recDateStr === todayStr;
+    } else if (dateFilter === "Yesterday") {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      matchDate = recDateStr === yesterdayStr;
+    }
+    
+    return matchType && matchSearch && matchDate;
   });
 
   const targetAccountName = form.payment_source === 'Bank' ? form.bank_name : 'Cash';
@@ -215,11 +230,38 @@ export default function Expenses({ type }) {
         </div>
       </div>
 
-      <div className="pos-table-actions">
-        <div className="search-bar">
-          <Search size={18} />
-          <input type="text" placeholder="Search expenses..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="pos-table-actions" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '15px' }}>
+          <div className="search-bar" style={{ flex: 1, minWidth: '250px' }}>
+            <Search size={18} />
+            <input type="text" placeholder="Search expenses..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          
+          <div className="filter-group" style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
+             {["Today", "Yesterday", "All Time"].map(d => (
+               <button 
+                 type="button"
+                 key={d} 
+                 className={`tab-btn ${dateFilter === d ? 'active' : ''}`} 
+                 onClick={() => setDateFilter(d)}
+                 style={{
+                   padding: '6px 16px',
+                   borderRadius: '8px',
+                   fontSize: '0.85rem',
+                   fontWeight: 700,
+                   background: dateFilter === d ? '#3b82f6' : 'transparent',
+                   color: dateFilter === d ? 'white' : '#64748b',
+                   border: 'none',
+                   cursor: 'pointer',
+                   transition: 'all 0.2s'
+                 }}
+               >
+                 {d}
+               </button>
+             ))}
+          </div>
         </div>
+        
         <div className="filter-group">
            {["All", "Office", "House", "Personal Vehicle"].map(t => (
              <button key={t} className={`tab-btn ${filterType === t ? 'active' : ''}`} onClick={() => setFilterType(t)}>{t}</button>
