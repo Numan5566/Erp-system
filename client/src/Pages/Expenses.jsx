@@ -179,6 +179,9 @@ export default function Expenses({ type }) {
     <div className="module-page">
       <div className="module-header">
         <div className="module-title">
+          <button className="btn-icon back-btn" onClick={() => window.history.back()} style={{marginRight: '15px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#475569', transition: 'all 0.2s'}}>
+            <ChevronLeft size={20} />
+          </button>
           <div className="module-icon expense-icon" style={{background: '#fef2f2', color: '#ef4444'}}><Receipt size={28} /></div>
           <div>
             <h1>{activeTab} Expenses</h1>
@@ -204,28 +207,28 @@ export default function Expenses({ type }) {
           <div className="icon blue"><Building2 size={24} /></div>
           <div className="info">
             <span className="label">Office Total</span>
-            <span className="value">Rs. {records.filter(r => r.expense_type === "Office").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Office").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
           <div className="icon orange"><Home size={24} /></div>
           <div className="info">
             <span className="label">House Total</span>
-            <span className="value">Rs. {records.filter(r => r.expense_type === "House").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="value">Rs. {filtered.filter(r => r.expense_type === "House").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
           <div className="icon blue" style={{ background: '#ecfeff', color: '#0891b2' }}><Truck size={24} /></div>
           <div className="info">
             <span className="label">Vehicle Total</span>
-            <span className="value">Rs. {records.filter(r => r.expense_type === "Personal Vehicle").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Personal Vehicle").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
           <div className="icon green"><Wallet size={24} /></div>
           <div className="info">
             <span className="label">Grand Total</span>
-            <span className="value">Rs. {records.reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="value">Rs. {filtered.reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
       </div>

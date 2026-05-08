@@ -294,6 +294,9 @@ export default function Customers({ type }) {
     <div className="module-page">
       <div className="module-header">
         <div className="module-title">
+          <button className="btn-icon back-btn" onClick={() => window.history.back()} style={{marginRight: '15px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#475569', transition: 'all 0.2s'}}>
+            <ChevronLeft size={20} />
+          </button>
           <div className="module-icon investment-icon" style={{background: '#eff6ff', color: '#3b82f6'}}><UsersIcon size={28} /></div>
           <div>
             <h1>{activeTab} CRM</h1>

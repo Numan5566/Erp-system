@@ -134,7 +134,7 @@ export default function Transport({ type }) {
   const fetchRecords = async () => {
     if (!activeCounter) return;
     try {
-      const res = await fetch(`${API}?type=${activeCounter}&ownership_type=${activeTab}`, {
+      const res = await fetch(`${API}?type=${activeCounter}`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -142,7 +142,7 @@ export default function Transport({ type }) {
     } catch (err) { console.error(err); }
   };
 
-  useEffect(() => { fetchRecords(); }, [activeCounter, activeTab]);
+  useEffect(() => { fetchRecords(); }, [activeCounter]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -195,8 +195,10 @@ export default function Transport({ type }) {
   };
 
   const filtered = records.filter(r => {
-    return (r.driver_name || "").toLowerCase().includes(search.toLowerCase()) || 
-           (r.vehicle_number || "").toLowerCase().includes(search.toLowerCase());
+    const matchesTab = (r.ownership_type || "Personal").toLowerCase() === activeTab.toLowerCase();
+    const matchesSearch = (r.driver_name || "").toLowerCase().includes(search.toLowerCase()) || 
+                          (r.vehicle_number || "").toLowerCase().includes(search.toLowerCase());
+    return matchesTab && matchesSearch;
   });
 
   if (user?.email === 'admin@erp.com' && !activeCounter && !type) {

@@ -232,11 +232,9 @@ export default function Stock({ type }) {
     <div className="module-page">
       <div className="module-header">
         <div className="module-title">
-          {selectedCategory && (
-            <button className="btn-icon back-btn" onClick={() => setSelectedCategory(null)} style={{marginRight: '15px'}}>
-              <ChevronLeft size={20} />
-            </button>
-          )}
+          <button className="btn-icon back-btn" onClick={() => selectedCategory ? setSelectedCategory(null) : window.history.back()} style={{marginRight: '15px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#475569', transition: 'all 0.2s'}}>
+            <ChevronLeft size={20} />
+          </button>
           <div className="module-icon stock-icon"><Database size={28} /></div>
           <div>
             <h1>{selectedCategory ? `${selectedCategory} Stock` : 'Stock Management'}</h1>

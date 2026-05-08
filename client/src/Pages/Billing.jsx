@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext, useMemo } from "react";
 import { 
   ShoppingCart, Search, Trash2, User, Plus, Minus, 
   Printer, CreditCard, Banknote, Truck, Tag, X, CheckCircle, Pencil,
-  History, ArrowLeft, FileText, Download, Filter, Package, Phone, MapPin,
+  History, ArrowLeft, ChevronLeft, FileText, Download, Filter, Package, Phone, MapPin,
   ArrowDownCircle, Hash, Users
 } from "lucide-react";
 import { Button } from 'primereact/button';
@@ -518,6 +518,9 @@ export default function Billing({ type }) {
     <div className="module-page billing-page">
       <div className="module-header no-print">
         <div className="module-title">
+          <button className="btn-icon back-btn" onClick={() => window.history.back()} style={{marginRight: '15px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#475569', transition: 'all 0.2s'}}>
+            <ChevronLeft size={20} />
+          </button>
           <div className="module-icon billing-icon"><ShoppingCart size={28} /></div>
           <div>
             <h1>{activeTab} POS System</h1>

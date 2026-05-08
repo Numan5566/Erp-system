@@ -170,14 +170,17 @@ export default function Products({ type }) {
 
   const filteredProducts = products.filter(p => {
     let matchesCategory = false;
+    const catLower = (p.category || "").toLowerCase();
+    const selCatLower = selectedCategory ? selectedCategory.toLowerCase() : "";
+
     if (!selectedCategory) {
       matchesCategory = true;
-    } else if (selectedCategory === "Steel" && (p.category === "Iron/Steel" || p.category === "Steel")) {
+    } else if (selCatLower === "steel" && (catLower === "iron/steel" || catLower === "steel")) {
       matchesCategory = true;
-    } else if (selectedCategory === "Crush" && (p.category === "Crush/Bajri" || p.category === "Crush")) {
+    } else if (selCatLower === "crush" && (catLower === "crush/bajri" || catLower === "crush")) {
       matchesCategory = true;
     } else {
-      matchesCategory = p.category === selectedCategory;
+      matchesCategory = catLower === selCatLower;
     }
     return matchesCategory && 
       (p.name.toLowerCase().includes(search.toLowerCase()) || (p.brand || "").toLowerCase().includes(search.toLowerCase()));
@@ -227,10 +230,16 @@ export default function Products({ type }) {
       {!selectedCategory ? (
         <div className="category-grid" style={{marginTop: '20px'}}>
           {CATEGORIES.map((cat) => {
-            const isSteel = cat.name === "Steel";
-            const isCrush = cat.name === "Crush";
-            const count = products.filter(p => isSteel ? (p.category === "Iron/Steel" || p.category === "Steel") : isCrush ? (p.category === "Crush/Bajri" || p.category === "Crush") : p.category === cat.name).length;
-            const catStock = products.filter(p => isSteel ? (p.category === "Iron/Steel" || p.category === "Steel") : isCrush ? (p.category === "Crush/Bajri" || p.category === "Crush") : p.category === cat.name).reduce((sum, p) => sum + parseFloat(p.stock_quantity || 0), 0);
+            const isSteel = cat.name.toLowerCase() === "steel";
+            const isCrush = cat.name.toLowerCase() === "crush";
+            const count = products.filter(p => {
+              const catLower = (p.category || "").toLowerCase();
+              return isSteel ? (catLower === "iron/steel" || catLower === "steel") : isCrush ? (catLower === "crush/bajri" || catLower === "crush") : catLower === cat.name.toLowerCase();
+            }).length;
+            const catStock = products.filter(p => {
+              const catLower = (p.category || "").toLowerCase();
+              return isSteel ? (catLower === "iron/steel" || catLower === "steel") : isCrush ? (catLower === "crush/bajri" || catLower === "crush") : catLower === cat.name.toLowerCase();
+            }).reduce((sum, p) => sum + parseFloat(p.stock_quantity || 0), 0);
             return (
               <div key={cat.name} className="category-card" onClick={() => setSelectedCategory(cat.name)}>
                 <div className="category-emoji">{cat.icon}</div>

@@ -144,7 +144,13 @@ export default function ActionMenu({ onEdit, onDelete, extraItems = [], bypassCo
               <button 
                 type="button"
                 onClick={() => {
-                  onDelete(pendingEvent);
+                  const originalConfirm = window.confirm;
+                  window.confirm = () => true;
+                  try {
+                    onDelete(pendingEvent);
+                  } finally {
+                    window.confirm = originalConfirm;
+                  }
                   setShowConfirm(false);
                 }}
                 style={{
