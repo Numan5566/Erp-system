@@ -110,11 +110,19 @@ export default function Accounts() {
   });
 
   const getAdminBankBalance = (acc) => {
+    const isToday = (dateStr) => {
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      const today = new Date();
+      return d.getDate() === today.getDate() &&
+             d.getMonth() === today.getMonth() &&
+             d.getFullYear() === today.getFullYear();
+    };
     const received = generalExpenses
-      .filter(e => (e.expense_type === 'Galla Closeout' || e.title === 'Galla Closeout' || e.description?.includes('Galla Closeout') || e.notes?.includes('Recipient Bank')) && e.notes?.includes(acc.bank_name) && e.notes?.includes(acc.account_number))
+      .filter(e => isToday(e.created_at || e.expense_date) && (e.expense_type === 'Galla Closeout' || e.title === 'Galla Closeout' || e.description?.includes('Galla Closeout') || e.notes?.includes('Recipient Bank')) && e.notes?.includes(acc.bank_name) && e.notes?.includes(acc.account_number))
       .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
     const paid = generalExpenses
-      .filter(e => e.expense_type === 'Admin Payment' && e.notes?.includes(acc.bank_name) && e.notes?.includes(acc.account_number))
+      .filter(e => isToday(e.created_at || e.expense_date) && e.expense_type === 'Admin Payment' && e.notes?.includes(acc.bank_name) && e.notes?.includes(acc.account_number))
       .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
     return received - paid;
   };
@@ -516,11 +524,19 @@ export default function Accounts() {
     .reduce((sum, [, v]) => sum + v, 0);
 
   const totalAdminReceived = useMemo(() => {
+    const isToday = (dateStr) => {
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      const today = new Date();
+      return d.getDate() === today.getDate() &&
+             d.getMonth() === today.getMonth() &&
+             d.getFullYear() === today.getFullYear();
+    };
     const received = generalExpenses
-      .filter(e => e.expense_type === 'Galla Closeout' || e.title === 'Galla Closeout' || e.description?.includes('Galla Closeout') || e.notes?.includes('Recipient Bank'))
+      .filter(e => isToday(e.created_at || e.expense_date) && (e.expense_type === 'Galla Closeout' || e.title === 'Galla Closeout' || e.description?.includes('Galla Closeout') || e.notes?.includes('Recipient Bank')))
       .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
     const paid = generalExpenses
-      .filter(e => e.expense_type === 'Admin Payment')
+      .filter(e => isToday(e.created_at || e.expense_date) && e.expense_type === 'Admin Payment')
       .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
     return received - paid;
   }, [generalExpenses]);
@@ -627,7 +643,7 @@ export default function Accounts() {
       }
       return { ...t, running_balance: currentBal };
     });
-    return withRunning.reverse();
+    return withRunning;
   }, [ledgerTransactions, selectedLedgerAccount]);
   
   // Calculate ledger totals (Opening, Cash In, Cash Out, Closing)
@@ -643,7 +659,7 @@ export default function Accounts() {
       }
     });
     const opening = parseFloat(selectedLedgerAccount?.opening_balance || 0);
-    const closing = calculatedTransactions.length > 0 ? calculatedTransactions[0].running_balance : opening;
+    const closing = calculatedTransactions.length > 0 ? calculatedTransactions[calculatedTransactions.length - 1].running_balance : opening;
     return {
       opening,
       totalIn,
@@ -1107,6 +1123,7 @@ export default function Accounts() {
           </div>
 
           <DataTable value={calculatedTransactions} paginator={!window.matchMedia('print').matches} rows={20} className="p-datatable-sm" stripedRows emptyMessage="No transactions found for this period.">
+            <Column header="S.No." body={(rowData, options) => <span style={{fontWeight: 700, color: '#64748b'}}>{options.rowIndex + 1}</span>} style={{width: '60px'}} />
             <Column field="id" header="Bill #" body={s => (
               <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-start'}}>
                 {s.id ? (

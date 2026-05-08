@@ -51,7 +51,7 @@ export default function Customers({ type }) {
       currentBal += (debit - credit);
       return { ...row, running_balance: currentBal };
     });
-    return withRunning.reverse();
+    return withRunning;
   }, [ledgerData]);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
@@ -487,6 +487,7 @@ export default function Customers({ type }) {
               <table style={{width: '100%', borderCollapse: 'collapse', marginTop: '10px'}}>
                 <thead>
                   <tr style={{background: '#f1f5f9'}}>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left', width: '50px'}}>S.No.</th>
                     <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Date</th>
                     <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Ref/Bill</th>
                     <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Details</th>
@@ -496,8 +497,9 @@ export default function Customers({ type }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {calculatedLedgerData.map(row => (
+                  {calculatedLedgerData.map((row, index) => (
                     <tr key={row.id}>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{index + 1}</td>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.created_at).toLocaleDateString()}</td>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>#SAL-{row.id}</td>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>
@@ -519,7 +521,7 @@ export default function Customers({ type }) {
                 </tbody>
                 <tfoot>
                   <tr style={{background: '#f8fafc', fontWeight: 'bold'}}>
-                    <td colSpan="3" style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Current Outstanding Balance:</td>
+                    <td colSpan="4" style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Current Outstanding Balance:</td>
                     <td colSpan="3" style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right', color: parseFloat(selectedCustomer.balance) > 0 ? 'red' : 'green'}}>
                       Rs. {Math.abs(parseFloat(selectedCustomer.balance)).toLocaleString()} ({parseFloat(selectedCustomer.balance) > 0 ? 'Receivable' : 'Advance'})
                     </td>
@@ -594,6 +596,7 @@ export default function Customers({ type }) {
                   <table className="module-table">
                     <thead>
                       <tr>
+                        <th style={{width: '50px'}}>S.No.</th>
                         <th>Date</th>
                         <th>Bill No.</th>
                         <th>Details</th>
@@ -604,10 +607,11 @@ export default function Customers({ type }) {
                     </thead>
                     <tbody>
                       {calculatedLedgerData.length === 0 ? (
-                        <tr><td colSpan="6" className="empty-msg">No history found.</td></tr>
+                        <tr><td colSpan="7" className="empty-msg">No history found.</td></tr>
                       ) : (
-                        calculatedLedgerData.map((row) => (
+                        calculatedLedgerData.map((row, index) => (
                           <tr key={row.id}>
+                            <td style={{fontWeight: '700', color: '#64748b'}}>{index + 1}</td>
                             <td>{new Date(row.created_at).toLocaleDateString()}<br/><small style={{color:'#64748b'}}>{new Date(row.created_at).toLocaleTimeString()}</small></td>
                             <td>#SAL-{row.id}</td>
                             <td>

@@ -225,6 +225,20 @@ export default function Expenses({ type }) {
           </div>
         </div>
         <div className="pos-stat-card">
+          <div className="icon red" style={{ background: '#fef2f2', color: '#ef4444' }}><Wallet size={24} /></div>
+          <div className="info">
+            <span className="label">Galla Handover</span>
+            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Galla Closeout").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+          </div>
+        </div>
+        <div className="pos-stat-card">
+          <div className="icon green" style={{ background: '#f0fdf4', color: '#16a34a' }}><Wallet size={24} /></div>
+          <div className="info">
+            <span className="label">Admin Payments</span>
+            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Admin Payment").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+          </div>
+        </div>
+        <div className="pos-stat-card">
           <div className="icon green"><Wallet size={24} /></div>
           <div className="info">
             <span className="label">Grand Total</span>
@@ -266,7 +280,7 @@ export default function Expenses({ type }) {
         </div>
         
         <div className="filter-group">
-           {["All", "Office", "House", "Personal Vehicle"].map(t => (
+           {["All", "Office", "House", "Personal Vehicle", "Galla Closeout", "Admin Payment"].map(t => (
              <button key={t} className={`tab-btn ${filterType === t ? 'active' : ''}`} onClick={() => setFilterType(t)}>{t}</button>
            ))}
         </div>
@@ -292,7 +306,15 @@ export default function Expenses({ type }) {
                   <td>{new Date(r.expense_date).toLocaleDateString()}</td>
                   <td>
                     <div className="prod-main-info">
-                      <span className={`type-tag ${r.expense_type.toLowerCase()}`} style={{fontSize:'0.7rem', width:'fit-content'}}>
+                      <span className="type-tag" style={{
+                        fontSize:'0.75rem', 
+                        width:'fit-content',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontWeight: '700',
+                        background: r.expense_type === 'Galla Closeout' ? '#fee2e2' : r.expense_type === 'Admin Payment' ? '#dcfce7' : r.expense_type === 'Office' ? '#eff6ff' : r.expense_type === 'House' ? '#fff7ed' : '#f1f5f9',
+                        color: r.expense_type === 'Galla Closeout' ? '#ef4444' : r.expense_type === 'Admin Payment' ? '#15803d' : r.expense_type === 'Office' ? '#1d4ed8' : r.expense_type === 'House' ? '#c2410c' : '#475569'
+                      }}>
                         {r.expense_type}
                       </span>
                       <span className="v-num">{r.category}</span>

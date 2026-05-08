@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import { 
   Truck, Plus, Pencil, Trash2, X, Search, Phone, Mail, 
   MapPin, Building, CreditCard, Banknote, ClipboardList, Package, FileText
@@ -46,7 +46,10 @@ export default function Suppliers({ type }) {
   const [ledgerFrom, setLedgerFrom] = useState("");
   const [ledgerTo, setLedgerTo] = useState("");
   const [ledgerFilter, setLedgerFilter] = useState("all");
-  const [ledgerData, setLedgerData] = useState([]);
+   const [ledgerData, setLedgerData] = useState([]);
+  const sortedLedgerData = useMemo(() => {
+    return [...ledgerData].sort((a, b) => new Date(a.purchase_date) - new Date(b.purchase_date));
+  }, [ledgerData]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [liveBalances, setLiveBalances] = useState({});
@@ -513,6 +516,7 @@ export default function Suppliers({ type }) {
               <table style={{width: '100%', borderCollapse: 'collapse', marginTop: '10px'}}>
                 <thead>
                   <tr style={{background: '#f1f5f9'}}>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left', width: '50px'}}>S.No.</th>
                     <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Date</th>
                     <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Product/Details</th>
                     <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Total Bill</th>
@@ -521,8 +525,9 @@ export default function Suppliers({ type }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {ledgerData.map(row => (
+                  {sortedLedgerData.map((row, index) => (
                     <tr key={row.id}>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{index + 1}</td>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.purchase_date).toLocaleDateString()}</td>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>
                         {row.product_name ? `${row.product_name} (${row.quantity} ${row.unit})` : row.vehicle_number || 'Payment'}
@@ -535,7 +540,7 @@ export default function Suppliers({ type }) {
                 </tbody>
                 <tfoot>
                   <tr style={{background: '#f8fafc', fontWeight: 'bold'}}>
-                    <td colSpan="2" style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Final Outstanding Balance:</td>
+                    <td colSpan="3" style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Final Outstanding Balance:</td>
                     <td colSpan="3" style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right', color: parseFloat(selectedSupplier.balance) > 0 ? 'red' : 'green'}}>
                       Rs. {Math.abs(parseFloat(selectedSupplier.balance)).toLocaleString()} ({parseFloat(selectedSupplier.balance) > 0 ? 'Payable' : 'Advance'})
                     </td>
@@ -610,6 +615,7 @@ export default function Suppliers({ type }) {
                   <table className="module-table">
                     <thead>
                       <tr>
+                        <th style={{width: '50px'}}>S.No.</th>
                         <th>Date</th>
                         <th>Product & Vehicle</th>
                         <th>Quantity & Rate</th>
@@ -619,11 +625,12 @@ export default function Suppliers({ type }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {ledgerData.length === 0 ? (
-                        <tr><td colSpan="6" className="empty-msg">No purchase history found for this supplier.</td></tr>
+                      {sortedLedgerData.length === 0 ? (
+                        <tr><td colSpan="7" className="empty-msg">No purchase history found for this supplier.</td></tr>
                       ) : (
-                        ledgerData.map((row) => (
+                        sortedLedgerData.map((row, index) => (
                           <tr key={row.id}>
+                            <td style={{fontWeight: '700', color: '#64748b'}}>{index + 1}</td>
                             <td>{new Date(row.purchase_date).toLocaleDateString()}<br/><small style={{color:'#64748b'}}>{new Date(row.purchase_date).toLocaleTimeString()}</small></td>
                             <td>
                               {row.product_name ? (

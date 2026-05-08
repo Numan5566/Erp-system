@@ -83,7 +83,7 @@ export default function Billing({ type }) {
       currentBal += (debit - credit);
       return { ...row, running_balance: currentBal };
     });
-    return withRunning.reverse();
+    return withRunning;
   }, [ledgerData]);
   const [ledgerFrom, setLedgerFrom] = useState("");
   const [ledgerTo, setLedgerTo] = useState("");
@@ -1133,6 +1133,7 @@ export default function Billing({ type }) {
               <table style={{width: '100%', borderCollapse: 'collapse', marginTop: '10px'}}>
                 <thead>
                   <tr style={{background: '#f1f5f9'}}>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left', width: '50px'}}>S.No.</th>
                     <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Date</th>
                     <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Bill No / Items</th>
                     <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Debit (+)</th>
@@ -1141,8 +1142,9 @@ export default function Billing({ type }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {calculatedLedgerData.map(row => (
+                  {calculatedLedgerData.map((row, index) => (
                     <tr key={row.id}>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{index + 1}</td>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.created_at).toLocaleDateString()}</td>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>
                         {parseFloat(row.net_amount) > 0 ? (
@@ -1219,6 +1221,7 @@ export default function Billing({ type }) {
                 <table className="module-table">
                   <thead>
                     <tr>
+                      <th style={{width: '50px'}}>S.No.</th>
                       <th>Date</th>
                       <th>Bill Details</th>
                       <th>Debit (+)</th>
@@ -1228,10 +1231,11 @@ export default function Billing({ type }) {
                   </thead>
                   <tbody>
                     {calculatedLedgerData.length === 0 ? (
-                      <tr><td colSpan="5" className="empty-msg">No sales history found for this customer.</td></tr>
+                      <tr><td colSpan="6" className="empty-msg">No sales history found for this customer.</td></tr>
                     ) : (
-                      calculatedLedgerData.map((row) => (
+                      calculatedLedgerData.map((row, index) => (
                         <tr key={row.id}>
+                          <td style={{fontWeight: '700', color: '#64748b'}}>{index + 1}</td>
                           <td>{new Date(row.created_at).toLocaleDateString()}</td>
                           <td>
                             {parseFloat(row.net_amount) > 0 ? (
