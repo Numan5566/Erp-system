@@ -8,12 +8,18 @@ const isAdmin = (req) => req.user.role === 'admin';
 // 1. GET all labours
 router.get('/', auth, async (req, res) => {
   try {
+    const { type } = req.query;
     let query = 'SELECT * FROM labours';
     let params = [];
 
-    if (!isAdmin(req)) {
-      query += ' WHERE user_id = $1';
-      params.push(req.user.id);
+    if (isAdmin(req)) {
+      if (type) {
+        query += ' WHERE module_type = $1';
+        params.push(type);
+      }
+    } else {
+      query += ' WHERE user_id = $1 OR module_type = $2';
+      params.push(req.user.id, req.user.module_type || 'Retail 1');
     }
 
     query += ' ORDER BY group_name ASC, name ASC';
@@ -25,10 +31,11 @@ router.get('/', auth, async (req, res) => {
 // 2. POST create labour
 router.post('/', auth, async (req, res) => {
   try {
-    const { name, group_name, contact, rate_per_day, cnic } = req.body;
+    const { name, group_name, contact, rate_per_day, cnic, module_type } = req.body;
+    const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
     const result = await pool.query(
-      'INSERT INTO labours (name, group_name, contact, rate_per_day, cnic, user_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [name, group_name, contact, rate_per_day || 0, cnic, req.user.id]
+      'INSERT INTO labours (name, group_name, contact, rate_per_day, cnic, user_id, module_type) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [name, group_name, contact, rate_per_day || 0, cnic, req.user.id, finalModule]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -57,12 +64,18 @@ router.delete('/:id', auth, async (req, res) => {
 // 5. GET all work history
 router.get('/work-history', auth, async (req, res) => {
   try {
+    const { type } = req.query;
     let query = 'SELECT * FROM labour_work_history';
     let params = [];
 
-    if (!isAdmin(req)) {
-      query += ' WHERE user_id = $1';
-      params.push(req.user.id);
+    if (isAdmin(req)) {
+      if (type) {
+        query += ' WHERE module_type = $1';
+        params.push(type);
+      }
+    } else {
+      query += ' WHERE user_id = $1 OR module_type = $2';
+      params.push(req.user.id, req.user.module_type || 'Retail 1');
     }
 
     query += ' ORDER BY created_at DESC';
@@ -74,10 +87,11 @@ router.get('/work-history', auth, async (req, res) => {
 // 6. POST log work entry
 router.post('/work-history', auth, async (req, res) => {
   try {
-    const { group_name, bill_id, description, amount } = req.body;
+    const { group_name, bill_id, description, amount, module_type } = req.body;
+    const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
     const result = await pool.query(
-      'INSERT INTO labour_work_history (group_name, bill_id, description, amount, status, user_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [group_name, bill_id, description, amount || 0, 'Unpaid', req.user.id]
+      'INSERT INTO labour_work_history (group_name, bill_id, description, amount, status, user_id, module_type) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [group_name, bill_id, description, amount || 0, 'Unpaid', req.user.id, finalModule]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -85,19 +99,20 @@ router.post('/work-history', auth, async (req, res) => {
 
 // 7. POST pay group wages
 router.post('/pay', auth, async (req, res) => {
-  const { group_name, bill_id, amount, notes, payment_type } = req.body;
+  const { group_name, bill_id, amount, notes, payment_type, module_type } = req.body;
   const finalPaymentType = payment_type || 'Cash';
+  const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
   try {
     // Log payment into work history
     await pool.query(
-      'INSERT INTO labour_work_history (group_name, bill_id, description, amount, status, user_id) VALUES ($1, $2, $3, $4, $5, $6)',
-      [group_name, bill_id || null, notes || `Paid wages to ${group_name} (Bill #${bill_id || 'N/A'})`, amount, 'Paid', req.user.id]
+      'INSERT INTO labour_work_history (group_name, bill_id, description, amount, status, user_id, module_type) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [group_name, bill_id || null, notes || `Paid wages to ${group_name} (Bill #${bill_id || 'N/A'})`, amount, 'Paid', req.user.id, finalModule]
     );
 
     // Record as an expense to deduct from the selected Cash/Bank account
     await pool.query(
       'INSERT INTO expenses (description, expense_type, category, amount, user_id, module_type, payment_type) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [`Labour Wage: ${group_name} (Bill #${bill_id || 'N/A'}, Notes: ${notes || 'Wages Paid'})`, 'Office', 'Labour Charges', amount, req.user.id, req.user.module_type || 'Retail 1', finalPaymentType]
+      [`Labour Wage: ${group_name} (Bill #${bill_id || 'N/A'}, Notes: ${notes || 'Wages Paid'})`, 'Office', 'Labour Charges', amount, req.user.id, finalModule, finalPaymentType]
     );
 
     res.json({ message: 'Wage payment successfully processed!' });

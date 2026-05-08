@@ -8,8 +8,9 @@ const API = "http://localhost:5000/api/labours";
 
 const emptyForm = { name: "", group_name: "", contact: "", rate_per_day: "", cnic: "" };
 
-export default function Labours() {
+export default function Labours({ type }) {
   const { user } = useContext(AuthContext);
+  const [activeTab, setActiveTab] = useState(type || (user?.email === 'admin@erp.com' ? "" : user?.module_type || "Wholesale"));
   const [labours, setLabours] = useState([]);
   const [workHistory, setWorkHistory] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -36,6 +37,14 @@ export default function Labours() {
   // Global payment modal states
   const [showGlobalPayModal, setShowGlobalPayModal] = useState(false);
   const [globalPayForm, setGlobalPayForm] = useState({ group_name: "", bill_id: "", amount: "", notes: "", payment_type: "Cash" });
+
+  useEffect(() => {
+    if (type) {
+      setActiveTab(type);
+    } else if (user?.module_type && user?.email !== 'admin@erp.com') {
+      setActiveTab(user.module_type);
+    }
+  }, [type, user?.module_type, user?.email]);
 
   const handleGlobalPayWages = async (e) => {
     e.preventDefault();
@@ -65,7 +74,8 @@ export default function Labours() {
           bill_id: globalPayForm.bill_id,
           amount: amt,
           notes: globalPayForm.notes || `Paid wages to ${globalPayForm.group_name} (Bill #${globalPayForm.bill_id || 'N/A'})`,
-          payment_type: globalPayForm.payment_type
+          payment_type: globalPayForm.payment_type,
+          module_type: type || activeTab
         })
       });
 
@@ -91,12 +101,13 @@ export default function Labours() {
   };
 
   const fetchData = async () => {
+    if (!activeTab) return;
     setLoading(true);
     try {
       const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
       const [labRes, workRes, balRes, banksRes] = await Promise.all([
-        fetch(API, { headers }),
-        fetch(`${API}/work-history`, { headers }),
+        fetch(`${API}?type=${activeTab}`, { headers }),
+        fetch(`${API}/work-history?type=${activeTab}`, { headers }),
         fetch("http://localhost:5000/api/banks/balances", { headers }),
         fetch("http://localhost:5000/api/banks", { headers })
       ]);
@@ -118,7 +129,7 @@ export default function Labours() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [activeTab]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -140,7 +151,7 @@ export default function Labours() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ ...form, group_name: finalGroup })
+        body: JSON.stringify({ ...form, group_name: finalGroup, module_type: type || activeTab })
       });
 
       if (res.ok) {
@@ -204,7 +215,8 @@ export default function Labours() {
           group_name: selectedGroup,
           amount: amt,
           notes: payForm.notes,
-          payment_type: payForm.payment_type
+          payment_type: payForm.payment_type,
+          module_type: type || activeTab
         })
       });
 
@@ -233,7 +245,8 @@ export default function Labours() {
         body: JSON.stringify({
           group_name: selectedGroup,
           description: workForm.description,
-          amount: workForm.amount
+          amount: workForm.amount,
+          module_type: type || activeTab
         })
       });
 
@@ -292,6 +305,33 @@ export default function Labours() {
   const globalCashAvailable = getSelectedGlobalPaymentBalance();
   const isGlobalWagePayInsufficient = parseFloat(globalPayForm.amount || 0) > globalCashAvailable;
 
+  // If Admin and no counter selected, show selection screen
+  if (user?.email === 'admin@erp.com' && !activeTab && !type) {
+    return (
+      <div className="admin-selection-container">
+        <h2>Select Counter</h2>
+        <p>Choose which counter's labour management you want to view</p>
+        <div className="selection-grid">
+          <div className="selection-card wholesale" onClick={() => setActiveTab('Wholesale')}>
+            <div className="icon-box">🧱</div>
+            <h3>Wholesale</h3>
+            <span>Main Warehouse</span>
+          </div>
+          <div className="selection-card retail1" onClick={() => setActiveTab('Retail 1')}>
+            <div className="icon-box">🏗️</div>
+            <h3>Retail 1</h3>
+            <span>Counter A</span>
+          </div>
+          <div className="selection-card retail2" onClick={() => setActiveTab('Retail 2')}>
+            <div className="icon-box">🔲</div>
+            <h3>Retail 2</h3>
+            <span>Counter B</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="module-page">
       <div className="module-header">
@@ -307,6 +347,14 @@ export default function Labours() {
             <p>{selectedGroup ? `Managing operations and wage ledger for ${selectedGroup}` : 'Organize labor, record group loading/unloading work, and pay wages'}</p>
           </div>
         </div>
+
+        {user?.role === 'admin' && !user?.module_type && !type && (
+          <div className="counter-switcher">
+            <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
+            <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
+            <button className={activeTab === 'Retail 2' ? 'active' : ''} onClick={() => setActiveTab('Retail 2')}>Retail 2</button>
+          </div>
+        )}
 
         <div style={{display: 'flex', gap: '10px'}}>
           {!selectedGroup && (
