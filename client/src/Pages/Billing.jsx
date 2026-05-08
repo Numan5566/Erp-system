@@ -21,7 +21,7 @@ const CUSTOMERS_API = "http://localhost:5000/api/customers";
 const SALES_API = "http://localhost:5000/api/sales";
 const TRANSPORT_API = "http://localhost:5000/api/transport";
 
-const CATEGORIES = ["All", "Cement", "Steel", "Bricks", "Sand", "Crush", "Tiles", "Chips", "Other"];
+const CATEGORIES = ["All", "Cement", "Steel", "Crush", "Bricks", "Sand", "Tiles Bond", "Chips", "Other"];
 
 export default function Billing({ type }) {
   const { user } = useContext(AuthContext);
@@ -480,10 +480,20 @@ export default function Billing({ type }) {
     openLedger(selectedCustForLedger, from, to, filterKey);
   };
 
-  const filteredProducts = products.filter(p => 
-    (selectedCategory === "All" || p.category === selectedCategory) &&
-    (p.name.toLowerCase().includes(search.toLowerCase()) || (p.brand || "").toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredProducts = products.filter(p => {
+    let matchesCategory = false;
+    if (selectedCategory === "All") {
+      matchesCategory = true;
+    } else if (selectedCategory === "Steel" && (p.category === "Iron/Steel" || p.category === "Steel")) {
+      matchesCategory = true;
+    } else if (selectedCategory === "Crush" && (p.category === "Crush/Bajri" || p.category === "Crush")) {
+      matchesCategory = true;
+    } else {
+      matchesCategory = p.category === selectedCategory;
+    }
+    return matchesCategory && 
+      (p.name.toLowerCase().includes(search.toLowerCase()) || (p.brand || "").toLowerCase().includes(search.toLowerCase()));
+  });
 
   return (
     <div className="module-page billing-page">

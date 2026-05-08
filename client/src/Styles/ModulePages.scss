@@ -1281,7 +1281,8 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  overflow-y: auto;
+  overflow: hidden;
+  height: 100%;
   padding-right: 5px;
 
   .category-tabs {
@@ -1352,7 +1353,12 @@
   .pos-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-auto-rows: max-content;
+    align-items: start;
     gap: 16px;
+    overflow-y: auto;
+    flex: 1;
+    padding-bottom: 20px;
 
     .pos-card {
       background: white;

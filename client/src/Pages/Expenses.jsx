@@ -353,7 +353,12 @@ export default function Expenses({ type }) {
               <div className="section-label">Payment Information</div>
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Payment Source *</label>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Payment Source *</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: (liveBalances['Cash'] || 0) < 0 ? '#ef4444' : '#16a34a' }}>
+                      Cash Bal: Rs. {(liveBalances['Cash'] || 0).toLocaleString()}
+                    </span>
+                  </label>
                   <div className="input-wrapper">
                     <Wallet size={18} />
                     <select 
@@ -367,7 +372,14 @@ export default function Expenses({ type }) {
                 </div>
                 {form.payment_source === 'Bank' && (
                   <div className="form-group">
-                    <label>Select Bank *</label>
+                    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Select Bank *</span>
+                      {form.bank_name && (
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: (liveBalances[form.bank_name] || 0) < 0 ? '#ef4444' : '#16a34a' }}>
+                          Bal: Rs. {(liveBalances[form.bank_name] || 0).toLocaleString()}
+                        </span>
+                      )}
+                    </label>
                     <div className="input-wrapper">
                       <Building2 size={18} />
                       <select 

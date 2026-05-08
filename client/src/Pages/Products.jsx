@@ -16,14 +16,12 @@ const API = "http://localhost:5000/api/products";
 
 const CATEGORIES = [
   { name: "Cement", icon: "🧱" },
-  { name: "Iron/Steel", icon: "🏗️" },
+  { name: "Steel", icon: "🏗️" },
+  { name: "Crush", icon: "🪨" },
   { name: "Bricks", icon: "🧱" },
   { name: "Sand", icon: "🏖️" },
-  { name: "Crush/Bajri", icon: "🪨" },
-  { name: "Tiles", icon: "🔲" },
-  { name: "Paint", icon: "🎨" },
-  { name: "Sanitary", icon: "🚿" },
-  { name: "Hardware", icon: "🔧" },
+  { name: "Tiles Bond", icon: "🔗" },
+  { name: "Chips", icon: "⚪" },
   { name: "Other", icon: "📦" }
 ];
 
