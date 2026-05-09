@@ -17,8 +17,8 @@ router.get('/ledger/all', auth, async (req, res) => {
     let params = [];
 
     if (!isAdmin(req)) {
-      query += ' WHERE p.module_type = $1 AND p.user_id = $2';
-      params.push(req.user.module_type || 'Retail 1', req.user.id);
+      query += ' WHERE (p.user_id = $1 OR p.module_type = $2)';
+      params.push(req.user.id, req.user.module_type || 'Retail 1');
     }
 
     query += ' ORDER BY p.purchase_date DESC';
@@ -43,8 +43,8 @@ router.get('/supplier/:supplierId', auth, async (req, res) => {
 
     let pIdx = 2;
     if (!isAdmin(req)) {
-      query += ` AND p.module_type = $${pIdx++} AND p.user_id = $${pIdx++}`;
-      params.push(req.user.module_type || 'Retail 1', req.user.id);
+      query += ` AND (p.user_id = $${pIdx++} OR p.module_type = $${pIdx++})`;
+      params.push(req.user.id, req.user.module_type || 'Retail 1');
     } else if (type) {
       query += ` AND p.module_type = $${pIdx++}`;
       params.push(type);
