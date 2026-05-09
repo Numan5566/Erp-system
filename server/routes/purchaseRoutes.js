@@ -118,13 +118,13 @@ router.post('/', auth, async (req, res) => {
         );
       }
 
-      // 5. Automatically record as an Expense
+      // 5. Automatically record as an Expense (Assigned to discrete Supplier Vehicle Type)
       await client.query(
         `INSERT INTO expenses (description, expense_type, category, amount, expense_date, notes, user_id, module_type, payment_type) 
          VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, $8)`,
         [
           `Transport Fare: ${vehicle_number || 'Vehicle'}`,
-          'Office',
+          'Supplier Vehicle', // UPDATED TYPE FOR SEPARATION
           'Transport',
           fare,
           JSON.stringify({ vehicle_id: vId, vehicle_number }),

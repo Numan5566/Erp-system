@@ -160,7 +160,7 @@ export default function Expenses({ type }) {
   };
 
   const filtered = records.filter(r => {
-    const matchType = filterType === "All" || r.expense_type === filterType;
+    const matchType = filterType === "All" ? true : filterType === "Pending Only" ? r.payment_type === 'Pending' : r.expense_type === filterType;
     const matchSearch = r.title.toLowerCase().includes(search.toLowerCase()) || 
                         (r.category || "").toLowerCase().includes(search.toLowerCase());
     
@@ -212,7 +212,7 @@ export default function Expenses({ type }) {
         </button>
       </div>
 
-      <div className="stats-grid-pos" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
+      <div className="stats-grid-pos" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
         <div className="pos-stat-card">
           <div className="icon blue"><Building2 size={24} /></div>
           <div className="info">
@@ -230,28 +230,28 @@ export default function Expenses({ type }) {
         <div className="pos-stat-card">
           <div className="icon blue" style={{ background: '#ecfeff', color: '#0891b2' }}><Truck size={24} /></div>
           <div className="info">
-            <span className="label">Vehicle Total</span>
+            <span className="label">Personal Veh.</span>
             <span className="value">Rs. {filtered.filter(r => r.expense_type === "Personal Vehicle" && r.payment_type !== 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
-          <div className="icon red" style={{ background: '#fef2f2', color: '#ef4444' }}><Wallet size={24} /></div>
+          <div className="icon orange" style={{ background: '#fff7ed', color: '#c2410c' }}><Truck size={24} /></div>
           <div className="info">
-            <span className="label">Galla Handover</span>
-            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Galla Closeout" && r.payment_type !== 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="label">Supplier Veh.</span>
+            <span className="value">Rs. {filtered.filter(r => (r.expense_type === "Supplier Vehicle" || r.category === 'Transport') && r.payment_type !== 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
-          <div className="icon green" style={{ background: '#f0fdf4', color: '#16a34a' }}><Wallet size={24} /></div>
+          <div className="icon red" style={{ background: '#fef2f2', color: '#ef4444' }}><CircleDollarSign size={24} /></div>
           <div className="info">
-            <span className="label">Admin Payments</span>
-            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Admin Payment" && r.payment_type !== 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="label" style={{color: '#ef4444', fontWeight: 'bold'}}>PENDING TOTAL</span>
+            <span className="value" style={{color: '#b91c1c', fontWeight: '900'}}>Rs. {filtered.filter(r => r.payment_type === 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
           <div className="icon green"><Wallet size={24} /></div>
           <div className="info">
-            <span className="label">Grand Total</span>
+            <span className="label">Grand Paid Total</span>
             <span className="value">Rs. {filtered.filter(r => r.payment_type !== 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
@@ -290,7 +290,7 @@ export default function Expenses({ type }) {
         </div>
         
         <div className="filter-group">
-           {["All", "Office", "House", "Personal Vehicle", "Galla Closeout", "Admin Payment"].map(t => (
+           {["All", "Pending Only", "Supplier Vehicle", "Personal Vehicle", "Office", "House", "Galla Closeout", "Admin Payment"].map(t => (
              <button key={t} className={`tab-btn ${filterType === t ? 'active' : ''}`} onClick={() => setFilterType(t)}>{t}</button>
            ))}
         </div>
@@ -383,6 +383,8 @@ export default function Expenses({ type }) {
                       <option value="Office">Office Expense</option>
                       <option value="House">House Expense</option>
                       <option value="Personal Vehicle">Personal Vehicle</option>
+                      <option value="Supplier Vehicle">Supplier Vehicle</option>
+                      <option value="Supplier Vehicle">Supplier Vehicle</option>
                     </select>
                   </div>
                 </div>
