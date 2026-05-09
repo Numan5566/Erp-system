@@ -33,17 +33,18 @@ export default function Dashboard() {
 
         const counterQuery = user?.role === 'admin' ? '' : `?type=${user?.module_type}`;
 
-        // Fetch products for stock stats
-        const prodRes = await fetch(`https://erp-backend-3rf8.onrender.com/api/products${counterQuery}`, { headers });
-        const products = await prodRes.json();
+        // Fetch products, expenses, and customers in parallel using Promise.all for 3x faster performance
+        const [prodRes, expRes, custRes] = await Promise.all([
+          fetch(`https://erp-backend-3rf8.onrender.com/api/products${counterQuery}`, { headers }),
+          fetch(`https://erp-backend-3rf8.onrender.com/api/expenses${counterQuery}`, { headers }),
+          fetch(`https://erp-backend-3rf8.onrender.com/api/customers${counterQuery}`, { headers })
+        ]);
 
-        // Fetch expenses
-        const expRes = await fetch(`https://erp-backend-3rf8.onrender.com/api/expenses${counterQuery}`, { headers });
-        const expenses = await expRes.json();
-
-        // Fetch customers
-        const custRes = await fetch(`https://erp-backend-3rf8.onrender.com/api/customers${counterQuery}`, { headers });
-        const customers = await custRes.json();
+        const [products, expenses, customers] = await Promise.all([
+          prodRes.json(),
+          expRes.json(),
+          custRes.json()
+        ]);
 
         if (Array.isArray(products) && Array.isArray(expenses) && Array.isArray(customers)) {
           setStats({
