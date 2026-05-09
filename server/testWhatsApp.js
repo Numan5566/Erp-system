@@ -1,24 +1,25 @@
-const dotenv = require('dotenv');
-dotenv.config();
-const { sendWhatsAppBill } = require('./utils/whatsapp');
+const axios = require('axios');
 
-const testSale = {
-  id: 124,
-  customer_name: 'Numan',
-  customer_phone: '03259773687',
-  payment_type: 'Cash',
-  sale_type: 'Wholesale',
-  total_amount: 50000,
-  discount: 1000,
-  delivery_charges: 500,
-  net_amount: 49500,
-  paid_amount: 49500,
-  balance_amount: 0
-};
+async function testUltraMsgDirect() {
+  console.log('🚀 Triggering direct UltraMsg API Test...');
+  const apiUrl = 'https://api.ultramsg.com/instance174172/messages/chat';
+  const token = '4722xwbvpu3mdq18';
+  const to = '923004269347'; // Admin Phone
+  const body = '🔔 *DATA WALEY CEMENT ERP: TEST MESSAGE* \n\nHello! This is a real-time live connection test for your automatic WhatsApp billing system.';
 
-const testItems = [
-  { product_name: 'Lucky Cement', qty: 50, rate: 1000, subtotal: 50000 }
-];
+  const params = new URLSearchParams();
+  params.append('token', token);
+  params.append('to', to);
+  params.append('body', body);
 
-console.log('--- STARTING WHATSAPP TEST DISPATCH ---');
-sendWhatsAppBill(testSale, testItems);
+  try {
+    const res = await axios.post(apiUrl, params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+    console.log('🎉 ULTRAMSG RESPONSE SUCCESS:', res.data);
+  } catch (err) {
+    console.error('❌ ULTRAMSG RESPONSE ERROR:', err.response?.data || err.message);
+  }
+}
+
+testUltraMsgDirect();

@@ -34,15 +34,15 @@ export default function Dashboard() {
         const counterQuery = user?.role === 'admin' ? '' : `?type=${user?.module_type}`;
 
         // Fetch products for stock stats
-        const prodRes = await fetch(`http://localhost:5000/api/products${counterQuery}`, { headers });
+        const prodRes = await fetch(`https://erp-backend-3rf8.onrender.com/api/products${counterQuery}`, { headers });
         const products = await prodRes.json();
 
         // Fetch expenses
-        const expRes = await fetch(`http://localhost:5000/api/expenses${counterQuery}`, { headers });
+        const expRes = await fetch(`https://erp-backend-3rf8.onrender.com/api/expenses${counterQuery}`, { headers });
         const expenses = await expRes.json();
 
         // Fetch customers
-        const custRes = await fetch(`http://localhost:5000/api/customers${counterQuery}`, { headers });
+        const custRes = await fetch(`https://erp-backend-3rf8.onrender.com/api/customers${counterQuery}`, { headers });
         const customers = await custRes.json();
 
         if (Array.isArray(products) && Array.isArray(expenses) && Array.isArray(customers)) {

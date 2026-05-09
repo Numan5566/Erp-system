@@ -9,7 +9,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "http://localhost:5000/api/customers";
+const API = "https://erp-backend-3rf8.onrender.com/api/customers";
 
 const emptyForm = {
   name: "",
@@ -71,7 +71,7 @@ export default function Customers({ type }) {
       const data = await res.json();
       setRecords(Array.isArray(data) ? data : []);
 
-      const banksRes = await fetch(`http://localhost:5000/api/banks`, {
+      const banksRes = await fetch(`https://erp-backend-3rf8.onrender.com/api/banks`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const banksData = await banksRes.json();
@@ -133,7 +133,7 @@ export default function Customers({ type }) {
     setShowLedgerModal(true);
     setLoading(true);
     try {
-      let url = `http://localhost:5000/api/sales/ledger/${customer.id}`;
+      let url = `https://erp-backend-3rf8.onrender.com/api/sales/ledger/${customer.id}`;
       if (from && to) url += `?from=${from}&to=${to}`;
       const res = await fetch(url, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
@@ -199,7 +199,7 @@ export default function Customers({ type }) {
 
     setLoading(true);
     try {
-      await fetch("http://localhost:5000/api/sales/payment", {
+      await fetch("https://erp-backend-3rf8.onrender.com/api/sales/payment", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -226,7 +226,7 @@ export default function Customers({ type }) {
 
   const handleItemUpdate = async (saleId, itemId, newQty, newRate) => {
     try {
-      const res = await fetch("http://localhost:5000/api/sales/update-item", {
+      const res = await fetch("https://erp-backend-3rf8.onrender.com/api/sales/update-item", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

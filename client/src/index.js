@@ -12,9 +12,9 @@ import { PrimeReactProvider } from 'primereact/api';
 // Centralized Live API redirect monkey-patch
 const originalFetch = window.fetch;
 window.fetch = function (url, options) {
-  if (typeof url === 'string' && url.includes('http://localhost:5000')) {
-    const apiURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-    url = url.replace('http://localhost:5000', apiURL);
+  if (typeof url === 'string' && url.includes('https://erp-backend-3rf8.onrender.com')) {
+    const apiURL = process.env.REACT_APP_API_URL || 'https://erp-backend-3rf8.onrender.com';
+    url = url.replace('https://erp-backend-3rf8.onrender.com', apiURL);
   }
   return originalFetch(url, options);
 };

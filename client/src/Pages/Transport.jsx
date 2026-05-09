@@ -8,7 +8,7 @@ import { AuthContext } from "../context/AuthContext";
 import ActionMenu from '../components/ActionMenu';
 import "../Styles/ModulePages.scss";
 
-const API = "http://localhost:5000/api/transport";
+const API = "https://erp-backend-3rf8.onrender.com/api/transport";
 
 const emptyForm = {
   ownership_type: "Personal",
@@ -52,7 +52,7 @@ export default function Transport({ type }) {
     if (showPaymentModal) {
       const fetchLiveBalances = async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/banks/balances?type=${activeCounter}`, {
+          const res = await fetch(`https://erp-backend-3rf8.onrender.com/api/banks/balances?type=${activeCounter}`, {
             headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
           });
           if (res.ok) {
@@ -67,7 +67,7 @@ export default function Transport({ type }) {
 
   const fetchBanks = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/banks', {
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/banks', {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -110,7 +110,7 @@ export default function Transport({ type }) {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/transport/payment`, {
+      const res = await fetch(`https://erp-backend-3rf8.onrender.com/api/transport/payment`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

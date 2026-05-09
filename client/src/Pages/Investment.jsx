@@ -12,7 +12,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "http://localhost:5000/api/investments";
+const API = "https://erp-backend-3rf8.onrender.com/api/investments";
 
 const CATEGORIES = ["Real Estate", "Stock Market", "Business", "Gold", "Bonds", "Fixed Deposit", "Other"];
 

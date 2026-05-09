@@ -4,7 +4,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "http://localhost:5000/api/labours";
+const API = "https://erp-backend-3rf8.onrender.com/api/labours";
 
 const emptyForm = { name: "", group_name: "", contact: "", rate_per_day: "", cnic: "" };
 
@@ -108,8 +108,8 @@ export default function Labours({ type }) {
       const [labRes, workRes, balRes, banksRes] = await Promise.all([
         fetch(`${API}?type=${activeTab}`, { headers }),
         fetch(`${API}/work-history?type=${activeTab}`, { headers }),
-        fetch("http://localhost:5000/api/banks/balances", { headers }),
-        fetch("http://localhost:5000/api/banks", { headers })
+        fetch("https://erp-backend-3rf8.onrender.com/api/banks/balances", { headers }),
+        fetch("https://erp-backend-3rf8.onrender.com/api/banks", { headers })
       ]);
       const labData = await labRes.json();
       const workData = await workRes.json();

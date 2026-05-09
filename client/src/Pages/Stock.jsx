@@ -10,7 +10,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "http://localhost:5000/api/products";
+const API = "https://erp-backend-3rf8.onrender.com/api/products";
 
 export default function Stock({ type }) {
   const { user } = useContext(AuthContext);
@@ -59,8 +59,8 @@ export default function Stock({ type }) {
       const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
       const [prodRes, supRes, vehRes] = await Promise.all([
         fetch(`${API}?type=${activeTab}`, { headers }),
-        fetch(`http://localhost:5000/api/suppliers?type=${activeTab}`, { headers }),
-        fetch(`http://localhost:5000/api/transport?type=${activeTab}`, { headers })
+        fetch(`https://erp-backend-3rf8.onrender.com/api/suppliers?type=${activeTab}`, { headers }),
+        fetch(`https://erp-backend-3rf8.onrender.com/api/transport?type=${activeTab}`, { headers })
       ]);
       const prodData = await prodRes.json();
       const supData = await supRes.json();
@@ -136,7 +136,7 @@ export default function Stock({ type }) {
     if (amt > 0) {
       try {
         // Fetch live balances
-        const balRes = await fetch('http://localhost:5000/api/banks/balances', {
+        const balRes = await fetch('https://erp-backend-3rf8.onrender.com/api/banks/balances', {
           headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
         });
         if (balRes.ok) {
@@ -152,7 +152,7 @@ export default function Stock({ type }) {
       } catch (err) { console.error("Balance fetch failed:", err); }
     }
     try {
-      const res = await fetch(`http://localhost:5000/api/purchases`, {
+      const res = await fetch(`https://erp-backend-3rf8.onrender.com/api/purchases`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -187,7 +187,7 @@ export default function Stock({ type }) {
     if (!returnBillNo) return;
     setReturnLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/sales/return", {
+      const res = await fetch("https://erp-backend-3rf8.onrender.com/api/sales/return", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

@@ -16,10 +16,10 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const PRODUCTS_API = "http://localhost:5000/api/products";
-const CUSTOMERS_API = "http://localhost:5000/api/customers";
-const SALES_API = "http://localhost:5000/api/sales";
-const TRANSPORT_API = "http://localhost:5000/api/transport";
+const PRODUCTS_API = "https://erp-backend-3rf8.onrender.com/api/products";
+const CUSTOMERS_API = "https://erp-backend-3rf8.onrender.com/api/customers";
+const SALES_API = "https://erp-backend-3rf8.onrender.com/api/sales";
+const TRANSPORT_API = "https://erp-backend-3rf8.onrender.com/api/transport";
 
 const CATEGORIES = ["All", "Cement", "Steel", "Crush", "Bricks", "Sand", "Tiles Bond", "Chips", "Other"];
 
@@ -136,9 +136,9 @@ export default function Billing({ type }) {
       fetch(`${PRODUCTS_API}?type=${activeTab}`, { headers }),
       fetch(`${SALES_API}?type=${activeTab}`, { headers }),
       fetch(`${TRANSPORT_API}?type=${activeTab}`, { headers }),
-      fetch(`http://localhost:5000/api/banks`, { headers }),
+      fetch(`https://erp-backend-3rf8.onrender.com/api/banks`, { headers }),
       fetch(`${CUSTOMERS_API}?type=${activeTab}`, { headers }),
-      fetch(`http://localhost:5000/api/labours`, { headers })
+      fetch(`https://erp-backend-3rf8.onrender.com/api/labours`, { headers })
     ]);
     const prods = await prodRes.json();
     const sls = await salesRes.json();
@@ -306,7 +306,7 @@ export default function Billing({ type }) {
     if (!returnBillNo) return;
     setReturnLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/sales/return", {
+      const res = await fetch("https://erp-backend-3rf8.onrender.com/api/sales/return", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -398,7 +398,7 @@ export default function Billing({ type }) {
         // Record Labour Loading Work Entry if selected
         if (selectedLabourGroup) {
           try {
-            await fetch("http://localhost:5000/api/labours/work-history", {
+            await fetch("https://erp-backend-3rf8.onrender.com/api/labours/work-history", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",

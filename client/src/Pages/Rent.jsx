@@ -11,7 +11,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "http://localhost:5000/api/rent";
+const API = "https://erp-backend-3rf8.onrender.com/api/rent";
 
 const emptyForm = {
   property_name: "",
@@ -64,7 +64,7 @@ export default function Rent({ type }) {
       const amt = parseFloat(form.amount || 0);
 
       // Fetch live balances
-      const balRes = await fetch('http://localhost:5000/api/banks/balances', {
+      const balRes = await fetch('https://erp-backend-3rf8.onrender.com/api/banks/balances', {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       if (balRes.ok) {

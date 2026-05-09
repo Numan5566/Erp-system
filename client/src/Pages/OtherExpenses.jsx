@@ -11,7 +11,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "http://localhost:5000/api/other-expenses";
+const API = "https://erp-backend-3rf8.onrender.com/api/other-expenses";
 
 const CATEGORIES = [
   "Utilities", "Maintenance", "Office Supplies", "Marketing",

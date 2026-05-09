@@ -12,7 +12,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "http://localhost:5000/api/products";
+const API = "https://erp-backend-3rf8.onrender.com/api/products";
 
 const CATEGORIES = [
   { name: "Cement", icon: "🧱" },

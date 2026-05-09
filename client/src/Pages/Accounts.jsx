@@ -137,7 +137,7 @@ export default function Accounts() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/banks', {
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/banks', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -222,7 +222,7 @@ export default function Accounts() {
         module_type: user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale'),
         notes: bankDetailsText ? `${bankDetailsText}. ${closeoutForm.notes}` : closeoutForm.notes
       };
-      const res = await fetch('http://localhost:5000/api/banks/closeout', {
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/banks/closeout', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -261,7 +261,7 @@ export default function Accounts() {
         module_type: user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale'),
         notes: bankDetailsText ? `${bankDetailsText}. ${adminPaymentForm.notes}` : adminPaymentForm.notes
       };
-      const res = await fetch('http://localhost:5000/api/banks/admin-payment', {
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/banks/admin-payment', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -288,7 +288,7 @@ export default function Accounts() {
   // Fetch bank accounts
   const fetchAccounts = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/banks?include_recipients=true', {
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/banks?include_recipients=true', {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -301,7 +301,7 @@ export default function Accounts() {
   // Fetch sales for payment summary
   const fetchSales = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/sales', {
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/sales', {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -314,7 +314,7 @@ export default function Accounts() {
   // Fetch supplier payments for account deductions
   const fetchSupplierPayments = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/purchases/ledger/all', {
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/purchases/ledger/all', {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       if (!res.ok) throw new Error("Could not fetch supplier payments");
@@ -330,27 +330,27 @@ export default function Accounts() {
     const h = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
     
     try {
-      const res = await fetch('http://localhost:5000/api/salary', { headers: h });
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/salary', { headers: h });
       if (res.ok) setSalaries(await res.json());
     } catch (err) { console.error("Failed to fetch salaries:", err); }
 
     try {
-      const res = await fetch('http://localhost:5000/api/rent', { headers: h });
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/rent', { headers: h });
       if (res.ok) setRents(await res.json());
     } catch (err) { console.error("Failed to fetch rents:", err); }
 
     try {
-      const res = await fetch('http://localhost:5000/api/investments', { headers: h });
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/investments', { headers: h });
       if (res.ok) setInvestments(await res.json());
     } catch (err) { console.error("Failed to fetch investments:", err); }
 
     try {
-      const res = await fetch('http://localhost:5000/api/other-expenses', { headers: h });
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/other-expenses', { headers: h });
       if (res.ok) setOtherExpenses(await res.json());
     } catch (err) { console.error("Failed to fetch other expenses:", err); }
 
     try {
-      const res = await fetch('http://localhost:5000/api/expenses', { headers: h });
+      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/expenses', { headers: h });
       if (res.ok) setGeneralExpenses(await res.json());
     } catch (err) { console.error("Failed to fetch general expenses:", err); }
   };
@@ -368,7 +368,7 @@ export default function Accounts() {
     setLoading(true);
     try {
       const method = editId ? "PUT" : "POST";
-      const url = editId ? `http://localhost:5000/api/banks/${editId}` : 'http://localhost:5000/api/banks';
+      const url = editId ? `https://erp-backend-3rf8.onrender.com/api/banks/${editId}` : 'https://erp-backend-3rf8.onrender.com/api/banks';
       
       const module_type = user?.email === 'admin@erp.com' ? activeTab : (user?.module_type || 'Wholesale');
       await fetch(url, {
@@ -404,7 +404,7 @@ export default function Accounts() {
 
   const handleDelete = async (id) => {
     try {
-      await fetch(`http://localhost:5000/api/banks/${id}`, {
+      await fetch(`https://erp-backend-3rf8.onrender.com/api/banks/${id}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });

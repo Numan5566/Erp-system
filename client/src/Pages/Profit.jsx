@@ -11,8 +11,8 @@ import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
 import "../Styles/ModulePages.scss";
 
-const SUMMARY_API = "http://localhost:5000/api/profit/summary";
-const DETAIL_API  = "http://localhost:5000/api/profit/detail";
+const SUMMARY_API = "https://erp-backend-3rf8.onrender.com/api/profit/summary";
+const DETAIL_API  = "https://erp-backend-3rf8.onrender.com/api/profit/detail";
 
 const COUNTER_COLORS = {
   Wholesale: { bg: '#eff6ff', border: '#3b82f6', icon: '#3b82f6', label: 'Wholesale' },
