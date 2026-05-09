@@ -92,6 +92,16 @@ export default function Billing({ type }) {
   const [heldBills, setHeldBills] = useState(() => JSON.parse(localStorage.getItem('heldBills') || '[]'));
   const [showHoldModal, setShowHoldModal] = useState(false);
   const [salesDateFilter, setSalesDateFilter] = useState("Today");
+  const [selectedSales, setSelectedSales] = useState([]);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
+
+  const triggerConfirm = (message, onConfirm) => {
+    setConfirmMessage(message);
+    setConfirmAction(() => onConfirm);
+    setShowConfirmModal(true);
+  };
 
   const filteredSales = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -799,7 +809,45 @@ export default function Billing({ type }) {
         <div className="history-container" style={{padding: '20px', background: 'white', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }} className="no-print">
-            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>Sales Log</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>Sales Log</h2>
+              {user?.role === 'admin' && selectedSales.length > 0 && (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    triggerConfirm(
+                      `Are you sure you want to delete ${selectedSales.length} selected sales? Stock and balance will be reverted.`,
+                      async () => {
+                        for (const s of selectedSales) {
+                          await fetch(`${SALES_API}/${s.id}`, { 
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                          });
+                        }
+                        setSelectedSales([]);
+                        fetchData();
+                      }
+                    );
+                  }}
+                  style={{
+                    background: '#fef2f2',
+                    color: '#ef4444',
+                    border: '1px solid #fca5a5',
+                    padding: '6px 16px',
+                    borderRadius: '12px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Trash2 size={16} /> Delete Selected ({selectedSales.length})
+                </button>
+              )}
+            </div>
             <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '12px' }}>
                {["Today", "Yesterday", "All Time"].map(d => (
                  <button 
@@ -850,7 +898,11 @@ export default function Billing({ type }) {
             </div>
           </div>
 
-          <DataTable value={filteredSales} paginator rows={10} rowsPerPageOptions={[10, 25, 50]} className="p-datatable-sm" stripedRows responsiveLayout="scroll">
+          <DataTable value={filteredSales} paginator rows={10} rowsPerPageOptions={[10, 25, 50]} className="p-datatable-sm" stripedRows responsiveLayout="scroll"
+                     selection={selectedSales} onSelectionChange={(e) => setSelectedSales(e.value)}>
+            {user?.role === 'admin' && (
+              <Column selectionMode="multiple" headerStyle={{ width: '3rem' }} />
+            )}
             <Column header="Date" body={(s) => new Date(s.created_at).toLocaleDateString()} sortable field="created_at" />
             <Column header="Bill No" body={(s) => `#SAL-${s.id}`} sortable field="id" />
             <Column header="Customer" field="customer_name" sortable />
@@ -904,14 +956,17 @@ export default function Billing({ type }) {
                   setEditId(s.id);
                   setView('POS');
                 } : null}
-                onDelete={user?.role === 'admin' ? async () => {
-                  if (window.confirm('Are you sure you want to delete this sale? Stock and balance will be reverted.')) {
-                    await fetch(`${SALES_API}/${s.id}`, { 
-                      method: 'DELETE',
-                      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-                    });
-                    fetchData();
-                  }
+                onDelete={user?.role === 'admin' ? () => {
+                  triggerConfirm(
+                    'Are you sure you want to delete this sale? Stock and balance will be reverted.',
+                    async () => {
+                      await fetch(`${SALES_API}/${s.id}`, { 
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                      });
+                      fetchData();
+                    }
+                  );
                 } : null}
                 extraItems={[
                   { 
@@ -1552,6 +1607,31 @@ export default function Billing({ type }) {
           </div>
         )}
       </Dialog>
+
+      {showConfirmModal && (
+        <div className="modal-overlay no-print" style={{zIndex: 9999}}>
+          <div className="modal" style={{maxWidth: '450px', borderRadius: '16px', padding: '24px', textAlign: 'center'}}>
+            <div style={{color: '#ef4444', marginBottom: '15px'}}>
+              <Trash2 size={48} style={{margin: '0 auto'}} />
+            </div>
+            <h3 style={{margin: '0 0 10px 0', fontSize: '1.25rem', fontWeight: 800, color: '#1e293b'}}>Confirm Deletion</h3>
+            <p style={{margin: '0 0 24px 0', fontSize: '0.95rem', color: '#64748b', lineHeight: '1.5'}}>{confirmMessage}</p>
+            <div style={{display: 'flex', gap: '12px', justifyContent: 'center'}}>
+              <button type="button" className="btn-secondary" onClick={() => setShowConfirmModal(false)} style={{padding: '10px 24px', borderRadius: '12px', fontSize: '0.95rem', fontWeight: 700}}>
+                Cancel
+              </button>
+              <button type="button" className="btn-primary" 
+                      onClick={() => {
+                        if (confirmAction) confirmAction();
+                        setShowConfirmModal(false);
+                      }} 
+                      style={{background: '#ef4444', borderColor: '#ef4444', padding: '10px 24px', borderRadius: '12px', fontSize: '0.95rem', fontWeight: 700}}>
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

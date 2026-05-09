@@ -34,9 +34,9 @@ export default function Profit() {
   const [detail, setDetail]   = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('sales');
-  const [quickFilter, setQuickFilter] = useState('all');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate]     = useState('');
+  const [quickFilter, setQuickFilter] = useState('today');
+  const [fromDate, setFromDate] = useState(today());
+  const [toDate, setToDate]     = useState(today());
 
   const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
 
@@ -65,7 +65,7 @@ export default function Profit() {
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { loadSummary('', ''); }, []);
+  useEffect(() => { loadSummary(today(), today()); }, []);
 
   const openDetail = async (counterName) => {
     setSelectedCounter(counterName);

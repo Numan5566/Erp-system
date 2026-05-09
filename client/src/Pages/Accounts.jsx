@@ -1040,11 +1040,15 @@ export default function Accounts() {
             return <div style={{fontWeight: 900, color: '#16a34a', fontSize: '1.1rem'}}>Rs. {bal.toLocaleString()}</div>
           }} />
           <Column header="" body={acc => {
-            const isAdmin = user?.email === 'admin@erp.com';
+            const isAdmin = user?.role === 'admin';
             return (
               <ActionMenu 
                 onEdit={acc.isCash || !isAdmin ? null : () => handleEdit(acc)}
-                onDelete={null}
+                onDelete={acc.isCash || !isAdmin ? null : () => {
+                  if (window.confirm(`Are you sure you want to delete ${acc.bank_name}?`)) {
+                    handleDelete(acc.id);
+                  }
+                }}
                 bypassConfirm={true}
                 extraItems={[
                   { 
