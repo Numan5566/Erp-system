@@ -1,3 +1,6 @@
+// DYNAMIC API PATCH
+const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
+
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { 
   ShoppingCart, Search, Trash2, User, Plus, Minus, 
@@ -16,10 +19,10 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const PRODUCTS_API = "https://erp-backend-3rf8.onrender.com/api/products";
-const CUSTOMERS_API = "https://erp-backend-3rf8.onrender.com/api/customers";
-const SALES_API = "https://erp-backend-3rf8.onrender.com/api/sales";
-const TRANSPORT_API = "https://erp-backend-3rf8.onrender.com/api/transport";
+const PRODUCTS_API = (API_BASE_URL + "/products");
+const CUSTOMERS_API = (API_BASE_URL + "/customers");
+const SALES_API = (API_BASE_URL + "/sales");
+const TRANSPORT_API = (API_BASE_URL + "/transport");
 
 const CATEGORIES = ["All", "Cement", "Steel", "Crush", "Bricks", "Sand", "Tiles Bond", "Chips", "Other"];
 
@@ -136,9 +139,9 @@ export default function Billing({ type }) {
       fetch(`${PRODUCTS_API}?type=${activeTab}`, { headers }),
       fetch(`${SALES_API}?type=${activeTab}`, { headers }),
       fetch(`${TRANSPORT_API}?type=${activeTab}`, { headers }),
-      fetch(`https://erp-backend-3rf8.onrender.com/api/banks`, { headers }),
+      fetch(`${API_BASE_URL}/banks`, { headers }),
       fetch(`${CUSTOMERS_API}?type=${activeTab}`, { headers }),
-      fetch(`https://erp-backend-3rf8.onrender.com/api/labours`, { headers })
+      fetch(`${API_BASE_URL}/labours`, { headers })
     ]);
     const prods = await prodRes.json();
     const sls = await salesRes.json();
@@ -306,7 +309,7 @@ export default function Billing({ type }) {
     if (!returnBillNo) return;
     setReturnLoading(true);
     try {
-      const res = await fetch("https://erp-backend-3rf8.onrender.com/api/sales/return", {
+      const res = await fetch((API_BASE_URL + "/sales/return"), {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -398,7 +401,7 @@ export default function Billing({ type }) {
         // Record Labour Loading Work Entry if selected
         if (selectedLabourGroup) {
           try {
-            await fetch("https://erp-backend-3rf8.onrender.com/api/labours/work-history", {
+            await fetch((API_BASE_URL + "/labours/work-history"), {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",

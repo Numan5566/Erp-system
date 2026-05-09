@@ -1,3 +1,6 @@
+// DYNAMIC API PATCH
+const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
+
 import React, { useState, useEffect, useContext } from "react";
 import { 
   Receipt, Plus, Pencil, Trash2, X, Search, 
@@ -8,7 +11,7 @@ import { AuthContext } from "../context/AuthContext";
 import ActionMenu from '../components/ActionMenu';
 import "../Styles/ModulePages.scss";
 
-const API = "https://erp-backend-3rf8.onrender.com/api/expenses";
+const API = (API_BASE_URL + "/expenses");
 
 const emptyForm = {
   title: "",
@@ -48,7 +51,7 @@ export default function Expenses({ type }) {
     if (showModal) {
       const fetchLiveBalances = async () => {
         try {
-          const res = await fetch(`https://erp-backend-3rf8.onrender.com/api/banks/balances?type=${activeTab}`, {
+          const res = await fetch(`${API_BASE_URL}/banks/balances?type=${activeTab}`, {
             headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
           });
           if (res.ok) {
@@ -84,7 +87,7 @@ export default function Expenses({ type }) {
 
   const fetchBanks = async () => {
     try {
-      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/banks', {
+      const res = await fetch((API_BASE_URL + '/banks'), {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -94,7 +97,7 @@ export default function Expenses({ type }) {
 
   const fetchPersonalVehicles = async () => {
     try {
-      const res = await fetch(`https://erp-backend-3rf8.onrender.com/api/transport?ownership_type=Personal&type=${activeTab}`, {
+      const res = await fetch(`${API_BASE_URL}/transport?ownership_type=Personal&type=${activeTab}`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -557,7 +560,7 @@ export default function Expenses({ type }) {
                    try {
                      const method = payForm.source === 'Bank' ? payForm.bank : 'Cash';
                      // 1. Check Balance
-                     const balRes = await fetch(`https://erp-backend-3rf8.onrender.com/api/banks/balance/${method}?module_type=${activeTab}`, {
+                     const balRes = await fetch(`${API_BASE_URL}/banks/balance/${method}?module_type=${activeTab}`, {
                        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
                      });
                      const { balance } = await balRes.json();

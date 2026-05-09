@@ -1,3 +1,6 @@
+// DYNAMIC API PATCH
+const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
+
 /* eslint-disable */
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { 
@@ -10,7 +13,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "https://erp-backend-3rf8.onrender.com/api/suppliers";
+const API = (API_BASE_URL + "/suppliers");
 
 const emptyForm = {
   name: "",
@@ -59,7 +62,7 @@ export default function Suppliers({ type }) {
     if (showPaymentModal) {
       const fetchLiveBalances = async () => {
         try {
-          const res = await fetch('https://erp-backend-3rf8.onrender.com/api/banks/balances', {
+          const res = await fetch((API_BASE_URL + '/banks/balances'), {
             headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
           });
           if (res.ok) {
@@ -91,7 +94,7 @@ export default function Suppliers({ type }) {
 
   const fetchBanks = async () => {
     try {
-      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/banks', {
+      const res = await fetch((API_BASE_URL + '/banks'), {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
@@ -167,7 +170,7 @@ export default function Suppliers({ type }) {
     setShowLedgerModal(true);
     setLoading(true);
     try {
-      let url = `https://erp-backend-3rf8.onrender.com/api/purchases/supplier/${supplier.id}?type=${activeTab}`;
+      let url = `${API_BASE_URL}/purchases/supplier/${supplier.id}?type=${activeTab}`;
       if (from && to) url += `&from=${from}&to=${to}`;
       const res = await fetch(url, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
@@ -237,7 +240,7 @@ export default function Suppliers({ type }) {
 
     try {
       // 3. Save the payment
-      const res = await fetch(`https://erp-backend-3rf8.onrender.com/api/purchases/payment`, {
+      const res = await fetch(`${API_BASE_URL}/purchases/payment`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -263,7 +266,7 @@ export default function Suppliers({ type }) {
 
   const handleEntryUpdate = async (purchaseId, newQty, newRate) => {
     try {
-      const res = await fetch("https://erp-backend-3rf8.onrender.com/api/purchases/update-ledger-entry", {
+      const res = await fetch((API_BASE_URL + "/purchases/update-ledger-entry"), {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

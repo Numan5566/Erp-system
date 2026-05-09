@@ -1,3 +1,6 @@
+// DYNAMIC API PATCH
+const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
+
 import React, { useState, useEffect, useContext } from "react";
 import { 
   Boxes, Plus, Minus, Search, AlertTriangle, TrendingUp, 
@@ -10,7 +13,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "https://erp-backend-3rf8.onrender.com/api/products";
+const API = (API_BASE_URL + "/products");
 
 export default function Stock({ type }) {
   const { user } = useContext(AuthContext);
@@ -58,8 +61,8 @@ export default function Stock({ type }) {
       const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
       const [prodRes, supRes, vehRes] = await Promise.all([
         fetch(`${API}?type=${activeTab}`, { headers }),
-        fetch(`https://erp-backend-3rf8.onrender.com/api/suppliers?type=${activeTab}`, { headers }),
-        fetch(`https://erp-backend-3rf8.onrender.com/api/transport?type=${activeTab}`, { headers })
+        fetch(`${API_BASE_URL}/suppliers?type=${activeTab}`, { headers }),
+        fetch(`${API_BASE_URL}/transport?type=${activeTab}`, { headers })
       ]);
       const prodData = await prodRes.json();
       const supData = await supRes.json();
@@ -160,7 +163,7 @@ export default function Stock({ type }) {
     if (amt > 0) {
       try {
         // Fetch live balances
-        const balRes = await fetch('https://erp-backend-3rf8.onrender.com/api/banks/balances', {
+        const balRes = await fetch((API_BASE_URL + '/banks/balances'), {
           headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
         });
         if (balRes.ok) {
@@ -176,7 +179,7 @@ export default function Stock({ type }) {
       } catch (err) { console.error("Balance fetch failed:", err); }
     }
     try {
-      const res = await fetch(`https://erp-backend-3rf8.onrender.com/api/purchases`, {
+      const res = await fetch(`${API_BASE_URL}/purchases`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -211,7 +214,7 @@ export default function Stock({ type }) {
     if (!returnBillNo) return;
     setReturnLoading(true);
     try {
-      const res = await fetch("https://erp-backend-3rf8.onrender.com/api/sales/return", {
+      const res = await fetch((API_BASE_URL + "/sales/return"), {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

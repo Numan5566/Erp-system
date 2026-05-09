@@ -1,10 +1,13 @@
+// DYNAMIC API PATCH
+const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
+
 import React, { useState, useEffect, useContext } from "react";
 import { Users, FolderGit2, Contact, Coins, Plus, Search, Edit, Trash2, X, Phone, Hash, CreditCard, ChevronLeft, ArrowUpCircle, ArrowDownCircle, ClipboardList } from "lucide-react";
 import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "https://erp-backend-3rf8.onrender.com/api/labours";
+const API = (API_BASE_URL + "/labours");
 
 const emptyForm = { name: "", group_name: "", contact: "", rate_per_day: "", cnic: "" };
 
@@ -107,8 +110,8 @@ export default function Labours({ type }) {
       const [labRes, workRes, balRes, banksRes] = await Promise.all([
         fetch(`${API}?type=${activeTab}`, { headers }),
         fetch(`${API}/work-history?type=${activeTab}`, { headers }),
-        fetch("https://erp-backend-3rf8.onrender.com/api/banks/balances", { headers }),
-        fetch("https://erp-backend-3rf8.onrender.com/api/banks", { headers })
+        fetch((API_BASE_URL + "/banks/balances"), { headers }),
+        fetch((API_BASE_URL + "/banks"), { headers })
       ]);
       const labData = await labRes.json();
       const workData = await workRes.json();

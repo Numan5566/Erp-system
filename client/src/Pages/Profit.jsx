@@ -1,3 +1,6 @@
+// DYNAMIC API PATCH
+const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
+
 import React, { useState, useEffect } from "react";
 import {
   TrendingUp, TrendingDown, DollarSign, ArrowUpRight, ArrowDownRight,
@@ -11,8 +14,8 @@ import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
 import "../Styles/ModulePages.scss";
 
-const SUMMARY_API = "https://erp-backend-3rf8.onrender.com/api/profit/summary";
-const DETAIL_API  = "https://erp-backend-3rf8.onrender.com/api/profit/detail";
+const SUMMARY_API = (API_BASE_URL + "/profit/summary");
+const DETAIL_API  = (API_BASE_URL + "/profit/detail");
 
 const COUNTER_COLORS = {
   Wholesale: { bg: '#eff6ff', border: '#3b82f6', icon: '#3b82f6', label: 'Wholesale' },

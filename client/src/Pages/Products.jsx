@@ -1,3 +1,6 @@
+// DYNAMIC API PATCH
+const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
+
 import React, { useState, useEffect, useContext } from "react";
 import { 
   Package, Plus, Pencil, Trash2, X, Search, ChevronLeft, 
@@ -12,7 +15,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "https://erp-backend-3rf8.onrender.com/api/products";
+const API = (API_BASE_URL + "/products");
 
 const CATEGORIES = [
   { name: "Cement", icon: "🧱" },

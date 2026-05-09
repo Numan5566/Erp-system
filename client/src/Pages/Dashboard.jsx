@@ -1,3 +1,6 @@
+// DYNAMIC API PATCH
+const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
+
 import React, { useContext, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -37,11 +40,11 @@ export default function Dashboard() {
 
         // Concurrently fetch all major system data entities to perfectly fill caches globally for ultra-fast response times.
         const [prodRes, expRes, custRes, supRes, transRes] = await Promise.all([
-          fetch(`https://erp-backend-3rf8.onrender.com/api/products${counterQuery}`, { headers }),
-          fetch(`https://erp-backend-3rf8.onrender.com/api/expenses${counterQuery}`, { headers }),
-          fetch(`https://erp-backend-3rf8.onrender.com/api/customers${counterQuery}`, { headers }),
-          fetch(`https://erp-backend-3rf8.onrender.com/api/suppliers${counterQuery}`, { headers }),
-          fetch(`https://erp-backend-3rf8.onrender.com/api/transport${counterQuery}`, { headers })
+          fetch(`${API_BASE_URL}/products${counterQuery}`, { headers }),
+          fetch(`${API_BASE_URL}/expenses${counterQuery}`, { headers }),
+          fetch(`${API_BASE_URL}/customers${counterQuery}`, { headers }),
+          fetch(`${API_BASE_URL}/suppliers${counterQuery}`, { headers }),
+          fetch(`${API_BASE_URL}/transport${counterQuery}`, { headers })
         ]);
 
         const [products, expenses, customers, suppliers, transport] = await Promise.all([

@@ -1,3 +1,6 @@
+// DYNAMIC API PATCH
+const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
+
 import React, { useState, useEffect, useContext } from "react";
 import { 
   Users, Plus, Pencil, Trash2, X, Search, 
@@ -7,7 +10,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "https://erp-backend-3rf8.onrender.com/api/salary";
+const API = (API_BASE_URL + "/salary");
 
 const emptyForm = {
   employee_name: "",
@@ -76,7 +79,7 @@ export default function Salary({ type }) {
       const amt = parseFloat(form.salary_amount || form.amount || 0);
       
       // Fetch live balances
-      const balRes = await fetch('https://erp-backend-3rf8.onrender.com/api/banks/balances', {
+      const balRes = await fetch((API_BASE_URL + '/banks/balances'), {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       if (balRes.ok) {

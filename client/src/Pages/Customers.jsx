@@ -1,3 +1,6 @@
+// DYNAMIC API PATCH
+const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
+
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { 
   Users as UsersIcon, Plus, Pencil, Trash2, X, Search, Phone, Mail, 
@@ -9,7 +12,7 @@ import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
 
-const API = "https://erp-backend-3rf8.onrender.com/api/customers";
+const API = (API_BASE_URL + "/customers");
 
 const emptyForm = {
   name: "",
@@ -73,7 +76,7 @@ export default function Customers({ type }) {
       setRecords(finalRecs);
       localStorage.setItem(`cache_customers_${activeTab}`, JSON.stringify(finalRecs));
 
-      const banksRes = await fetch(`https://erp-backend-3rf8.onrender.com/api/banks`, {
+      const banksRes = await fetch(`${API_BASE_URL}/banks`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const banksData = await banksRes.json();
@@ -148,7 +151,7 @@ export default function Customers({ type }) {
     setShowLedgerModal(true);
     setLoading(true);
     try {
-      let url = `https://erp-backend-3rf8.onrender.com/api/sales/ledger/${customer.id}`;
+      let url = `${API_BASE_URL}/sales/ledger/${customer.id}`;
       if (from && to) url += `?from=${from}&to=${to}`;
       const res = await fetch(url, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
@@ -214,7 +217,7 @@ export default function Customers({ type }) {
 
     setLoading(true);
     try {
-      await fetch("https://erp-backend-3rf8.onrender.com/api/sales/payment", {
+      await fetch((API_BASE_URL + "/sales/payment"), {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -241,7 +244,7 @@ export default function Customers({ type }) {
 
   const handleItemUpdate = async (saleId, itemId, newQty, newRate) => {
     try {
-      const res = await fetch("https://erp-backend-3rf8.onrender.com/api/sales/update-item", {
+      const res = await fetch((API_BASE_URL + "/sales/update-item"), {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
