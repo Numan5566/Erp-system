@@ -6,7 +6,6 @@ import {
   Store,
   Package, 
   Boxes, 
-  Receipt, 
   Users as UsersIcon, 
   UserSquare2, 
   Truck, 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { 
-  Truck, Plus, Pencil, Trash2, X, Search, Phone, Mail, 
+  Truck, Plus, X, Search, Phone, Mail, 
   MapPin, Building, CreditCard, Banknote, ClipboardList, Package, FileText
 } from "lucide-react";
 import { DataTable } from 'primereact/datatable';

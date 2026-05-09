@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { 
-  Truck, Plus, Pencil, Trash2, X, Search, 
+  Truck, Plus, X, Search, 
   User, Hash, Phone, CreditCard, Tag
 } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
