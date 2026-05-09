@@ -69,21 +69,36 @@ export default function Customers({ type }) {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-      setRecords(Array.isArray(data) ? data : []);
+      const finalRecs = Array.isArray(data) ? data : [];
+      setRecords(finalRecs);
+      localStorage.setItem(`cache_customers_${activeTab}`, JSON.stringify(finalRecs));
 
       const banksRes = await fetch(`https://erp-backend-3rf8.onrender.com/api/banks`, {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const banksData = await banksRes.json();
-      setBankAccounts(Array.isArray(banksData) ? banksData : []);
-      return data;
+      const finalBanks = Array.isArray(banksData) ? banksData : [];
+      setBankAccounts(finalBanks);
+      localStorage.setItem(`cache_banks_list`, JSON.stringify(finalBanks));
+      return finalRecs;
     } catch (err) {
       console.error("Failed to fetch data", err);
       return [];
     }
   };
 
-  useEffect(() => { fetchRecords(); }, [activeTab]);
+  useEffect(() => { 
+    if (!activeTab) return;
+    try {
+      const cached = localStorage.getItem(`cache_customers_${activeTab}`);
+      const cachedBanks = localStorage.getItem(`cache_banks_list`);
+      if (cached) setRecords(JSON.parse(cached));
+      if (cachedBanks) setBankAccounts(JSON.parse(cachedBanks));
+    } catch (e) {
+      console.error(e);
+    }
+    fetchRecords(); 
+  }, [activeTab]);
 
   // If Admin and no counter selected, show selection screen
   if (user?.email === 'admin@erp.com' && !activeTab && !type) {

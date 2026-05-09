@@ -66,13 +66,24 @@ export default function Products({ type }) {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-      setProducts(Array.isArray(data) ? data : []);
+      const finalProducts = Array.isArray(data) ? data : [];
+      setProducts(finalProducts);
+      localStorage.setItem(`cache_products_${activeTab}`, JSON.stringify(finalProducts));
     } catch (err) {
       console.error("Failed to fetch products", err);
     }
   };
 
-  useEffect(() => { fetchProducts(); }, [activeTab]);
+  useEffect(() => { 
+    if (!activeTab) return;
+    try {
+      const cached = localStorage.getItem(`cache_products_${activeTab}`);
+      if (cached) setProducts(JSON.parse(cached));
+    } catch (e) {
+      console.error(e);
+    }
+    fetchProducts(); 
+  }, [activeTab]);
 
   // If Admin and no counter selected, show selection screen
   if (user?.email === 'admin@erp.com' && !activeTab && !type) {
