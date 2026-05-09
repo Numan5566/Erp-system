@@ -7,6 +7,7 @@ import "primeflex/primeflex.css";
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import { PrimeReactProvider } from 'primereact/api';
 
 // Centralized Live API redirect monkey-patch
 const originalFetch = window.fetch;
@@ -17,8 +18,6 @@ window.fetch = function (url, options) {
   }
   return originalFetch(url, options);
 };
-
-import { PrimeReactProvider } from 'primereact/api';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
