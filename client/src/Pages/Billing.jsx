@@ -175,12 +175,22 @@ export default function Billing({ type }) {
   };
 
   const addToCart = (product) => {
+    const maxStock = parseFloat(product.stock_quantity) || 0;
     const existing = cart.find(item => item.id === product.id);
     if (existing) {
+      const newQty = existing.qty + 1;
+      if (newQty > maxStock) {
+        alert(`OUT OF STOCK! Maximum available stock for ${product.name} is ${maxStock}.`);
+        return;
+      }
       setCart(cart.map(item => 
-        item.id === product.id ? { ...item, qty: item.qty + 1, subtotal: (item.qty + 1) * item.price } : item
+        item.id === product.id ? { ...item, qty: newQty, subtotal: newQty * item.price } : item
       ));
     } else {
+      if (maxStock <= 0) {
+        alert(`OUT OF STOCK! ${product.name} has zero inventory left.`);
+        return;
+      }
       setCart([...cart, { 
         id: product.id, 
         name: product.name, 
@@ -192,10 +202,17 @@ export default function Billing({ type }) {
   };
 
   const updateQty = (id, delta) => {
+    const pInfo = products.find(prod => prod.id === id);
+    const maxAllowed = pInfo ? parseFloat(pInfo.stock_quantity || 0) : Infinity;
     setCart(cart.map(item => {
       if (item.id === id) {
         const currentQty = parseFloat(item.qty) || 0;
-        const newQty = Math.max(1, currentQty + delta);
+        let newQty = currentQty + delta;
+        if (newQty > maxAllowed) {
+          alert(`Out of Stock Limit reached! Available: ${maxAllowed}`);
+          newQty = maxAllowed;
+        }
+        newQty = Math.max(1, newQty);
         return { ...item, qty: newQty, subtotal: newQty * item.price };
       }
       return item;
@@ -203,18 +220,22 @@ export default function Billing({ type }) {
   };
 
   const setQtyDirect = (id, value) => {
+    const pInfo = products.find(prod => prod.id === id);
+    const maxAllowed = pInfo ? parseFloat(pInfo.stock_quantity || 0) : Infinity;
     setCart(cart.map(item => {
       if (item.id === id) {
         const parsed = parseFloat(value);
-        const newQty = isNaN(parsed) ? '' : Math.max(0, parsed);
-        const subtotalQty = newQty === '' ? 0 : newQty;
-        return { ...item, qty: value, subtotal: subtotalQty * item.price };
+        let finalVal = isNaN(parsed) ? '' : Math.max(0, parsed);
+        if (finalVal !== '' && finalVal > maxAllowed) {
+          alert(`Cannot exceed stock limit of ${maxAllowed}`);
+          finalVal = maxAllowed;
+        }
+        const subtotalQty = finalVal === '' ? 0 : finalVal;
+        return { ...item, qty: finalVal, subtotal: subtotalQty * item.price };
       }
       return item;
     }));
-  };
-
-  const updatePrice = (id, newPrice) => {
+  };\n\n  const updatePrice = (id, newPrice) => {
     setCart(cart.map(item => {
       if (item.id === id) {
         const p = parseFloat(newPrice) || 0;
