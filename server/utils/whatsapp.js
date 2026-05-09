@@ -56,11 +56,12 @@ async function sendWhatsAppMessage(to, body) {
 
   try {
     if (apiUrl.includes('ultramsg')) {
-      await axios.post(apiUrl, {
-        token: token,
-        to: `${cleanPhone}@c.us`,
-        body: body
-      }, {
+      const params = new URLSearchParams();
+      params.append('token', token);
+      params.append('to', cleanPhone);
+      params.append('body', body);
+
+      await axios.post(apiUrl, params, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
     } else {
