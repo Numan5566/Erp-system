@@ -50,7 +50,7 @@ async function sendWhatsAppMessage(to, body) {
  * Formats and triggers billing receipts for both the Customer and Admin
  */
 async function sendWhatsAppBill(sale, items) {
-  const adminPhone = process.env.ADMIN_PHONE || '923001234567'; // Default fallback admin phone
+  const adminPhone = process.env.ADMIN_PHONE || '923004269347'; // Default fallback admin phone
 
   let itemsList = '';
   items.forEach((item, idx) => {
