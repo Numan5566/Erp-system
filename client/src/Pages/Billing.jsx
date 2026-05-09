@@ -703,9 +703,6 @@ export default function Billing({ type }) {
                   const maxStock = pInfo ? parseFloat(pInfo.stock_quantity || 0) : 0;
                   const isOver = parseFloat(item.qty || 0) > maxStock;
 
-                  const pInfo = products.find(p => p.id === item.id);
-                  const maxStock = pInfo ? parseFloat(pInfo.stock_quantity || 0) : 0;
-                  const isOver = parseFloat(item.qty || 0) > maxStock;
 
                   let compactClass = "";
                   if (cart.length >= 5) compactClass = "ultra-compact";

@@ -73,7 +73,21 @@ router.post('/', auth, async (req, res) => {
     );
     const saleId = saleResult.rows[0].id;
 
-    // 2. Insert items and update stock
+    // 2. Inventory Pre-check & Safety Loop (Hard Lock against negative stock)
+    for (const item of items) {
+      const prodId = item.product_id || item.id;
+      const requestedQty = parseFloat(item.qty || 0);
+      
+      const pCheck = await client.query('SELECT name, stock_quantity FROM products WHERE id = $1', [prodId]);
+      if (pCheck.rows.length > 0) {
+        const currentInv = parseFloat(pCheck.rows[0].stock_quantity || 0);
+        if (requestedQty > currentInv) {
+          throw new Error(`OUT OF STOCK PREVENTED: Available: \${currentInv}, Requested: \${requestedQty} for "\${pCheck.rows[0].name}". Transaction blocked.`);
+        }
+      }
+    }
+
+    // 3. Insert items and update stock
     for (const item of items) {
       const prodId = item.product_id || item.id;
       const prodName = item.product_name || item.name;
