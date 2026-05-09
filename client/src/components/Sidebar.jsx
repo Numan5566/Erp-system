@@ -17,12 +17,13 @@ import {
   Home,
   TrendingUp,
   MoreHorizontal,
-  ShoppingCart
+  ShoppingCart,
+  X
 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import '../Styles/Sidebar.scss';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, onClose }) => {
   const { user, logout } = useContext(AuthContext);
 
   const menuItems = [
@@ -60,11 +61,16 @@ const Sidebar = () => {
   });
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
-        <div className="brand-logo">
-           <Building2 size={24} />
-           <h2>Data Waley</h2>
+        <div className="brand-header-row">
+          <div className="brand-logo">
+             <Building2 size={24} />
+             <h2>Data Waley</h2>
+          </div>
+          <button className="sidebar-close-btn" onClick={onClose}>
+            <X size={20} />
+          </button>
         </div>
         <p className="brand-sub">Cement ERP</p>
         
@@ -84,6 +90,7 @@ const Sidebar = () => {
             key={idx} 
             to={item.path} 
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            onClick={onClose}
           >
             <div className="nav-icon">{item.icon}</div>
             <span>{item.name}</span>
@@ -92,7 +99,7 @@ const Sidebar = () => {
       </nav>
 
       <div className="sidebar-footer">
-        <button className="logout-btn" onClick={logout}>
+        <button className="logout-btn" onClick={() => { logout(); onClose(); }}>
           <LogOut size={20} />
           <span>Exit System</span>
         </button>
