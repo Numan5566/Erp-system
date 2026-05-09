@@ -9,7 +9,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const loadUser = async () => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       if (!token) {
         setLoading(false);
         return;
@@ -21,6 +21,7 @@ export const AuthProvider = ({ children }) => {
       } catch (err) {
         console.error('Failed to load user', err);
         localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
       } finally {
         setLoading(false);
       }
@@ -28,22 +29,30 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (email, password, rememberMe) => {
     const res = await api.post('/auth/login', { email, password });
-    localStorage.setItem('token', res.data.token);
+    if (rememberMe) {
+      localStorage.setItem('token', res.data.token);
+      sessionStorage.removeItem('token');
+    } else {
+      sessionStorage.setItem('token', res.data.token);
+      localStorage.removeItem('token');
+    }
     setUser(res.data.user);
     return res.data;
   };
 
   const register = async (name, email, password) => {
     const res = await api.post('/auth/register', { name, email, password });
-    localStorage.setItem('token', res.data.token);
+    sessionStorage.setItem('token', res.data.token);
+    localStorage.removeItem('token');
     setUser(res.data.user);
     return res.data;
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     setUser(null);
   };
 

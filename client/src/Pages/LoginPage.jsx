@@ -7,6 +7,7 @@ import { Building2 } from 'lucide-react';
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
 
   const { login } = useContext(AuthContext);
@@ -15,7 +16,7 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.msg || 'Login failed. Please check credentials.');
@@ -58,7 +59,11 @@ const LoginPage = () => {
           </div>
           <div className="form-options">
             <label className="remember-me">
-              <input type="checkbox" /> Remember me
+              <input 
+                type="checkbox" 
+                checked={rememberMe} 
+                onChange={(e) => setRememberMe(e.target.checked)} 
+              /> Remember me
             </label>
             <Link to="/forgot" className="forgot-link">Forgot Password?</Link>
           </div>
