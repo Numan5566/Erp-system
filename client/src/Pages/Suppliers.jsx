@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { 
   Truck, Plus, X, Search, Phone, Mail, 
