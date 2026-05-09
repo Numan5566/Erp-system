@@ -355,7 +355,7 @@ export default function Billing({ type }) {
     let exceedsLimit = false;
     let brokenItemName = "";
     cart.forEach(item => {
-      const p = products.find(x => x.id === item.id);
+      const p = products.find(x => String(x.id) === String(item.id));
       const stock = p ? parseFloat(p.stock_quantity || 0) : 0;
       if (parseFloat(item.qty || 0) > stock) {
         exceedsLimit = true;
@@ -372,7 +372,7 @@ export default function Billing({ type }) {
     let exceedsLimit = false;
     let brokenItemName = "";
     cart.forEach(item => {
-      const p = products.find(x => x.id === item.id);
+      const p = products.find(x => String(x.id) === String(item.id));
       const stock = p ? parseFloat(p.stock_quantity || 0) : 0;
       if (parseFloat(item.qty || 0) > stock) {
         exceedsLimit = true;
@@ -699,7 +699,7 @@ export default function Billing({ type }) {
             <div className="sidebar-cart-scrollable">
               <div className="cart-list">
                 {cart.map(item => {
-                  const pInfo = products.find(p => p.id === item.id);
+                  const pInfo = products.find(p => String(p.id) === String(item.id));
                   const maxStock = pInfo ? parseFloat(pInfo.stock_quantity || 0) : 0;
                   const isOver = parseFloat(item.qty || 0) > maxStock;
 
@@ -841,7 +841,7 @@ export default function Billing({ type }) {
               </div>
 
               <Button label={loading ? "Processing..." : "Complete Sale"} icon="pi pi-check" onClick={handleCheckout} 
-                      disabled={loading || cart.length === 0 || cart.some(item => { const p = products.find(x => x.id === item.id); return parseFloat(item.qty || 0) > parseFloat(p ? p.stock_quantity : 0); })} className="w-full mt-3 p-button-lg shadow-2" />
+                      disabled={loading || cart.length === 0 || cart.some(item => { const p = products.find(x => String(x.id) === String(item.id)); return parseFloat(item.qty || 0) > parseFloat(p ? p.stock_quantity : 0); })} className="w-full mt-3 p-button-lg shadow-2" />
             </div>
           </div>
         </div>
