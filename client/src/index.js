@@ -9,14 +9,26 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { PrimeReactProvider } from 'primereact/api';
 
-// Centralized Live API redirect monkey-patch
+// Centralized Live API redirect and 401 response monkey-patch
 const originalFetch = window.fetch;
-window.fetch = function (url, options) {
+window.fetch = async function (url, options) {
   if (typeof url === 'string' && url.includes('https://erp-backend-3rf8.onrender.com')) {
     const apiURL = process.env.REACT_APP_API_URL || 'https://erp-backend-3rf8.onrender.com';
     url = url.replace('https://erp-backend-3rf8.onrender.com', apiURL);
   }
-  return originalFetch(url, options);
+  try {
+    const response = await originalFetch(url, options);
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      if (window.location.pathname !== '/') {
+        window.location.href = '/';
+      }
+    }
+    return response;
+  } catch (err) {
+    throw err;
+  }
 };
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
