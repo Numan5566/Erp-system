@@ -175,22 +175,12 @@ export default function Billing({ type }) {
   };
 
   const addToCart = (product) => {
-    const maxStock = parseFloat(product.stock_quantity) || 0;
     const existing = cart.find(item => item.id === product.id);
     if (existing) {
-      const newQty = existing.qty + 1;
-      if (newQty > maxStock) {
-        alert(`OUT OF STOCK! Maximum available stock for ${product.name} is ${maxStock}.`);
-        return;
-      }
       setCart(cart.map(item => 
-        item.id === product.id ? { ...item, qty: newQty, subtotal: newQty * item.price } : item
+        item.id === product.id ? { ...item, qty: item.qty + 1, subtotal: (item.qty + 1) * item.price } : item
       ));
     } else {
-      if (maxStock <= 0) {
-        alert(`OUT OF STOCK! ${product.name} has zero inventory left.`);
-        return;
-      }
       setCart([...cart, { 
         id: product.id, 
         name: product.name, 
@@ -202,17 +192,10 @@ export default function Billing({ type }) {
   };
 
   const updateQty = (id, delta) => {
-    const pInfo = products.find(prod => prod.id === id);
-    const maxAllowed = pInfo ? parseFloat(pInfo.stock_quantity || 0) : Infinity;
     setCart(cart.map(item => {
       if (item.id === id) {
         const currentQty = parseFloat(item.qty) || 0;
-        let newQty = currentQty + delta;
-        if (newQty > maxAllowed) {
-          alert(`Out of Stock Limit reached! Available: ${maxAllowed}`);
-          newQty = maxAllowed;
-        }
-        newQty = Math.max(1, newQty);
+        const newQty = Math.max(1, currentQty + delta);
         return { ...item, qty: newQty, subtotal: newQty * item.price };
       }
       return item;
@@ -220,16 +203,10 @@ export default function Billing({ type }) {
   };
 
   const setQtyDirect = (id, value) => {
-    const pInfo = products.find(prod => prod.id === id);
-    const maxAllowed = pInfo ? parseFloat(pInfo.stock_quantity || 0) : Infinity;
     setCart(cart.map(item => {
       if (item.id === id) {
         const parsed = parseFloat(value);
-        let finalVal = isNaN(parsed) ? '' : Math.max(0, parsed);
-        if (finalVal !== '' && finalVal > maxAllowed) {
-          alert(`Cannot exceed stock limit of ${maxAllowed}`);
-          finalVal = maxAllowed;
-        }
+        const finalVal = isNaN(parsed) ? '' : Math.max(0, parsed);
         const subtotalQty = finalVal === '' ? 0 : finalVal;
         return { ...item, qty: finalVal, subtotal: subtotalQty * item.price };
       }
@@ -372,7 +349,41 @@ export default function Billing({ type }) {
   };
 
   const handleCheckout = async () => {
-    if (cart.length === 0) return alert("Cart is empty!");
+            if (cart.length === 0) return alert("Cart is empty!");
+    
+    // Master Inventory Lockdown Check
+    let exceedsLimit = false;
+    let brokenItemName = "";
+    cart.forEach(item => {
+      const p = products.find(x => x.id === item.id);
+      const stock = p ? parseFloat(p.stock_quantity || 0) : 0;
+      if (parseFloat(item.qty || 0) > stock) {
+        exceedsLimit = true;
+        brokenItemName = item.name;
+      }
+    });
+
+    if (exceedsLimit) {
+      alert(`ERROR: Cannot complete sale. ${brokenItemName} quantity exceeds available stock limit! Please fix the cart first.`);
+      return;
+    }
+    
+    // Master Inventory Lockdown Check
+    let exceedsLimit = false;
+    let brokenItemName = "";
+    cart.forEach(item => {
+      const p = products.find(x => x.id === item.id);
+      const stock = p ? parseFloat(p.stock_quantity || 0) : 0;
+      if (parseFloat(item.qty || 0) > stock) {
+        exceedsLimit = true;
+        brokenItemName = item.name;
+      }
+    });
+
+    if (exceedsLimit) {
+      alert(`ERROR: Cannot complete sale. ${brokenItemName} quantity exceeds available stock limit! Please fix the cart first.`);
+      return;
+    }
     
     if (parseFloat(paidAmount || 0) > netTotal) {
       alert("Invalid Payment: Paid amount cannot be more than the total bill amount!");
@@ -688,6 +699,14 @@ export default function Billing({ type }) {
             <div className="sidebar-cart-scrollable">
               <div className="cart-list">
                 {cart.map(item => {
+                  const pInfo = products.find(p => p.id === item.id);
+                  const maxStock = pInfo ? parseFloat(pInfo.stock_quantity || 0) : 0;
+                  const isOver = parseFloat(item.qty || 0) > maxStock;
+
+                  const pInfo = products.find(p => p.id === item.id);
+                  const maxStock = pInfo ? parseFloat(pInfo.stock_quantity || 0) : 0;
+                  const isOver = parseFloat(item.qty || 0) > maxStock;
+
                   let compactClass = "";
                   if (cart.length >= 5) compactClass = "ultra-compact";
                   else if (cart.length >= 3) compactClass = "compact-card";
@@ -708,9 +727,9 @@ export default function Billing({ type }) {
                   else if (subtotalStr.length > 10) subtotalFontSize = "0.7rem";
 
                   return (
-                    <div key={item.id} className={`cart-item ${compactClass}`}>
+                    <div key={item.id} className={`cart-item ${compactClass} ${isOver ? 'over-stock-row' : ''}`} style={isOver ? {borderColor: '#fecaca', background: '#fffafb', boxShadow: '0 0 0 1px #ef4444 inset'} : {}}>
                       <div className="item-top">
-                        <span className="name">{item.name}</span>
+                        <span className="name" style={{color: isOver ? "#dc2626" : "inherit", fontWeight: isOver ? "700" : "inherit"}}>{item.name} {isOver && <span style={{background: "#fee2e2", color: "#b91c1c", padding: "2px 6px", borderRadius: "4px", fontSize: "0.6rem", marginLeft: "6px"}}>Out of Stock</span>}</span>
                         <button className="cart-delete-btn" onClick={() => removeFromCart(item.id)}><Trash2 size={14} /></button>
                       </div>
                       <div className="item-bottom">
@@ -825,7 +844,7 @@ export default function Billing({ type }) {
               </div>
 
               <Button label={loading ? "Processing..." : "Complete Sale"} icon="pi pi-check" onClick={handleCheckout} 
-                      disabled={loading || cart.length === 0} className="w-full mt-3 p-button-lg shadow-2" />
+                      disabled={loading || cart.length === 0 || cart.some(item => { const p = products.find(x => x.id === item.id); return parseFloat(item.qty || 0) > parseFloat(p ? p.stock_quantity : 0); })} className="w-full mt-3 p-button-lg shadow-2" />
             </div>
           </div>
         </div>
