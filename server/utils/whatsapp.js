@@ -5,13 +5,12 @@ const axios = require('axios');
  * Fallbacks cleanly to logging if no API is configured so the system never crashes.
  */
 async function sendWhatsAppMessage(to, body) {
-  const apiUrl = process.env.WHATSAPP_API_URL; // e.g., https://api.ultramsg.com/instanceXXXX/messages/chat
-  const token = process.env.WHATSAPP_TOKEN;
+  const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+  const twilioFrom = process.env.TWILIO_FROM || 'whatsapp:+14155238886'; // Twilio's official shared sandbox number
 
-  if (!apiUrl) {
-    console.log(`[WhatsApp Logger] Message to ${to}:\n${body}\n(Set WHATSAPP_API_URL & WHATSAPP_TOKEN in Render to send live)`);
-    return;
-  }
+  const apiUrl = process.env.WHATSAPP_API_URL;
+  const token = process.env.WHATSAPP_TOKEN;
 
   // Sanitize phone number (remove spaces, plus, dashes)
   let cleanPhone = to.replace(/[^0-9]/g, '');
@@ -20,8 +19,42 @@ async function sendWhatsAppMessage(to, body) {
     cleanPhone = '92' + cleanPhone.substring(1);
   }
 
+  // OPTION A: Twilio (No personal phone needed, sends from Twilio's system number)
+  if (twilioSid && twilioToken) {
+    try {
+      const formattedTo = `whatsapp:+${cleanPhone}`;
+      const params = new URLSearchParams();
+      params.append('From', twilioFrom);
+      params.append('To', formattedTo);
+      params.append('Body', body);
+
+      const authHeader = Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64');
+
+      await axios.post(
+        `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
+        params,
+        {
+          headers: {
+            'Authorization': `Basic ${authHeader}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+      console.log(`✅ Twilio WhatsApp successfully sent to ${cleanPhone}`);
+      return;
+    } catch (err) {
+      console.error(`❌ Twilio WhatsApp failed to ${cleanPhone}:`, err.response?.data || err.message);
+      return;
+    }
+  }
+
+  // OPTION B: Scanned Gateways (UltraMsg / Green-API)
+  if (!apiUrl) {
+    console.log(`[WhatsApp Logger] Message to ${cleanPhone}:\n${body}\n(Set TWILIO or WHATSAPP credentials in Render to send live)`);
+    return;
+  }
+
   try {
-    // Support UltraMsg style POST parameters (most popular free-trial gateway)
     if (apiUrl.includes('ultramsg')) {
       await axios.post(apiUrl, {
         token: token,
@@ -31,7 +64,6 @@ async function sendWhatsAppMessage(to, body) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
       });
     } else {
-      // Generic JSON POST (Wassenger / Whapi / Green-API)
       await axios.post(apiUrl, {
         to: cleanPhone,
         chatId: `${cleanPhone}@c.us`,
@@ -40,9 +72,9 @@ async function sendWhatsAppMessage(to, body) {
         token: token
       });
     }
-    console.log(`✅ WhatsApp successfully sent to ${cleanPhone}`);
+    console.log(`✅ Gateway WhatsApp successfully sent to ${cleanPhone}`);
   } catch (err) {
-    console.error(`❌ Failed to send WhatsApp to ${cleanPhone}:`, err.message);
+    console.error(`❌ Gateway WhatsApp failed to ${cleanPhone}:`, err.message);
   }
 }
 
