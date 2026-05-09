@@ -107,7 +107,7 @@ export default function Dashboard() {
   ];
 
   const hasPermission = (moduleId) => {
-    if (user?.email === 'admin@erp.com') return true;
+    if (user?.role === 'admin') return true;
     return user?.permissions?.includes(moduleId);
   };
 
@@ -138,7 +138,7 @@ export default function Dashboard() {
       </header>
 
       {/* Stats Grid - ONLY for Master Admin */}
-      {user?.email === 'admin@erp.com' && (
+      {user?.role === 'admin' && (
         <div className="stats-grid">
           <div className="stat-card premium-shadow">
             <div className="stat-icon blue"><Package size={24} /></div>

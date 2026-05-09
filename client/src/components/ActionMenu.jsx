@@ -16,7 +16,7 @@ export default function ActionMenu({ onEdit, onDelete, extraItems = [], bypassCo
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingEvent, setPendingEvent] = useState(null);
 
-  const isAdmin = user?.email === 'admin@erp.com';
+  const isAdmin = user?.role === 'admin';
 
   const items = [
     ...(onEdit ? [{

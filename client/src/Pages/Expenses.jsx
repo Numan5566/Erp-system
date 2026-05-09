@@ -336,8 +336,8 @@ export default function Expenses({ type }) {
                   <td className="bold text-red">Rs. {parseFloat(r.amount).toLocaleString()}</td>
                   <td style={{ textAlign: 'center' }}>
                     <ActionMenu 
-                      onEdit={user?.email === 'admin@erp.com' ? () => { setForm(r); setEditId(r.id); setShowModal(true); } : null}
-                      onDelete={user?.email === 'admin@erp.com' ? () => handleDelete(r.id) : null}
+                      onEdit={user?.role === 'admin' ? () => { setForm(r); setEditId(r.id); setShowModal(true); } : null}
+                      onDelete={user?.role === 'admin' ? () => handleDelete(r.id) : null}
                       extraItems={r.payment_type === 'Pending' ? [
                         { label: 'Payable', icon: 'pi pi-wallet', command: () => { setSelectedExpForPay(r); setShowPayModal(true); } }
                       ] : []}

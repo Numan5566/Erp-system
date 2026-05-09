@@ -416,7 +416,7 @@ export default function Accounts() {
       const method = editId ? "PUT" : "POST";
       const url = editId ? `https://erp-backend-3rf8.onrender.com/api/banks/${editId}` : 'https://erp-backend-3rf8.onrender.com/api/banks';
       
-      const module_type = user?.email === 'admin@erp.com' ? activeTab : (user?.module_type || 'Wholesale');
+      const module_type = user?.role === 'admin' ? activeTab : (user?.module_type || 'Wholesale');
       await fetch(url, {
         method,
         headers: {
@@ -437,7 +437,7 @@ export default function Accounts() {
   };
 
   const handleEdit = (acc) => {
-    if (user?.email !== 'admin@erp.com') return;
+    if (user?.role !== 'admin') return;
     setEditId(acc.id);
     setForm({
       bank_name: acc.bank_name,
@@ -784,7 +784,7 @@ export default function Accounts() {
       {/* Cash Card */}
       <div className="stat-card" 
         onClick={() => {
-          if (user?.email === 'admin@erp.com') {
+          if (user?.role === 'admin') {
             handleCashOpeningBalance();
           }
         }}
@@ -793,22 +793,22 @@ export default function Accounts() {
           padding: '24px', borderRadius: '20px', color: '#fff', 
           boxShadow: '0 10px 20px rgba(16, 185, 129, 0.2)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          cursor: (user?.email === 'admin@erp.com') ? 'pointer' : 'default', transition: 'transform 0.2s'
+          cursor: (user?.role === 'admin') ? 'pointer' : 'default', transition: 'transform 0.2s'
         }}
         onMouseEnter={e => {
-          if (user?.email === 'admin@erp.com') {
+          if (user?.role === 'admin') {
             e.currentTarget.style.transform = 'scale(1.02)';
           }
         }}
         onMouseLeave={e => {
-          if (user?.email === 'admin@erp.com') {
+          if (user?.role === 'admin') {
             e.currentTarget.style.transform = 'scale(1)';
           }
         }}
       >
         <div>
           <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px'}}>
-            Total Cash {(user?.email === 'admin@erp.com') && "(Click to Set Opening)"}
+            Total Cash {(user?.role === 'admin') && "(Click to Set Opening)"}
           </p>
           <h2 style={{margin: '8px 0 0 0', fontSize: '2rem', fontWeight: 800}}>Rs. {totalCash.toLocaleString()}</h2>
         </div>
@@ -820,7 +820,7 @@ export default function Accounts() {
       {/* Bank Card */}
       <div className="stat-card" 
         onClick={() => {
-          if (user?.email === 'admin@erp.com') {
+          if (user?.role === 'admin') {
             setShowBankSelectorModal(true);
           }
         }}
@@ -829,22 +829,22 @@ export default function Accounts() {
           padding: '24px', borderRadius: '20px', color: '#fff', 
           boxShadow: '0 10px 20px rgba(59, 130, 246, 0.2)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          cursor: (user?.email === 'admin@erp.com') ? 'pointer' : 'default', transition: 'transform 0.2s'
+          cursor: (user?.role === 'admin') ? 'pointer' : 'default', transition: 'transform 0.2s'
         }}
         onMouseEnter={e => {
-          if (user?.email === 'admin@erp.com') {
+          if (user?.role === 'admin') {
             e.currentTarget.style.transform = 'scale(1.02)';
           }
         }}
         onMouseLeave={e => {
-          if (user?.email === 'admin@erp.com') {
+          if (user?.role === 'admin') {
             e.currentTarget.style.transform = 'scale(1)';
           }
         }}
       >
         <div>
           <p style={{margin: 0, opacity: 0.9, fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px'}}>
-            Total Bank Received {(user?.email === 'admin@erp.com') && "(Click to Edit Banks)"}
+            Total Bank Received {(user?.role === 'admin') && "(Click to Edit Banks)"}
           </p>
           <h2 style={{margin: '8px 0 0 0', fontSize: '2rem', fontWeight: 800}}>Rs. {totalBank.toLocaleString()}</h2>
         </div>
@@ -854,7 +854,7 @@ export default function Accounts() {
       </div>
 
       {/* Admin Received Card (Only visible to Admin) */}
-      {user?.email === 'admin@erp.com' && (
+      {user?.role === 'admin' && (
         <div className="stat-card" 
           style={{
             background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)', 
@@ -905,7 +905,7 @@ export default function Accounts() {
           </div>
         </div>
 
-        {user?.role === 'admin' && user?.email === 'admin@erp.com' && (
+        {user?.role === 'admin' && user?.role === 'admin' && (
           <div className="counter-switcher">
             <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
             <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
@@ -915,13 +915,13 @@ export default function Accounts() {
 
         <div className="module-actions" style={{display: 'flex', gap: '10px'}}>
           <Button label="Galla Closeout" icon="pi pi-lock" onClick={handleOpenCloseout} className="p-button-warning" style={{borderRadius: '12px'}} />
-          {user?.email === 'admin@erp.com' && (
+          {user?.role === 'admin' && (
             <Button label="Send Admin Payment" icon="pi pi-download" onClick={() => {
               setAdminPaymentForm({ amount: "", admin_bank_id: "", payment_type: "Cash", notes: "" });
               setShowAdminPaymentModal(true);
             }} className="p-button-info" style={{borderRadius: '12px'}} />
           )}
-          {user?.email === 'admin@erp.com' && (
+          {user?.role === 'admin' && (
             <Button label="Add Recipient Bank" icon="pi pi-plus-circle" onClick={() => { setAdminBankForm({ bank_name: "", account_title: "", account_number: "" }); setShowAdminBankModal(true); }} className="p-button-success" style={{borderRadius: '12px'}} />
           )}
           <Button label="Add Bank Account" icon="pi pi-plus" onClick={() => { setEditId(null); setForm({ bank_name: "", account_title: "", account_number: "", opening_balance: 0 }); setShowModal(true); }} className="p-button-primary" style={{borderRadius: '12px'}} />
@@ -1426,7 +1426,7 @@ export default function Accounts() {
                 </div>
               </div>
 
-              {user?.email === 'admin@erp.com' && (
+              {user?.role === 'admin' && (
                 <div className="field mb-4">
                   <label className="block mb-2 font-bold">Opening Balance (PKR) *</label>
                   <div className="p-inputgroup">

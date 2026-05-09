@@ -163,12 +163,10 @@ export default function UsersManager() {
                   {u.permissions?.length ? u.permissions.join(', ') : 'None'}
                 </td>
                 <td>
-                  {u.email !== 'admin@erp.com' && (
-                    <ActionMenu 
-                      onEdit={() => handleEditClick(u)} 
-                      onDelete={() => handleDelete(u.id)} 
-                    />
-                  )}
+                  <ActionMenu 
+                    onEdit={() => handleEditClick(u)} 
+                    onDelete={() => handleDelete(u.id)} 
+                  />
                 </td>
               </tr>
             ))}

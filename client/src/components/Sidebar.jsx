@@ -51,7 +51,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   // Filter menu items based on Permissions
   const filteredMenuItems = menuItems.filter(item => {
     // Master Admin sees EVERYTHING
-    if (user?.email === 'admin@erp.com') return true;
+    if (user?.role === 'admin') return true;
 
     // Dashboard is always visible for everyone
     if (item.id === 'dashboard') return true;
