@@ -9,8 +9,8 @@ async function sendWhatsAppMessage(to, body) {
   const twilioToken = process.env.TWILIO_AUTH_TOKEN;
   const twilioFrom = process.env.TWILIO_FROM || 'whatsapp:+14155238886'; // Twilio's official shared sandbox number
 
-  const apiUrl = process.env.WHATSAPP_API_URL;
-  const token = process.env.WHATSAPP_TOKEN;
+  const apiUrl = process.env.WHATSAPP_API_URL || 'https://api.ultramsg.com/instance174172/messages/chat';
+  const token = process.env.WHATSAPP_TOKEN || '4722xwbvpu3mdq18';
 
   // Sanitize phone number (remove spaces, plus, dashes)
   let cleanPhone = to.replace(/[^0-9]/g, '');
