@@ -4252,3 +4252,187 @@ form {
     border-radius: 0 0 20px 20px;
   }
 }
+
+/* ==========================================================================
+   📱 COMPREHENSIVE RESPONSIVENESS AND DEVICE ADAPTABILITY PATTERNS
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .module-page {
+    padding: 16px 20px;
+    
+    .stats-grid-pos, .stats-row, .summary-row {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+      gap: 12px;
+    }
+
+    .category-grid {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+      gap: 16px;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .module-page {
+    padding: 12px 16px;
+
+    .module-header {
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 12px !important;
+      margin-bottom: 20px;
+
+      .module-title {
+        align-items: flex-start !important;
+        h1 {
+          font-size: 1.5rem !important;
+        }
+      }
+
+      .module-actions {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+
+        button, a {
+          width: 100% !important;
+          justify-content: center;
+        }
+      }
+    }
+
+    .stats-grid-pos, .stats-row, .summary-row {
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 10px;
+    }
+
+    .category-grid {
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 12px;
+    }
+
+    .pos-table-actions, .filter-row {
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 10px !important;
+      background: white;
+      padding: 10px;
+      border-radius: 12px;
+
+      .search-bar, .search-box {
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+
+      .filter-group, .view-tabs {
+        width: 100% !important;
+        display: flex;
+        gap: 8px;
+
+        select, button {
+          flex: 1 !important;
+          width: 100% !important;
+        }
+      }
+    }
+
+    /* Make PrimeReact Datatables and Custom Tables scrollable on mobile */
+    .module-table-container {
+      width: 100% !important;
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch;
+      border-radius: 12px;
+    }
+
+    /* Custom form grids responsiveness */
+    .form-grid, .modal-form .form-row {
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+    }
+    
+    .form-group {
+      grid-column: span 1 !important;
+    }
+
+    /* Modal adjustments */
+    .modal {
+      width: 100% !important;
+      max-width: 95% !important;
+      margin: 10px !important;
+      border-radius: 16px !important;
+
+      .modal-header {
+        padding: 16px 20px 0 !important;
+      }
+
+      .modal-form, form {
+        padding: 16px 20px 20px !important;
+      }
+
+      .form-actions, .modal-actions {
+        flex-direction: column-reverse;
+        gap: 8px;
+
+        button {
+          width: 100% !important;
+        }
+      }
+    }
+
+    /* Detail Modal adaptation */
+    .detail-body, .detail-content {
+      padding: 16px !important;
+
+      .detail-header {
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+        gap: 16px !important;
+      }
+
+      .detail-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        padding: 14px !important;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .module-page {
+    padding: 8px 10px;
+
+    .module-header .module-title {
+      gap: 10px;
+      .module-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        svg {
+          width: 20px;
+          height: 20px;
+        }
+      }
+      h1 {
+        font-size: 1.3rem !important;
+      }
+    }
+
+    .stats-grid-pos, .stats-row, .summary-row {
+      grid-template-columns: 1fr !important;
+    }
+
+    .category-grid {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Table small padding adjustments */
+    .p-datatable-sm .p-datatable-tbody > tr > td {
+      padding: 10px 8px !important;
+      font-size: 0.85rem !important;
+    }
+  }
+}

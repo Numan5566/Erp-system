@@ -54,7 +54,6 @@ export default function Stock({ type }) {
 
   const fetchData = async () => {
     if (!activeTab) return;
-    setLoading(true);
     try {
       const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
       const [prodRes, supRes, vehRes] = await Promise.all([
@@ -66,9 +65,17 @@ export default function Stock({ type }) {
       const supData = await supRes.json();
       const vehData = await vehRes.json();
       
-      setProducts(Array.isArray(prodData) ? prodData : []);
-      setSuppliers(Array.isArray(supData) ? supData : []);
-      setVehicles(Array.isArray(vehData) ? vehData : []);
+      const newProds = Array.isArray(prodData) ? prodData : [];
+      const newSups = Array.isArray(supData) ? supData : [];
+      const newVehs = Array.isArray(vehData) ? vehData : [];
+
+      setProducts(newProds);
+      setSuppliers(newSups);
+      setVehicles(newVehs);
+
+      localStorage.setItem(`cache_products_${activeTab}`, JSON.stringify(newProds));
+      localStorage.setItem(`cache_suppliers_${activeTab}`, JSON.stringify(newSups));
+      localStorage.setItem(`cache_vehicles_${activeTab}`, JSON.stringify(newVehs));
     } catch (err) {
       console.error(err);
     } finally {
@@ -76,7 +83,24 @@ export default function Stock({ type }) {
     }
   };
 
-  useEffect(() => { fetchData(); }, [activeTab]);
+  useEffect(() => {
+    if (!activeTab) return;
+    // Pre-load from cache instantly for 0ms delay
+    try {
+      const cachedProds = localStorage.getItem(`cache_products_${activeTab}`);
+      const cachedSups = localStorage.getItem(`cache_suppliers_${activeTab}`);
+      const cachedVehs = localStorage.getItem(`cache_vehicles_${activeTab}`);
+      if (cachedProds) setProducts(JSON.parse(cachedProds));
+      if (cachedSups) setSuppliers(JSON.parse(cachedSups));
+      if (cachedVehs) setVehicles(JSON.parse(cachedVehs));
+      
+      // If there's no cache, show loader, else run silently in background
+      if (!cachedProds) setLoading(true);
+    } catch (e) {
+      setLoading(true);
+    }
+    fetchData();
+  }, [activeTab]);
 
   // If Admin and no counter selected, show selection screen
   if (user?.email === 'admin@erp.com' && !activeTab && !type) {

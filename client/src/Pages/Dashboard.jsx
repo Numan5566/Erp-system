@@ -10,11 +10,13 @@ import "../Styles/Dashboard.scss";
 
 export default function Dashboard() {
   const { user } = useContext(AuthContext);
-  const [stats, setStats] = useState({
-    products: 0,
-    lowStock: 0,
-    customers: 0,
-    monthlyExpenses: 0
+  const [stats, setStats] = useState(() => {
+    try {
+      const cached = localStorage.getItem("cache_dashboard_stats");
+      return cached ? JSON.parse(cached) : { products: 0, lowStock: 0, customers: 0, monthlyExpenses: 0 };
+    } catch {
+      return { products: 0, lowStock: 0, customers: 0, monthlyExpenses: 0 };
+    }
   });
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -47,12 +49,14 @@ export default function Dashboard() {
         ]);
 
         if (Array.isArray(products) && Array.isArray(expenses) && Array.isArray(customers)) {
-          setStats({
+          const newStats = {
             products: products.length,
             lowStock: products.filter(p => parseFloat(p.stock_quantity || 0) <= parseFloat(p.minimum_stock || 0)).length,
             customers: customers.length,
             monthlyExpenses: expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0)
-          });
+          };
+          setStats(newStats);
+          localStorage.setItem("cache_dashboard_stats", JSON.stringify(newStats));
         }
       } catch (err) {
         console.error("Dashboard stats fetch failed", err);

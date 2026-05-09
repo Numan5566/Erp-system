@@ -79,8 +79,10 @@ export default function Suppliers({ type }) {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-      setRecords(Array.isArray(data) ? data : []);
-      return data;
+      const finalRecs = Array.isArray(data) ? data : [];
+      setRecords(finalRecs);
+      localStorage.setItem(`cache_suppliers_records_${activeTab}`, JSON.stringify(finalRecs));
+      return finalRecs;
     } catch (err) {
       console.error("Failed to fetch suppliers", err);
       return [];
@@ -93,13 +95,24 @@ export default function Suppliers({ type }) {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-      setBankAccounts(Array.isArray(data) ? data : []);
+      const finalBanks = Array.isArray(data) ? data : [];
+      setBankAccounts(finalBanks);
+      localStorage.setItem(`cache_banks_list`, JSON.stringify(finalBanks));
     } catch (err) {
       console.error("Failed to fetch banks", err);
     }
   };
 
   useEffect(() => { 
+    if (!activeTab) return;
+    try {
+      const cached = localStorage.getItem(`cache_suppliers_records_${activeTab}`);
+      const cachedBanks = localStorage.getItem(`cache_banks_list`);
+      if (cached) setRecords(JSON.parse(cached));
+      if (cachedBanks) setBankAccounts(JSON.parse(cachedBanks));
+    } catch (e) {
+      console.error(e);
+    }
     fetchRecords(); 
     fetchBanks();
   }, [activeTab]);
