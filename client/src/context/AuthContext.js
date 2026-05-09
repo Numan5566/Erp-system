@@ -3,6 +3,17 @@ import api from '../services/api';
 
 export const AuthContext = createContext();
 
+const sanitizeUser = (userData) => {
+  if (!userData) return userData;
+  if (!userData.module_type) {
+    const em = (userData.email || '').toLowerCase();
+    if (em.includes('wholesale')) userData.module_type = 'Wholesale';
+    else if (em.includes('retail1') || em.includes('retailsaller1')) userData.module_type = 'Retail 1';
+    else if (em.includes('retail2') || em.includes('retailseller2')) userData.module_type = 'Retail 2';
+  }
+  return userData;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,7 +28,7 @@ export const AuthProvider = ({ children }) => {
 
       try {
         const res = await api.get('/auth/me');
-        setUser(res.data);
+        setUser(sanitizeUser(res.data));
       } catch (err) {
         console.error('Failed to load user', err);
         localStorage.removeItem('token');
@@ -38,7 +49,7 @@ export const AuthProvider = ({ children }) => {
       sessionStorage.setItem('token', res.data.token);
       localStorage.removeItem('token');
     }
-    setUser(res.data.user);
+    setUser(sanitizeUser(res.data.user));
     return res.data;
   };
 
@@ -46,7 +57,7 @@ export const AuthProvider = ({ children }) => {
     const res = await api.post('/auth/register', { name, email, password });
     sessionStorage.setItem('token', res.data.token);
     localStorage.removeItem('token');
-    setUser(res.data.user);
+    setUser(sanitizeUser(res.data.user));
     return res.data;
   };
 
