@@ -12,8 +12,12 @@ async function sendWhatsAppMessage(to, body) {
   const apiUrl = process.env.WHATSAPP_API_URL || 'https://api.ultramsg.com/instance174172/messages/chat';
   const token = process.env.WHATSAPP_TOKEN || '4722xwbvpu3mdq18';
 
+  if (!to) {
+    console.log('❌ No recipient phone number provided for WhatsApp');
+    return;
+  }
   // Sanitize phone number (remove spaces, plus, dashes)
-  let cleanPhone = to.replace(/[^0-9]/g, '');
+  let cleanPhone = String(to).replace(/[^0-9]/g, '');
   if (cleanPhone.startsWith('0')) {
     // Convert local Pakistan number to international (replace leading 0 with 92)
     cleanPhone = '92' + cleanPhone.substring(1);
