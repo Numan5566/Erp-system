@@ -6,9 +6,8 @@ import {
 } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
 import ActionMenu from '../components/ActionMenu';
+import api from "../services/api"; // Use system-wide dynamic api service instead of hardcoded string
 import "../Styles/ModulePages.scss";
-
-const API = "https://erp-backend-3rf8.onrender.com/api/transport";
 
 const emptyForm = {
   ownership_type: "Personal",
@@ -52,13 +51,8 @@ export default function Transport({ type }) {
     if (showPaymentModal) {
       const fetchLiveBalances = async () => {
         try {
-          const res = await fetch(`https://erp-backend-3rf8.onrender.com/api/banks/balances?type=${activeCounter}`, {
-            headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setLiveBalances(data);
-          }
+          const res = await api.get(`/banks/balances?type=${activeCounter}`);
+          setLiveBalances(res.data || {});
         } catch (e) { console.error(e); }
       };
       fetchLiveBalances();
@@ -67,11 +61,8 @@ export default function Transport({ type }) {
 
   const fetchBanks = async () => {
     try {
-      const res = await fetch('https://erp-backend-3rf8.onrender.com/api/banks', {
-        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
-      });
-      const data = await res.json();
-      setBankAccounts(Array.isArray(data) ? data : []);
+      const res = await api.get('/banks');
+      setBankAccounts(Array.isArray(res.data) ? res.data : []);
     } catch (err) { console.error(err); }
   };
 
@@ -110,24 +101,15 @@ export default function Transport({ type }) {
     }
 
     try {
-      const res = await fetch(`https://erp-backend-3rf8.onrender.com/api/transport/payment`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          vehicle_id: selectedVehicle.id,
-          paid_amount: paymentForm.amount,
-          notes: paymentForm.notes,
-          payment_type: finalPaymentType,
-          module_type: activeCounter
-        })
+      const res = await api.post(`/transport/payment`, {
+        vehicle_id: selectedVehicle.id,
+        paid_amount: paymentForm.amount,
+        notes: paymentForm.notes,
+        payment_type: finalPaymentType,
+        module_type: activeCounter
       });
-      if (res.ok) {
-        setShowPaymentModal(false);
-        fetchRecords();
-      }
+      setShowPaymentModal(false);
+      fetchRecords();
     } catch (err) { console.error(err); }
     setLoading(false);
   };
@@ -135,10 +117,8 @@ export default function Transport({ type }) {
   const fetchRecords = async () => {
     if (!activeCounter) return;
     try {
-      const res = await fetch(`${API}?type=${activeCounter}`, {
-        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
-      });
-      const data = await res.json();
+      const res = await api.get(`/transport?type=${activeCounter}`);
+      const data = res.data;
       const finalRecs = Array.isArray(data) ? data : [];
       setRecords(finalRecs);
       localStorage.setItem(`cache_transport_${activeCounter}`, JSON.stringify(finalRecs));
@@ -158,20 +138,14 @@ export default function Transport({ type }) {
     e.preventDefault();
     setLoading(true);
     try {
-      const method = editId ? "PUT" : "POST";
-      const url = editId ? `${API}/${editId}` : API;
-      const res = await fetch(url, {
-        method,
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ ...form, module_type: activeCounter }),
-      });
-      if (res.ok) {
-        setShowModal(false);
-        fetchRecords();
+      const payload = { ...form, module_type: activeCounter };
+      if (editId) {
+        await api.put(`/transport/${editId}`, payload);
+      } else {
+        await api.post('/transport', payload);
       }
+      setShowModal(false);
+      fetchRecords();
     } catch (err) { console.error(err); }
     setLoading(false);
   };
@@ -184,24 +158,25 @@ export default function Transport({ type }) {
 
   const openLedger = async (vehicle) => {
     setSelectedVehicle(vehicle);
+    setLedgerData([]); // Reset to clean array immediately
     setShowLedgerModal(true);
     setLoading(true);
     try {
-      const res = await fetch(`${API}/ledger/${vehicle.id}`, {
-        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
-      });
-      const data = await res.json();
-      setLedgerData(data);
-    } catch (err) { console.error(err); }
+      const res = await api.get(`/transport/ledger/${vehicle.id}`);
+      const data = res.data;
+      setLedgerData(Array.isArray(data) ? data : []);
+    } catch (err) { 
+      console.error(err); 
+      setLedgerData([]); // Ensure it stays an array on failure
+    }
     setLoading(false);
   };
 
   const handleDelete = async (id) => {
-    await fetch(`${API}/${id}`, { 
-      method: "DELETE",
-      headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
-    });
-    fetchRecords();
+    try {
+      await api.delete(`/transport/${id}`);
+      fetchRecords();
+    } catch (err) { console.error(err); }
   };
 
   const filtered = records.filter(r => {
@@ -420,12 +395,12 @@ export default function Transport({ type }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {ledgerData.map(row => (
-                    <tr key={row.id}>
-                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.created_at).toLocaleDateString()}</td>
-                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.customer_name} (Invoice #{row.id})</td>
-                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.delivery_charges).toLocaleString()}</td>
-                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.payment_type}</td>
+                  {(Array.isArray(ledgerData) ? ledgerData : []).map((row, idx) => (
+                    <tr key={idx}>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.date ? new Date(row.date).toLocaleDateString() : 'N/A'}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.party_name || 'N/A'}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.amount || 0).toLocaleString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.payment_type || 'N/A'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -463,22 +438,22 @@ export default function Transport({ type }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {ledgerData.length === 0 ? (
+                    {(!Array.isArray(ledgerData) || ledgerData.length === 0) ? (
                       <tr><td colSpan="5" className="empty-msg">No trip history found for this vehicle.</td></tr>
                     ) : (
                       ledgerData.map((row, idx) => (
                         <tr key={idx}>
-                          <td>{new Date(row.date).toLocaleDateString()}</td>
+                          <td>{row.date ? new Date(row.date).toLocaleDateString() : 'N/A'}</td>
                           <td>
-                             <span className={`status-badge ${row.trip_type.includes('Inward') ? 'pending' : 'paid'}`} style={{fontSize: '0.7rem'}}>
-                               {row.trip_type}
+                             <span className={`status-badge ${(row.trip_type || '').includes('Inward') ? 'pending' : 'paid'}`} style={{fontSize: '0.7rem'}}>
+                               {row.trip_type || 'Trip'}
                              </span>
                           </td>
                           <td>
-                            <strong>{row.party_name}</strong>
-                            <br/><small style={{color:'#64748b'}}>ID: #{row.id}</small>
+                            <strong>{row.party_name || 'N/A'}</strong>
+                            <br/><small style={{color:'#64748b'}}>ID: #{row.id || idx}</small>
                           </td>
-                          <td className="bold text-green">Rs. {parseFloat(row.amount).toLocaleString()}</td>
+                          <td className="bold text-green">Rs. {parseFloat(row.amount || 0).toLocaleString()}</td>
                           <td><span className="status-badge paid">{row.payment_type || 'Cash'}</span></td>
                         </tr>
                       ))
