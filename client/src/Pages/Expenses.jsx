@@ -217,42 +217,42 @@ export default function Expenses({ type }) {
           <div className="icon blue"><Building2 size={24} /></div>
           <div className="info">
             <span className="label">Office Total</span>
-            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Office").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Office" && r.payment_type !== 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
           <div className="icon orange"><Home size={24} /></div>
           <div className="info">
             <span className="label">House Total</span>
-            <span className="value">Rs. {filtered.filter(r => r.expense_type === "House").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="value">Rs. {filtered.filter(r => r.expense_type === "House" && r.payment_type !== 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
           <div className="icon blue" style={{ background: '#ecfeff', color: '#0891b2' }}><Truck size={24} /></div>
           <div className="info">
             <span className="label">Vehicle Total</span>
-            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Personal Vehicle").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Personal Vehicle" && r.payment_type !== 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
           <div className="icon red" style={{ background: '#fef2f2', color: '#ef4444' }}><Wallet size={24} /></div>
           <div className="info">
             <span className="label">Galla Handover</span>
-            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Galla Closeout").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Galla Closeout" && r.payment_type !== 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
           <div className="icon green" style={{ background: '#f0fdf4', color: '#16a34a' }}><Wallet size={24} /></div>
           <div className="info">
             <span className="label">Admin Payments</span>
-            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Admin Payment").reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="value">Rs. {filtered.filter(r => r.expense_type === "Admin Payment" && r.payment_type !== 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="pos-stat-card">
           <div className="icon green"><Wallet size={24} /></div>
           <div className="info">
             <span className="label">Grand Total</span>
-            <span className="value">Rs. {filtered.reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+            <span className="value">Rs. {filtered.filter(r => r.payment_type !== 'Pending').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
           </div>
         </div>
       </div>

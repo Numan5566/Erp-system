@@ -4,7 +4,7 @@ const pool = require('../config/db');
 const auth = require('../middleware/auth');
 
 // Helper: get sum with optional date range
-const getSum = async (table, amountCol, moduleType, moduleCol, dateCol, fromDate, toDate) => {
+const getSum = async (table, amountCol, moduleType, moduleCol, dateCol, fromDate, toDate, extraCond = '') => {
   let conditions = [];
   let params = [];
 
@@ -19,6 +19,9 @@ const getSum = async (table, amountCol, moduleType, moduleCol, dateCol, fromDate
   if (toDate) {
     params.push(toDate);
     conditions.push(`${dateCol} <= $${params.length}`);
+  }
+  if (extraCond) {
+    conditions.push(extraCond);
   }
 
   const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
@@ -36,8 +39,8 @@ const buildSummary = async (fromDate, toDate) => {
     // REVENUE: Only what has been actually PAID by customers
     const sales = await getSum('sales', 'paid_amount', c, 'sale_type', 'created_at', fromDate, toDate);
     
-    // EXPENSES: Operational + Supply chain payments
-    const expenses = await getSum('expenses',       'amount',      c, 'module_type',  'created_at',    fromDate, toDate);
+    // EXPENSES: Operational + Supply chain payments (Ignore Pending payments until cleared)
+    const expenses = await getSum('expenses',       'amount',      c, 'module_type',  'created_at',    fromDate, toDate, "payment_type != 'Pending'");
     const rent     = await getSum('rent',           'amount',      c, 'module_type',  'rent_date',     fromDate, toDate);
     const salary   = await getSum('salary',         'amount',      c, 'module_type',  'payment_date',  fromDate, toDate);
     const other    = await getSum('other_expenses', 'amount',      c, 'module_type',  'date',          fromDate, toDate);
