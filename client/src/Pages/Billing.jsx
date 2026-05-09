@@ -212,7 +212,9 @@ export default function Billing({ type }) {
       }
       return item;
     }));
-  };\n\n  const updatePrice = (id, newPrice) => {
+  };
+
+  const updatePrice = (id, newPrice) => {
     setCart(cart.map(item => {
       if (item.id === id) {
         const p = parseFloat(newPrice) || 0;
@@ -350,23 +352,6 @@ export default function Billing({ type }) {
 
   const handleCheckout = async () => {
             if (cart.length === 0) return alert("Cart is empty!");
-    
-    // Master Inventory Lockdown Check
-    let exceedsLimit = false;
-    let brokenItemName = "";
-    cart.forEach(item => {
-      const p = products.find(x => String(x.id) === String(item.id));
-      const stock = p ? parseFloat(p.stock_quantity || 0) : 0;
-      if (parseFloat(item.qty || 0) > stock) {
-        exceedsLimit = true;
-        brokenItemName = item.name;
-      }
-    });
-
-    if (exceedsLimit) {
-      alert(`ERROR: Cannot complete sale. ${brokenItemName} quantity exceeds available stock limit! Please fix the cart first.`);
-      return;
-    }
     
     // Master Inventory Lockdown Check
     let exceedsLimit = false;
