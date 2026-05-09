@@ -8,6 +8,16 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+// Centralized Live API redirect monkey-patch
+const originalFetch = window.fetch;
+window.fetch = function (url, options) {
+  if (typeof url === 'string' && url.includes('http://localhost:5000')) {
+    const apiURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    url = url.replace('http://localhost:5000', apiURL);
+  }
+  return originalFetch(url, options);
+};
+
 import { PrimeReactProvider } from 'primereact/api';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
