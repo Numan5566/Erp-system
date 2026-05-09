@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/db');
 const auth = require('../middleware/auth');
+const { sendWhatsAppBill } = require('../utils/whatsapp');
 
 const isAdmin = (req) => req.user.role === 'admin';
 
@@ -107,6 +108,23 @@ router.post('/', auth, async (req, res) => {
     }
 
     await client.query('COMMIT');
+
+    // Trigger WhatsApp notification asynchronously in the background so it is 100% instant!
+    const fullSale = {
+      id: saleId,
+      customer_name,
+      customer_phone,
+      payment_type,
+      sale_type: finalModule,
+      total_amount,
+      discount,
+      delivery_charges,
+      net_amount,
+      paid_amount,
+      balance_amount
+    };
+    sendWhatsAppBill(fullSale, items).catch(err => console.error('WhatsApp failed:', err));
+
     res.json({ success: true, saleId });
   } catch (err) {
     await client.query('ROLLBACK');
