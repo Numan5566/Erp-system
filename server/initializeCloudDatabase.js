@@ -121,7 +121,11 @@ async function initializeCloudDatabase() {
         balance_amount DECIMAL(15,2) DEFAULT 0,
         purchase_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         module_type VARCHAR(50),
-        user_id INTEGER
+        user_id INTEGER,
+        vehicle_id INTEGER,
+        delivery_charges DECIMAL(15,2) DEFAULT 0,
+        fare_payment_type VARCHAR(50) DEFAULT 'Pending',
+        payment_type VARCHAR(50) DEFAULT 'Cash'
       );
     `);
     console.log('✅ purchases table verified.');
@@ -151,6 +155,18 @@ async function initializeCloudDatabase() {
       await pool.query(`ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS ${col} ${type};`);
     }
     console.log('✅ bank_accounts table patched.');
+    
+    // 10. Quick safety column checks for purchases
+    const purchaseCols = [
+      ['vehicle_id', 'INTEGER'],
+      ['delivery_charges', 'DECIMAL(15, 2) DEFAULT 0'],
+      ['fare_payment_type', 'VARCHAR(50) DEFAULT \'Pending\''],
+      ['payment_type', 'VARCHAR(50) DEFAULT \'Cash\'']
+    ];
+    for (const [col, type] of purchaseCols) {
+      await pool.query(`ALTER TABLE purchases ADD COLUMN IF NOT EXISTS ${col} ${type};`);
+    }
+    console.log('✅ purchases table patched.');
 
     console.log('\n🎉 ALL CORE TABLES INITIALIZED AND SYNCHRONIZED ON CLOUD DATABASE!');
     process.exit(0);
