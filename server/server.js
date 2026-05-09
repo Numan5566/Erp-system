@@ -29,10 +29,18 @@ app.use('/api/labours', require('./routes/labourRoutes'));
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, (err) => {
-  if (err) {
-    console.error(`Failed to start server: ${err.message}`);
-    process.exit(1);
-  }
-  console.log(`Server started on port ${PORT}`);
+// Auto-sync database schema on startup
+const syncDatabaseSchema = require('./utils/dbInit');
+syncDatabaseSchema().then(() => {
+  app.listen(PORT, (err) => {
+    if (err) {
+      console.error(`Failed to start server: ${err.message}`);
+      process.exit(1);
+    }
+    console.log(`Server started on port ${PORT}`);
+  });
+}).catch(err => {
+  console.error('Failed to initialize database sync:', err);
+  // Start server anyway just in case
+  app.listen(PORT, () => console.log(`Server running (schema sync failed) on port ${PORT}`));
 });

@@ -26,7 +26,8 @@ export default function Stock({ type }) {
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receiveForm, setReceiveForm] = useState({ 
     supplier_id: "", quantity: "", vehicle_number: "", vehicle_id: "", 
-    rate: "", paid_amount: "0", delivery_charges: "0", fare_status: "Pending" 
+    rate: "", paid_amount: "0", delivery_charges: "0", fare_status: "Pending",
+    vehicle_type: "External" 
   });
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -189,6 +190,7 @@ export default function Stock({ type }) {
           supplier_id: receiveForm.supplier_id,
           product_id: selectedProduct.id,
           vehicle_number: receiveForm.vehicle_number,
+          vehicle_id: receiveForm.vehicle_id,
           quantity: receiveForm.quantity,
           rate: receiveForm.rate,
           paid_amount: receiveForm.paid_amount,
@@ -201,7 +203,8 @@ export default function Stock({ type }) {
         setShowReceiveModal(false);
         setReceiveForm({ 
           supplier_id: "", quantity: "", vehicle_number: "", vehicle_id: "", 
-          rate: "", paid_amount: "0", delivery_charges: "0", fare_status: "Pending" 
+          rate: "", paid_amount: "0", delivery_charges: "0", fare_status: "Pending",
+          vehicle_type: "External" 
         });
         fetchData();
       }
@@ -545,11 +548,33 @@ export default function Stock({ type }) {
                 </div>
 
                 <div className="form-group">
-                  <label>Vehicle Number *</label>
+                  <label style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                    Vehicle *
+                    <div className="type-toggle" style={{display: 'flex', fontSize: '0.7rem', gap: '4px', background: '#f1f5f9', padding: '2px', borderRadius: '6px'}}>
+                      <button type="button" onClick={() => setReceiveForm({...receiveForm, vehicle_type: 'External', vehicle_id: '', vehicle_number: ''})} 
+                        style={{border: 'none', cursor: 'pointer', background: receiveForm.vehicle_type === 'External' ? 'white' : 'transparent', padding: '2px 6px', borderRadius: '4px', color: '#475569', fontWeight: receiveForm.vehicle_type === 'External' ? '600' : '400', boxShadow: receiveForm.vehicle_type === 'External' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'}}>Supplier</button>
+                      <button type="button" onClick={() => setReceiveForm({...receiveForm, vehicle_type: 'Personal', vehicle_id: '', vehicle_number: ''})} 
+                        style={{border: 'none', cursor: 'pointer', background: receiveForm.vehicle_type === 'Personal' ? 'white' : 'transparent', padding: '2px 6px', borderRadius: '4px', color: '#475569', fontWeight: receiveForm.vehicle_type === 'Personal' ? '600' : '400', boxShadow: receiveForm.vehicle_type === 'Personal' ? '0 1px 2px rgba(0,0,0,0.1)' : 'none'}}>Personal</button>
+                    </div>
+                  </label>
                   <div className="input-wrapper">
                     <Truck size={18} />
-                    <input type="text" required value={receiveForm.vehicle_number} placeholder="e.g. LET-123"
-                      onChange={(e) => setReceiveForm({ ...receiveForm, vehicle_number: e.target.value })} />
+                    {receiveForm.vehicle_type === 'Personal' ? (
+                      <select required value={receiveForm.vehicle_id} 
+                        onChange={(e) => {
+                          const vId = e.target.value;
+                          const vObj = vehicles.find(v => String(v.id) === String(vId));
+                          setReceiveForm({ ...receiveForm, vehicle_id: vId, vehicle_number: vObj ? vObj.vehicle_number : '' });
+                        }}>
+                        <option value="">Select Transport Vehicle</option>
+                        {vehicles.map(v => (
+                          <option key={v.id} value={v.id}>{v.vehicle_number} ({v.driver_name})</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input type="text" required value={receiveForm.vehicle_number} placeholder="e.g. LET-123"
+                        onChange={(e) => setReceiveForm({ ...receiveForm, vehicle_number: e.target.value, vehicle_id: "" })} />
+                    )}
                   </div>
                 </div>
 
