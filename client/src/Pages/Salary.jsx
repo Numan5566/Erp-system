@@ -50,11 +50,20 @@ export default function Salary({ type }) {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-      setRecords(Array.isArray(data) ? data : []);
+      const finalRecs = Array.isArray(data) ? data : [];
+      setRecords(finalRecs);
+      localStorage.setItem(`cache_salary_${activeTab}`, JSON.stringify(finalRecs));
     } catch (err) { console.error(err); }
   };
 
-  useEffect(() => { fetchRecords(); }, [activeTab]);
+  useEffect(() => { 
+    if (!activeTab) return;
+    try {
+      const cached = localStorage.getItem(`cache_salary_${activeTab}`);
+      if (cached) setRecords(JSON.parse(cached));
+    } catch (e) { console.error(e); }
+    fetchRecords(); 
+  }, [activeTab]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

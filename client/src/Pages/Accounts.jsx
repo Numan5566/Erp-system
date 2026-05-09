@@ -292,7 +292,9 @@ export default function Accounts() {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-      setAccounts(Array.isArray(data) ? data : []);
+      const finalData = Array.isArray(data) ? data : [];
+      setAccounts(finalData);
+      localStorage.setItem('cache_acc_banks', JSON.stringify(finalData));
     } catch (err) {
       console.error('Failed to fetch bank accounts', err);
     }
@@ -305,7 +307,9 @@ export default function Accounts() {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-      setSales(Array.isArray(data) ? data : []);
+      const finalData = Array.isArray(data) ? data : [];
+      setSales(finalData);
+      localStorage.setItem('cache_acc_sales', JSON.stringify(finalData));
     } catch (err) {
       console.error('Failed to fetch sales', err);
     }
@@ -319,7 +323,9 @@ export default function Accounts() {
       });
       if (!res.ok) throw new Error("Could not fetch supplier payments");
       const data = await res.json();
-      setSupplierPayments(Array.isArray(data) ? data.filter(p => parseFloat(p.paid_amount) > 0 && (!p.product_name)) : []);
+      const finalData = Array.isArray(data) ? data.filter(p => parseFloat(p.paid_amount) > 0 && (!p.product_name)) : [];
+      setSupplierPayments(finalData);
+      localStorage.setItem('cache_acc_sup_pay', JSON.stringify(finalData));
     } catch (err) {
       console.error('Failed to fetch supplier payments', err);
     }
@@ -331,32 +337,72 @@ export default function Accounts() {
     
     try {
       const res = await fetch('https://erp-backend-3rf8.onrender.com/api/salary', { headers: h });
-      if (res.ok) setSalaries(await res.json());
+      if (res.ok) {
+        const d = await res.json();
+        setSalaries(d);
+        localStorage.setItem('cache_acc_salary', JSON.stringify(d));
+      }
     } catch (err) { console.error("Failed to fetch salaries:", err); }
 
     try {
       const res = await fetch('https://erp-backend-3rf8.onrender.com/api/rent', { headers: h });
-      if (res.ok) setRents(await res.json());
+      if (res.ok) {
+        const d = await res.json();
+        setRents(d);
+        localStorage.setItem('cache_acc_rent', JSON.stringify(d));
+      }
     } catch (err) { console.error("Failed to fetch rents:", err); }
 
     try {
       const res = await fetch('https://erp-backend-3rf8.onrender.com/api/investments', { headers: h });
-      if (res.ok) setInvestments(await res.json());
+      if (res.ok) {
+        const d = await res.json();
+        setInvestments(d);
+        localStorage.setItem('cache_acc_invest', JSON.stringify(d));
+      }
     } catch (err) { console.error("Failed to fetch investments:", err); }
 
     try {
       const res = await fetch('https://erp-backend-3rf8.onrender.com/api/other-expenses', { headers: h });
-      if (res.ok) setOtherExpenses(await res.json());
+      if (res.ok) {
+        const d = await res.json();
+        setOtherExpenses(d);
+        localStorage.setItem('cache_acc_other_exp', JSON.stringify(d));
+      }
     } catch (err) { console.error("Failed to fetch other expenses:", err); }
 
     try {
       const res = await fetch('https://erp-backend-3rf8.onrender.com/api/expenses', { headers: h });
-      if (res.ok) setGeneralExpenses(await res.json());
+      if (res.ok) {
+        const d = await res.json();
+        setGeneralExpenses(d);
+        localStorage.setItem('cache_acc_gen_exp', JSON.stringify(d));
+      }
     } catch (err) { console.error("Failed to fetch general expenses:", err); }
   };
 
   // Initialise data on mount
   useEffect(() => {
+    try {
+      const cBanks = localStorage.getItem('cache_acc_banks');
+      const cSales = localStorage.getItem('cache_acc_sales');
+      const cSupPay = localStorage.getItem('cache_acc_sup_pay');
+      const cSalary = localStorage.getItem('cache_acc_salary');
+      const cRent = localStorage.getItem('cache_acc_rent');
+      const cInvest = localStorage.getItem('cache_acc_invest');
+      const cOtherExp = localStorage.getItem('cache_acc_other_exp');
+      const cGenExp = localStorage.getItem('cache_acc_gen_exp');
+
+      if (cBanks) setAccounts(JSON.parse(cBanks));
+      if (cSales) setSales(JSON.parse(cSales));
+      if (cSupPay) setSupplierPayments(JSON.parse(cSupPay));
+      if (cSalary) setSalaries(JSON.parse(cSalary));
+      if (cRent) setRents(JSON.parse(cRent));
+      if (cInvest) setInvestments(JSON.parse(cInvest));
+      if (cOtherExp) setOtherExpenses(JSON.parse(cOtherExp));
+      if (cGenExp) setGeneralExpenses(JSON.parse(cGenExp));
+    } catch (e) { console.error(e); }
+
     fetchAccounts();
     fetchSales();
     fetchSupplierPayments();

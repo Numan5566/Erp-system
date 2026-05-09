@@ -102,7 +102,6 @@ export default function Labours({ type }) {
 
   const fetchData = async () => {
     if (!activeTab) return;
-    setLoading(true);
     try {
       const headers = { "Authorization": `Bearer ${localStorage.getItem('token')}` };
       const [labRes, workRes, balRes, banksRes] = await Promise.all([
@@ -116,10 +115,16 @@ export default function Labours({ type }) {
       const balData = await balRes.json();
       const banksData = await banksRes.json();
 
-      setLabours(Array.isArray(labData) ? labData : []);
-      setWorkHistory(Array.isArray(workData) ? workData : []);
+      const finalLabours = Array.isArray(labData) ? labData : [];
+      const finalWork = Array.isArray(workData) ? workData : [];
+
+      setLabours(finalLabours);
+      setWorkHistory(finalWork);
       setLiveBalances(balData || {});
       setBanks(Array.isArray(banksData) ? banksData : []);
+
+      localStorage.setItem(`cache_labours_${activeTab}`, JSON.stringify(finalLabours));
+      localStorage.setItem(`cache_workhistory_${activeTab}`, JSON.stringify(finalWork));
     } catch (err) {
       console.error(err);
     } finally {
@@ -128,6 +133,13 @@ export default function Labours({ type }) {
   };
 
   useEffect(() => {
+    if (!activeTab) return;
+    try {
+      const cachedLabours = localStorage.getItem(`cache_labours_${activeTab}`);
+      const cachedWork = localStorage.getItem(`cache_workhistory_${activeTab}`);
+      if (cachedLabours) setLabours(JSON.parse(cachedLabours));
+      if (cachedWork) setWorkHistory(JSON.parse(cachedWork));
+    } catch (e) { console.error(e); }
     fetchData();
   }, [activeTab]);
 

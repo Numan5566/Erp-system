@@ -49,13 +49,22 @@ export default function Rent({ type }) {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-      setRecords(Array.isArray(data) ? data : []);
+      const finalRecs = Array.isArray(data) ? data : [];
+      setRecords(finalRecs);
+      localStorage.setItem(`cache_rent_${activeTab}`, JSON.stringify(finalRecs));
     } catch (err) {
       console.error("Failed to fetch rent records", err);
     }
   };
 
-  useEffect(() => { fetchRecords(); }, [activeTab]);
+  useEffect(() => { 
+    if (!activeTab) return;
+    try {
+      const cached = localStorage.getItem(`cache_rent_${activeTab}`);
+      if (cached) setRecords(JSON.parse(cached));
+    } catch (e) { console.error(e); }
+    fetchRecords(); 
+  }, [activeTab]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

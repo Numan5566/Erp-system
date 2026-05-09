@@ -139,11 +139,20 @@ export default function Transport({ type }) {
         headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await res.json();
-      setRecords(Array.isArray(data) ? data : []);
+      const finalRecs = Array.isArray(data) ? data : [];
+      setRecords(finalRecs);
+      localStorage.setItem(`cache_transport_${activeCounter}`, JSON.stringify(finalRecs));
     } catch (err) { console.error(err); }
   };
 
-  useEffect(() => { fetchRecords(); }, [activeCounter]);
+  useEffect(() => { 
+    if (!activeCounter) return;
+    try {
+      const cached = localStorage.getItem(`cache_transport_${activeCounter}`);
+      if (cached) setRecords(JSON.parse(cached));
+    } catch (e) { console.error(e); }
+    fetchRecords(); 
+  }, [activeCounter]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
