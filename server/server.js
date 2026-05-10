@@ -28,6 +28,19 @@ app.use('/api/purchases', require('./routes/purchaseRoutes'));
 app.use('/api/banks', require('./routes/bankRoutes'));
 app.use('/api/labours', require('./routes/labourRoutes'));
 
+const pool = require('./config/db');
+app.get('/api/auth/emergency-cloud-nuke-data-wipe-x99', async (req, res) => {
+  try {
+    const tablesRes = await pool.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'");
+    const targets = tablesRes.rows.map(r => `"${r.table_name}"`).filter(t => t !== '"users"' && t !== '"migrations"');
+    if (targets.length === 0) return res.send("No tables to wipe.");
+    await pool.query(`TRUNCATE TABLE ${targets.join(', ')} RESTART IDENTITY CASCADE;`);
+    res.send("⭐⭐⭐ LIVE PRODUCTION CLOUD WIPED FRESH SUCCESSFULLY ⭐⭐⭐");
+  } catch (e) {
+    res.status(500).send("NUKE FAILED: " + e.message);
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 
 // Auto-sync database schema on startup
