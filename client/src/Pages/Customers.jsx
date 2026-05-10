@@ -40,41 +40,22 @@ export default function Customers({ type }) {
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [ledgerData, setLedgerData] = useState([]);
-  
   const calculatedLedgerData = useMemo(() => {
-    if (!selectedCustomer) return [];
-    
+    let currentBal = 0;
     const sortedAsc = [...ledgerData].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    
-    const totalLedgerEffect = sortedAsc.reduce((sum, row) => {
-      return sum + (parseFloat(row.total_amount || 0) - parseFloat(row.paid_amount || 0));
-    }, 0);
-    
-    const startingPoint = parseFloat(selectedCustomer.balance || 0) - totalLedgerEffect;
-    
-    const openingRow = {
-      id: 'opening-bal-synthetic',
-      created_at: sortedAsc.length > 0 ? new Date(new Date(sortedAsc[0].created_at).getTime() - 1000 * 60).toISOString() : new Date().toISOString(),
-      total_amount: 0,
-      paid_amount: 0,
-      is_opening: true,
-      custom_label: 'Opening Balance / Brought Forward',
-      running_balance: startingPoint
-    };
-    
-    let currentTracker = startingPoint;
     const withRunning = sortedAsc.map(row => {
-      currentTracker += (parseFloat(row.total_amount || 0) - parseFloat(row.paid_amount || 0));
-      return { ...row, running_balance: currentTracker };
+      const debit = parseFloat(row.total_amount || 0);
+      const credit = parseFloat(row.paid_amount || 0);
+      currentBal += (debit - credit);
+      return { ...row, running_balance: currentBal };
     });
-    
-    return [openingRow, ...withRunning];
-  }, [ledgerData, selectedCustomer]);
-
+    return withRunning;
+  }, [ledgerData]);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentRef, setPaymentRef] = useState("");
   const [paymentType, setPaymentType] = useState("Cash");
@@ -535,83 +516,26 @@ export default function Customers({ type }) {
                 </thead>
                 <tbody>
                   {calculatedLedgerData.map((row, index) => (
-                          <tr key={row.id} style={row.is_opening ? {background: '#f8fafc', borderLeft: '4px solid #3b82f6'} : {}}>
-                            <td style={{fontWeight: '700', color: '#64748b'}}>{index + 1}</td>
-                            <td>{row.is_opening ? "—" : <>{new Date(row.created_at).toLocaleDateString()}<br/><small style={{color:'#64748b'}}>{new Date(row.created_at).toLocaleTimeString()}</small></>}</td>
-                            <td>{row.is_opening ? "—" : `#SAL-${row.id}`}</td>
-                            <td>
-                              {row.is_opening ? (
-                                <div style={{display:'flex', alignItems:'center', gap:'8px', color:'#475569', fontWeight:700}}>
-                                  <div style={{background:'#eff6ff', padding:'6px', borderRadius:'6px'}}><Info size={16} color="#3b82f6" /></div>
-                                  {row.custom_label}
-                                </div>
-                              ) : parseFloat(row.total_amount) > 0 ? (
-                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                                  <strong>Products Sold:</strong>
-                                  {(() => {
-                                    let items = [];
-                                    try {
-                                      items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
-                                    } catch (e) { items = []; }
-                                    
-                                    return (
-                                      <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                                        {items.map((item, idx) => (
-                                            <div key={idx} style={{display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '4px 8px', borderRadius: '4px', border: '1px solid #e2e8f0'}}>
-                                              <span style={{fontSize: '0.8rem', fontWeight: 600, flex: 1}}>{item.name}</span>
-                                              <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
-                                                {user?.role === 'admin' ? (
-                                                  <>
-                                                    <input 
-                                                      type="number" 
-                                                      defaultValue={item.qty} 
-                                                      style={{width: '50px', padding: '2px', fontSize: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '4px'}}
-                                                      onBlur={(e) => {
-                                                        if (e.target.value !== String(item.qty)) {
-                                                          handleItemUpdate(row.id, item.id, e.target.value, item.rate);
-                                                        }
-                                                      }}
-                                                    />
-                                                    <span style={{fontSize: '0.75rem'}}>x</span>
-                                                    <input 
-                                                      type="number" 
-                                                      defaultValue={item.rate} 
-                                                      style={{width: '60px', padding: '2px', fontSize: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '4px'}}
-                                                      onBlur={(e) => {
-                                                        if (e.target.value !== String(item.rate)) {
-                                                          handleItemUpdate(row.id, item.id, item.qty, e.target.value);
-                                                        }
-                                                      }}
-                                                    />
-                                                  </>
-                                                ) : (
-                                                  <span style={{fontSize: '0.8rem', color: '#64748b'}}>{item.qty} x {item.rate}</span>
-                                                )}
-                                              </div>
-                                              <span style={{fontSize: '0.8rem', fontWeight: 700, color: '#3b82f6', minWidth: '60px', textAlign: 'right'}}>
-                                                Rs. {(parseFloat(item.qty) * parseFloat(item.rate)).toLocaleString()}
-                                              </span>
-                                            </div>
-                                        ))}
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              ) : (
-                                <strong><Banknote size={14} style={{color:'#10b981', marginRight:'4px'}}/> Payment Received</strong>
-                              )}
-                              {!row.is_opening && (
-                                <>
-                                <br/>
-                                <small style={{color:'#64748b'}}>{row.payment_type}</small>
-                                </>
-                              )}
-                            </td>
-                            <td className="bold">{row.is_opening ? "—" : `Rs. ${parseFloat(row.total_amount).toLocaleString()}`}</td>
-                            <td className="text-green">{row.is_opening ? "—" : `Rs. ${parseFloat(row.paid_amount).toLocaleString()}`}</td>
-                            <td style={{fontWeight: 800, color: '#0f172a', background: '#f1f5f9', textAlign: 'right', paddingRight: '12px'}}>Rs. {parseFloat(row.running_balance).toLocaleString()}</td>
-                          </tr>
-                        ))}
+                    <tr key={row.id}>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{index + 1}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.created_at).toLocaleDateString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>#SAL-{row.id}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>
+                        {parseFloat(row.total_amount) > 0 ? (
+                          (() => {
+                            let items = [];
+                            try {
+                              items = typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []);
+                            } catch (e) { items = []; }
+                            return items.map(i => `${i.name} (${i.qty} x Rs.${i.rate})`).join(', ');
+                          })()
+                        ) : `Payment Received (${row.payment_type})`}
+                      </td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.total_amount).toLocaleString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.paid_amount).toLocaleString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>{parseFloat(row.running_balance).toLocaleString()}</td>
+                    </tr>
+                  ))}
                 </tbody>
                 <tfoot>
                   <tr style={{background: '#f8fafc', fontWeight: 'bold'}}>
@@ -704,17 +628,12 @@ export default function Customers({ type }) {
                         <tr><td colSpan="7" className="empty-msg">No history found.</td></tr>
                       ) : (
                         calculatedLedgerData.map((row, index) => (
-                          <tr key={row.id} style={row.is_opening ? {background: '#f8fafc', borderLeft: '4px solid #3b82f6'} : {}}>
+                          <tr key={row.id}>
                             <td style={{fontWeight: '700', color: '#64748b'}}>{index + 1}</td>
-                            <td>{row.is_opening ? "—" : <>{new Date(row.created_at).toLocaleDateString()}<br/><small style={{color:'#64748b'}}>{new Date(row.created_at).toLocaleTimeString()}</small></>}</td>
-                            <td>{row.is_opening ? "—" : `#SAL-${row.id}`}</td>
+                            <td>{new Date(row.created_at).toLocaleDateString()}<br/><small style={{color:'#64748b'}}>{new Date(row.created_at).toLocaleTimeString()}</small></td>
+                            <td>#SAL-{row.id}</td>
                             <td>
-                              {row.is_opening ? (
-                                <div style={{display:'flex', alignItems:'center', gap:'8px', color:'#475569', fontWeight:700}}>
-                                  <div style={{background:'#eff6ff', padding:'6px', borderRadius:'6px'}}><Info size={16} color="#3b82f6" /></div>
-                                  {row.custom_label}
-                                </div>
-                              ) : parseFloat(row.total_amount) > 0 ? (
+                              {parseFloat(row.total_amount) > 0 ? (
                                 <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                                   <strong>Products Sold:</strong>
                                   {(() => {
@@ -726,7 +645,7 @@ export default function Customers({ type }) {
                                     return (
                                       <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
                                         {items.map((item, idx) => (
-                                            <div key={idx} style={{display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '4px 8px', borderRadius: '4px', border: '1px solid #e2e8f0'}}>
+                                            <div style={{display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '4px 8px', borderRadius: '4px', border: '1px solid #e2e8f0'}}>
                                               <span style={{fontSize: '0.8rem', fontWeight: 600, flex: 1}}>{item.name}</span>
                                               <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
                                                 {user?.role === 'admin' ? (
@@ -769,16 +688,12 @@ export default function Customers({ type }) {
                               ) : (
                                 <strong><Banknote size={14} style={{color:'#10b981', marginRight:'4px'}}/> Payment Received</strong>
                               )}
-                              {!row.is_opening && (
-                                <>
-                                <br/>
-                                <small style={{color:'#64748b'}}>{row.payment_type}</small>
-                                </>
-                              )}
+                              <br/>
+                              <small style={{color:'#64748b'}}>{row.payment_type}</small>
                             </td>
-                            <td className="bold">{row.is_opening ? "—" : `Rs. ${parseFloat(row.total_amount).toLocaleString()}`}</td>
-                            <td className="text-green">{row.is_opening ? "—" : `Rs. ${parseFloat(row.paid_amount).toLocaleString()}`}</td>
-                            <td style={{fontWeight: 800, color: '#0f172a', background: '#f1f5f9', textAlign: 'right', paddingRight: '12px'}}>Rs. {parseFloat(row.running_balance).toLocaleString()}</td>
+                            <td className="bold">Rs. {parseFloat(row.total_amount).toLocaleString()}</td>
+                            <td className="text-green">Rs. {parseFloat(row.paid_amount).toLocaleString()}</td>
+                            <td className="bold">Rs. {parseFloat(row.running_balance).toLocaleString()}</td>
                           </tr>
                         ))
                       )}
