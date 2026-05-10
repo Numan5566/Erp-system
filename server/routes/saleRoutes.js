@@ -21,7 +21,9 @@ router.get('/', auth, async (req, res) => {
       params.push(type);
     }
 
-    query += ' ORDER BY created_at DESC';
+    const limit = req.query.limit ? parseInt(req.query.limit) : 500;
+    query += ` ORDER BY created_at DESC LIMIT $${params.length + 1}`;
+    params.push(limit);
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -73,22 +75,34 @@ router.post('/', auth, async (req, res) => {
     );
     const saleId = saleResult.rows[0].id;
 
-    // 2. Inventory Pre-check & Safety Loop (Hard Lock against negative stock)
-    for (const item of items) {
-      const prodId = item.product_id || item.id;
-      const requestedQty = parseFloat(item.qty || 0);
+    // 2. Inventory Pre-check (Single Query Optimization)
+    const productIds = [...new Set(items.map(item => item.product_id || item.id))];
+    if (productIds.length > 0) {
+      const placeholders = productIds.map((_, i) => `$${i + 1}`).join(', ');
+      const productsCheck = await client.query(
+        `SELECT id, name, stock_quantity FROM products WHERE id IN (${placeholders})`,
+        productIds
+      );
       
-      const pCheck = await client.query('SELECT name, stock_quantity FROM products WHERE id = $1', [prodId]);
-      if (pCheck.rows.length > 0) {
-        const currentInv = parseFloat(pCheck.rows[0].stock_quantity || 0);
-        if (requestedQty > currentInv) {
-          throw new Error(`OUT OF STOCK PREVENTED: Available: \${currentInv}, Requested: \${requestedQty} for "\${pCheck.rows[0].name}". Transaction blocked.`);
+      const productMap = {};
+      productsCheck.rows.forEach(p => { productMap[p.id] = p; });
+
+      for (const item of items) {
+        const prodId = item.product_id || item.id;
+        const requestedQty = parseFloat(item.qty || 0);
+        const pData = productMap[prodId];
+        
+        if (pData) {
+          const currentInv = parseFloat(pData.stock_quantity || 0);
+          if (requestedQty > currentInv) {
+            throw new Error(`OUT OF STOCK PREVENTED: Available: ${currentInv}, Requested: ${requestedQty} for "${pData.name}". Transaction blocked.`);
+          }
         }
       }
     }
 
-    // 3. Insert items and update stock
-    for (const item of items) {
+    // 3. Insert items and update stock (Parallelized Execution within transaction)
+    const operations = items.map(async (item) => {
       const prodId = item.product_id || item.id;
       const prodName = item.product_name || item.name;
       const rate = item.rate || item.price;
@@ -102,7 +116,9 @@ router.post('/', auth, async (req, res) => {
         'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
         [item.qty, prodId]
       );
-    }
+    });
+    
+    await Promise.all(operations);
 
     // 3. Update customer balance if it's a credit sale
     if (finalCustomerId && balance_amount !== 0) {

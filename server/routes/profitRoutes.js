@@ -35,17 +35,16 @@ const buildSummary = async (fromDate, toDate) => {
   const counters = ['Wholesale', 'Retail 1', 'Retail 2'];
   const summary = {};
 
-  for (const c of counters) {
-    // REVENUE: Only what has been actually PAID by customers
-    const sales = await getSum('sales', 'paid_amount', c, 'sale_type', 'created_at', fromDate, toDate);
-    
-    // EXPENSES: Operational + Supply chain payments (Ignore Pending payments until cleared)
-    const expenses = await getSum('expenses',       'amount',      c, 'module_type',  'created_at',    fromDate, toDate, "payment_type != 'Pending'");
-    const rent     = await getSum('rent',           'amount',      c, 'module_type',  'rent_date',     fromDate, toDate);
-    const salary   = await getSum('salary',         'amount',      c, 'module_type',  'payment_date',  fromDate, toDate);
-    const other    = await getSum('other_expenses', 'amount',      c, 'module_type',  'date',          fromDate, toDate);
-    const supply   = await getSum('purchases',      'paid_amount', c, 'module_type',  'purchase_date', fromDate, toDate);
-    
+  const fetchCounterData = async (c) => {
+    const [sales, expenses, rent, salary, other, supply] = await Promise.all([
+      getSum('sales', 'paid_amount', c, 'sale_type', 'created_at', fromDate, toDate),
+      getSum('expenses',       'amount',      c, 'module_type',  'created_at',    fromDate, toDate, "payment_type != 'Pending'"),
+      getSum('rent',           'amount',      c, 'module_type',  'rent_date',     fromDate, toDate),
+      getSum('salary',         'amount',      c, 'module_type',  'payment_date',  fromDate, toDate),
+      getSum('other_expenses', 'amount',      c, 'module_type',  'date',          fromDate, toDate),
+      getSum('purchases',      'paid_amount', c, 'module_type',  'purchase_date', fromDate, toDate)
+    ]);
+
     const totalExpenses = expenses + rent + salary + other + supply;
 
     // Actual Sales Profit (Gross Profit based on product cost price vs sold price)
@@ -60,19 +59,28 @@ const buildSummary = async (fromDate, toDate) => {
       [c, ...(fromDate ? [fromDate] : []), ...(toDate ? [toDate] : [])]
     );
     const salesProfit = parseFloat(salesProfitRes.rows[0].profit || 0);
-    
-    summary[c] = { 
-      sales, 
-      expenses, 
-      rent, 
-      salary, 
-      other, 
-      supply, // Added supply chain costs
-      totalExpenses, 
-      netProfit: sales - totalExpenses,
-      salesProfit
+
+    return {
+      counter: c,
+      data: {
+        sales,
+        expenses,
+        rent,
+        salary,
+        other,
+        supply,
+        totalExpenses,
+        netProfit: sales - totalExpenses,
+        salesProfit
+      }
     };
-  }
+  };
+
+  const results = await Promise.all(counters.map(fetchCounterData));
+  results.forEach(res => {
+    summary[res.counter] = res.data;
+  });
+
   return summary;
 };
 
