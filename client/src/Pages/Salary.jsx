@@ -18,8 +18,8 @@ const emptyForm = {
   cnic: "",
   salary_amount: "",
   advance_salary: 0,
-  joining_date: new Date().toISOString().split('T')[0],
-  payment_date: new Date().toISOString().split('T')[0],
+  joining_date: new Date().toLocaleDateString('en-CA'),
+  payment_date: new Date().toLocaleDateString('en-CA'),
   status: "Paid",
   notes: ""
 };
@@ -116,7 +116,7 @@ export default function Salary({ type }) {
       ...rec,
       salary_amount: rec.salary_amount || rec.amount || "",  // map DB 'amount' → form 'salary_amount'
       joining_date: rec.joining_date ? rec.joining_date.split('T')[0] : "",
-      payment_date: rec.payment_date ? rec.payment_date.split('T')[0] : new Date().toISOString().split('T')[0],
+      payment_date: rec.payment_date ? rec.payment_date.split('T')[0] : new Date().toLocaleDateString('en-CA'),
     });
     setEditId(rec.id);
     setShowModal(true);

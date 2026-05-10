@@ -18,7 +18,7 @@ const emptyForm = {
   expense_type: "Office",
   category: "General",
   amount: "",
-  expense_date: new Date().toISOString().split('T')[0],
+  expense_date: new Date().toLocaleDateString('en-CA'),
   notes: "",
   payment_source: "Cash",
   bank_name: ""
@@ -165,7 +165,7 @@ export default function Expenses({ type }) {
                         (r.category || "").toLowerCase().includes(search.toLowerCase());
     
     let matchDate = true;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toLocaleDateString('en-CA');
     const recDateStr = r.expense_date ? r.expense_date.split('T')[0] : '';
     
     if (dateFilter === "Today") {
@@ -173,7 +173,7 @@ export default function Expenses({ type }) {
     } else if (dateFilter === "Yesterday") {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const yesterdayStr = yesterday.toLocaleDateString('en-CA');
       matchDate = recDateStr === yesterdayStr;
     }
     

@@ -24,7 +24,7 @@ const emptyForm = {
   investor: "",
   category: "Business",
   amount: "",
-  date: new Date().toISOString().split("T")[0],
+  date: new Date().toLocaleDateString('en-CA'),
   notes: "",
 };
 

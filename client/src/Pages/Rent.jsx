@@ -20,7 +20,7 @@ const emptyForm = {
   property_name: "",
   landlord_name: "",
   amount: "",
-  rent_date: new Date().toISOString().split("T")[0],
+  rent_date: new Date().toLocaleDateString('en-CA'),
   status: "Paid",
   notes: "",
 };

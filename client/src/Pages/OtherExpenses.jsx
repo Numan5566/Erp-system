@@ -26,7 +26,7 @@ const emptyForm = {
   title: "",
   category: "Miscellaneous",
   amount: "",
-  date: new Date().toISOString().split("T")[0],
+  date: new Date().toLocaleDateString('en-CA'),
   payment_method: "Cash",
   notes: "",
 };

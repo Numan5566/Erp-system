@@ -169,16 +169,16 @@ export default function Customers({ type }) {
     const today = new Date();
     
     if (filterKey === 'today') {
-      from = today.toISOString().split('T')[0];
+      from = today.toLocaleDateString('en-CA');
       to = from;
     } else if (filterKey === 'week') {
       const weekAgo = new Date();
       weekAgo.setDate(today.getDate() - 7);
-      from = weekAgo.toISOString().split('T')[0];
-      to = today.toISOString().split('T')[0];
+      from = weekAgo.toLocaleDateString('en-CA');
+      to = today.toLocaleDateString('en-CA');
     } else if (filterKey === 'month') {
-      from = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-      to = today.toISOString().split('T')[0];
+      from = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA');
+      to = today.toLocaleDateString('en-CA');
     }
 
     if (filterKey === 'custom') {

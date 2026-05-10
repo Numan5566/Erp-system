@@ -26,9 +26,9 @@ const COUNTER_COLORS = {
 const fmt = (n) => `Rs. ${parseFloat(n || 0).toLocaleString()}`;
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString() : '—';
 
-const today = () => new Date().toISOString().split('T')[0];
-const weekAgo = () => { const d = new Date(); d.setDate(d.getDate()-6); return d.toISOString().split('T')[0]; };
-const monthStart = () => { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0]; };
+const today = () => new Date().toLocaleDateString('en-CA');
+const weekAgo = () => { const d = new Date(); d.setDate(d.getDate()-6); return d.toLocaleDateString('en-CA'); };
+const monthStart = () => { const d = new Date(); d.setDate(1); return d.toLocaleDateString('en-CA'); };
 
 export default function Profit() {
   const [summary, setSummary] = useState(null);
