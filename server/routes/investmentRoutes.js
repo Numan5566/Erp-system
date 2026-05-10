@@ -34,7 +34,7 @@ router.post('/', auth, async (req, res) => {
 
     const result = await pool.query(
       'INSERT INTO investment (title, investor, category, amount, date, notes, user_id, module_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [title, investor, category, amount || 0, date || new Date().toISOString().split('T')[0], notes, req.user.id, finalModule]
+      [title, investor, category, amount || 0, date || new Date().toLocaleDateString('en-CA'), notes, req.user.id, finalModule]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }

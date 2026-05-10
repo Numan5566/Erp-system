@@ -14,7 +14,7 @@ async function check() {
     result.rows.forEach(r => console.log(' -', r.column_name, ':', r.data_type, '| nullable:', r.is_nullable));
 
     // Generate month value same as route will
-    const paymentDate = new Date().toISOString().split('T')[0];
+    const paymentDate = new Date().toLocaleDateString('en-CA');
     const month = new Date(paymentDate).toLocaleString('default', { month: 'long', year: 'numeric' });
     console.log('\nDerived month value:', month);
 

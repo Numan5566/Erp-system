@@ -16,7 +16,9 @@ const pool = new Pool(
       }
 );
 
-pool.on('connect', () => {
+pool.on('connect', (client) => {
+  // Ensure every connection operates natively on Pakistan Time for date filters
+  client.query("SET TIME ZONE 'Asia/Karachi'").catch(e => console.error("Timezone error", e));
   console.log('Connected to PostgreSQL Database.');
 });
 

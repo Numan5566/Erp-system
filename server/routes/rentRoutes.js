@@ -34,7 +34,7 @@ router.post('/', auth, async (req, res) => {
 
     const result = await pool.query(
       'INSERT INTO rent (property_name, landlord_name, amount, rent_date, status, notes, user_id, module_type, payment_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [property_name, landlord_name, amount || 0, rent_date || new Date().toISOString().split('T')[0], status || 'Paid', notes, req.user.id, finalModule, payment_type || 'Cash']
+      [property_name, landlord_name, amount || 0, rent_date || new Date().toLocaleDateString('en-CA'), status || 'Paid', notes, req.user.id, finalModule, payment_type || 'Cash']
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }

@@ -34,7 +34,7 @@ router.post('/', auth, async (req, res) => {
 
     const result = await pool.query(
       'INSERT INTO expenses (description, expense_type, category, amount, expense_date, notes, user_id, module_type, payment_type, vehicle_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, description as title, expense_type, category, amount, expense_date, notes, user_id, module_type, payment_type, vehicle_id, created_at',
-      [title, expense_type || 'Office', category, amount || 0, expense_date || new Date().toISOString().split('T')[0], notes, req.user.id, finalModule, payment_type || 'Cash', vehicle_id || null]
+      [title, expense_type || 'Office', category, amount || 0, expense_date || new Date().toLocaleDateString('en-CA'), notes, req.user.id, finalModule, payment_type || 'Cash', vehicle_id || null]
     );
 
     if (vehicle_id) {
