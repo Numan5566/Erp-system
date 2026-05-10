@@ -19,6 +19,7 @@ async function syncDatabaseSchema() {
     `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS email VARCHAR(255);`,
     `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS company VARCHAR(255);`,
     `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS balance DECIMAL(12, 2) DEFAULT 0;`,
+    `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS opening_balance DECIMAL(15, 2) DEFAULT 0;`,
     `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS user_id INTEGER;`,
     `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS module_type VARCHAR(100) DEFAULT 'Wholesale';`,
 
@@ -52,6 +53,7 @@ async function syncDatabaseSchema() {
 
     // --- 6. CUSTOMERS ---
     `ALTER TABLE customers ADD COLUMN IF NOT EXISTS balance DECIMAL(12, 2) DEFAULT 0;`,
+    `ALTER TABLE customers ADD COLUMN IF NOT EXISTS opening_balance DECIMAL(15, 2) DEFAULT 0;`,
     `ALTER TABLE customers ADD COLUMN IF NOT EXISTS user_id INTEGER;`,
     `ALTER TABLE customers ADD COLUMN IF NOT EXISTS module_type VARCHAR(100) DEFAULT 'Wholesale';`,
 
@@ -64,7 +66,10 @@ async function syncDatabaseSchema() {
 
     // --- 8. LABOURS ---
     `ALTER TABLE labours ADD COLUMN IF NOT EXISTS module_type VARCHAR(100) DEFAULT 'Wholesale';`,
-    `ALTER TABLE labour_work_history ADD COLUMN IF NOT EXISTS module_type VARCHAR(100) DEFAULT 'Wholesale';`
+    `ALTER TABLE labour_work_history ADD COLUMN IF NOT EXISTS module_type VARCHAR(100) DEFAULT 'Wholesale';`,
+
+    // --- 9. DATA HEALING MIGRATIONS ---
+    `UPDATE expenses SET expense_type = 'Supplier Vehicle' WHERE category = 'Transport' AND expense_type = 'Office';`
   ];
 
   let totalExecuted = 0;
