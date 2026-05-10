@@ -31,8 +31,14 @@ const weekAgo = () => { const d = new Date(); d.setDate(d.getDate()-6); return d
 const monthStart = () => { const d = new Date(); d.setDate(1); return d.toLocaleDateString('en-CA'); };
 
 export default function Profit() {
-  const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState(() => {
+    try {
+      const cached = localStorage.getItem('profit_summary_cache');
+      return cached ? JSON.parse(cached) : null;
+    } catch (e) { return null; }
+  });
+  const [loading, setLoading] = useState(!summary);
+  const [bgLoading, setBgLoading] = useState(false);
   const [selectedCounter, setSelectedCounter] = useState(null);
   const [detail, setDetail]   = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -61,11 +67,23 @@ export default function Profit() {
   };
 
   const loadSummary = (from = fromDate, to = toDate) => {
-    setLoading(true);
+    if (summary) setBgLoading(true);
+    else setLoading(true);
+
     fetch(SUMMARY_API + buildQS(from, to), { headers })
       .then(r => r.json())
-      .then(d => { setSummary(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(d => { 
+        setSummary(d); 
+        setLoading(false);
+        setBgLoading(false);
+        if (from === today() && to === today()) {
+          localStorage.setItem('profit_summary_cache', JSON.stringify(d));
+        }
+      })
+      .catch(() => {
+        setLoading(false);
+        setBgLoading(false);
+      });
   };
 
   useEffect(() => { loadSummary(today(), today()); }, []);
@@ -117,8 +135,13 @@ export default function Profit() {
             <TrendingUp size={28} />
           </div>
           <div>
-            <h1>Master Profit &amp; Loss</h1>
-            <p>Click any counter card for full breakdown</p>
+            <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              Master Profit &amp; Loss
+              {bgLoading && (
+                <div style={{ width: '16px', height: '16px', border: '2px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              )}
+            </h1>
+            <p>{bgLoading ? 'Syncing fresh data...' : 'Click any counter card for full breakdown'}</p>
           </div>
         </div>
         <button className="btn-primary" onClick={() => window.print()}>
