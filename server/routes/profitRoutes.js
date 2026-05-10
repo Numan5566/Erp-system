@@ -13,11 +13,11 @@ const getSum = async (table, amountCol, moduleType, moduleCol, dateCol, fromDate
     conditions.push(`${moduleCol} = $${params.length}`);
   }
   if (fromDate) {
-    params.push(fromDate);
+    params.push(`${fromDate} 00:00:00`);
     conditions.push(`${dateCol} >= $${params.length}`);
   }
   if (toDate) {
-    params.push(toDate);
+    params.push(`${toDate} 23:59:59`);
     conditions.push(`${dateCol} <= $${params.length}`);
   }
   if (extraCond) {
@@ -56,7 +56,7 @@ const buildSummary = async (fromDate, toDate) => {
        WHERE s.sale_type = $1
        ${fromDate ? `AND s.created_at >= $2` : ''}
        ${toDate ? `AND s.created_at <= $${fromDate ? 3 : 2}` : ''}`,
-      [c, ...(fromDate ? [fromDate] : []), ...(toDate ? [toDate] : [])]
+      [c, ...(fromDate ? [`${fromDate} 00:00:00`] : []), ...(toDate ? [`${toDate} 23:59:59`] : [])]
     );
     const salesProfit = parseFloat(salesProfitRes.rows[0].profit || 0);
 
@@ -97,7 +97,9 @@ router.get('/summary', auth, async (req, res) => {
 router.get('/detail/:counter', auth, async (req, res) => {
   try {
     const c = decodeURIComponent(req.params.counter);
-    const { from, to } = req.query;
+    let { from, to } = req.query;
+    if (from) from = `${from} 00:00:00`;
+    if (to)   to   = `${to} 23:59:59`;
 
     const dateFilter = (col) => {
       let conds = [`${col} IS NOT NULL`];
