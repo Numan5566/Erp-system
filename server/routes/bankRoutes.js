@@ -17,10 +17,11 @@ router.get('/balances', auth, async (req, res) => {
     let accountsQ = 'SELECT bank_name, opening_balance FROM bank_accounts';
     let params = [];
     if (!isAdminUser) {
-      accountsQ += ' WHERE user_id = $1 OR module_type = $2';
+      accountsQ += " WHERE user_id = $1 OR COALESCE(module_type, 'Wholesale') = $2";
       params.push(userId, targetModule);
     } else {
-      accountsQ += ' WHERE module_type = $1';
+      // Admins fetch all relevant accounts for this context
+      accountsQ += " WHERE COALESCE(module_type, 'Wholesale') = $1 OR module_type = 'Admin Recipient'";
       params.push(targetModule);
     }
     const accountsRes = await pool.query(accountsQ, params);
@@ -33,7 +34,7 @@ router.get('/balances', auth, async (req, res) => {
     });
 
     // 2. Fetch sales
-    let salesQ = 'SELECT net_amount, paid_amount, payment_type FROM sales WHERE sale_type = $1';
+    let salesQ = "SELECT net_amount, paid_amount, payment_type FROM sales WHERE COALESCE(sale_type, 'Wholesale') = $1";
     const salesRes = await pool.query(salesQ, [targetModule]);
     salesRes.rows.forEach(s => {
       let method = s.payment_type || 'Cash';
@@ -46,7 +47,7 @@ router.get('/balances', auth, async (req, res) => {
     });
 
     // 3. Fetch purchases & supplier payments
-    let purchasesQ = 'SELECT paid_amount, payment_type FROM purchases WHERE module_type = $1';
+    let purchasesQ = "SELECT paid_amount, payment_type FROM purchases WHERE COALESCE(module_type, 'Wholesale') = $1";
     const purchasesRes = await pool.query(purchasesQ, [targetModule]);
     purchasesRes.rows.forEach(p => {
       let method = p.payment_type || 'Cash';
@@ -59,7 +60,7 @@ router.get('/balances', auth, async (req, res) => {
     });
 
     // 4. Fetch expenses
-    let expensesQ = 'SELECT amount, payment_type, expense_type FROM expenses WHERE module_type = $1';
+    let expensesQ = "SELECT amount, payment_type, expense_type FROM expenses WHERE COALESCE(module_type, 'Wholesale') = $1";
     const expensesRes = await pool.query(expensesQ, [targetModule]);
     expensesRes.rows.forEach(e => {
       let method = e.payment_type || 'Cash';
@@ -76,7 +77,7 @@ router.get('/balances', auth, async (req, res) => {
     });
 
     // 5. Fetch actual salaries paid from salary_payments
-    let salariesQ = 'SELECT amount, payment_type FROM salary_payments WHERE module_type = $1';
+    let salariesQ = "SELECT amount, payment_type FROM salary_payments WHERE COALESCE(module_type, 'Wholesale') = $1";
     const salariesRes = await pool.query(salariesQ, [targetModule]);
     salariesRes.rows.forEach(s => {
       let method = s.payment_type || 'Cash';
@@ -88,9 +89,8 @@ router.get('/balances', auth, async (req, res) => {
       balances[cleanMethod] -= parseFloat(s.amount) || 0;
     });
 
-
     // 6. Fetch rents
-    let rentsQ = 'SELECT amount FROM rent WHERE module_type = $1';
+    let rentsQ = "SELECT amount FROM rent WHERE COALESCE(module_type, 'Wholesale') = $1";
     const rentsRes = await pool.query(rentsQ, [targetModule]);
     rentsRes.rows.forEach(r => {
       balances['Cash'] -= parseFloat(r.amount) || 0;
@@ -106,29 +106,31 @@ router.get('/balances', auth, async (req, res) => {
 router.get('/', auth, async (req, res) => {
   try {
     const includeRecipients = req.query.include_recipients === 'true';
+    const isAdminUser = req.user.role === 'admin';
     let result;
-    if (req.user.email === 'admin@erp.com') {
-      // Master Admin sees ALL banks
+    if (isAdminUser) {
+      // Admins see all bank accounts available across all counter flows
       if (includeRecipients) {
         result = await pool.query('SELECT * FROM bank_accounts ORDER BY id ASC');
       } else {
-        result = await pool.query('SELECT * FROM bank_accounts WHERE module_type IS NULL OR module_type != \'Admin Recipient\' ORDER BY id ASC');
+        result = await pool.query("SELECT * FROM bank_accounts WHERE COALESCE(module_type, '') != 'Admin Recipient' ORDER BY id ASC");
       }
     } else {
       // Everyone else sees their own banks, those added for their shop
       if (includeRecipients) {
         result = await pool.query(
-          'SELECT * FROM bank_accounts WHERE user_id = $1 OR module_type = $2 OR module_type = \'Admin Recipient\' ORDER BY id ASC',
+          "SELECT * FROM bank_accounts WHERE user_id = $1 OR module_type = $2 OR module_type = 'Admin Recipient' ORDER BY id ASC",
           [req.user.id, req.user.module_type || 'Retail 1']
         );
       } else {
         result = await pool.query(
-          'SELECT * FROM bank_accounts WHERE (user_id = $1 OR module_type = $2) AND (module_type IS NULL OR module_type != \'Admin Recipient\') ORDER BY id ASC',
+          "SELECT * FROM bank_accounts WHERE (user_id = $1 OR module_type = $2) AND COALESCE(module_type, '') != 'Admin Recipient' ORDER BY id ASC",
           [req.user.id, req.user.module_type || 'Retail 1']
         );
       }
     }
     res.json(result.rows);
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
