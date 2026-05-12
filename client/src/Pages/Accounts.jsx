@@ -533,9 +533,23 @@ export default function Accounts() {
     ].sort((a, b) => new Date(a.created_at || a.expense_date || a.purchase_date || a.date) - new Date(b.created_at || b.expense_date || b.purchase_date || b.date))
     .reduce((acc, s) => {
       const method = s.payment_type || 'Cash';
-      let cleanMethod = method.replace('Bank - ', '');
+      let cleanMethod = method.replace('Bank - ', '').trim();
       if (cleanMethod === 'Cash Account' || cleanMethod.toLowerCase() === 'cash') {
         cleanMethod = 'Cash';
+      }
+      
+      // FIX: Match dirty dynamic names back to visual bank cards
+      if (cleanMethod !== 'Cash') {
+        const cLower = cleanMethod.toLowerCase();
+        const matchedBank = filteredAccounts.find(b => {
+           const bLower = b.bank_name.toLowerCase();
+           return cLower.includes(bLower) || bLower.includes(cLower);
+        });
+        if (matchedBank) {
+          let fixN = matchedBank.bank_name.replace(' Account', '');
+          if (fixN.toLowerCase() === 'cash') fixN = 'Cash';
+          cleanMethod = fixN;
+        }
       }
       
       const amount = getTransactionAmount(s);
