@@ -400,7 +400,7 @@ router.post('/return', auth, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { sale_id, items_to_return, refund_amount, refund_method } = req.body;
+    const { sale_id, items_to_return, refund_amount, refund_method, vehicle_id, vehicle_type, delivery_charges } = req.body;
     const sId = parseInt(sale_id);
     if (isNaN(sId)) throw new Error('Invalid Bill Number');
 
@@ -484,8 +484,8 @@ router.post('/return', auth, async (req, res) => {
       `INSERT INTO sales (
         sale_type, customer_id, customer_name, customer_phone, 
         net_amount, paid_amount, balance_amount, status, 
-        payment_type, user_id, items, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP) RETURNING id`,
+        payment_type, user_id, items, vehicle_id, delivery_charges, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP) RETURNING id`,
       [
         sale.sale_type,
         sale.customer_id,
@@ -497,10 +497,20 @@ router.post('/return', auth, async (req, res) => {
         'Returned',
         refund_method || 'Cash',
         req.user.id,
-        JSON.stringify(items.map(i => ({ ...i, quantity: i.return_qty || i.qty, name: i.product_name || i.name })))
+        JSON.stringify(items.map(i => ({ ...i, quantity: i.return_qty || i.qty, name: i.product_name || i.name }))),
+        vehicle_id || null,
+        delivery_charges || 0
       ]
     );
     const newReturnId = returnBillResult.rows[0].id;
+
+    // 3.5 Automatic Transport Earnings Update
+    if (vehicle_id && (parseFloat(delivery_charges) || 0) > 0) {
+      await client.query(
+        `UPDATE vehicles SET total_earnings = total_earnings + $1 WHERE id = $2`,
+        [parseFloat(delivery_charges), vehicle_id]
+      );
+    }
 
     // 4. Insert returned items into sale_items for the return bill
     for (const item of items) {

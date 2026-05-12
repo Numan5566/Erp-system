@@ -36,6 +36,10 @@ export default function Stock({ type }) {
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnBillNo, setReturnBillNo] = useState("");
   const [returnLoading, setReturnLoading] = useState(false);
+  const [billData, setBillData] = useState(null);
+  const [returnItems, setReturnItems] = useState([]);
+  const [returnVehicleId, setReturnVehicleId] = useState("");
+  const [returnFare, setReturnFare] = useState("0");
 
   useEffect(() => {
     if (type) {
@@ -212,9 +216,39 @@ export default function Stock({ type }) {
     setLoading(false);
   };
 
+  const handleFetchBill = async (e) => {
+    e?.preventDefault();
+    if (!returnBillNo) return;
+    setReturnLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/sales/${returnBillNo}`, {
+        headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setBillData(data);
+        setReturnItems((data.items || []).map(i => ({
+          ...i,
+          return_qty: i.qty,
+          rate: i.rate
+        })));
+      } else {
+        alert(data.error || "Bill not found");
+      }
+    } catch (err) { alert("Error fetching bill"); }
+    setReturnLoading(false);
+  };
+
   const handleSaleReturn = async (e) => {
     e.preventDefault();
-    if (!returnBillNo) return;
+    if (!billData || returnItems.length === 0) return;
+    
+    const finalItems = returnItems.filter(i => parseFloat(i.return_qty || 0) > 0);
+    if (finalItems.length === 0) {
+      alert("Please enter return quantity for at least one item");
+      return;
+    }
+
     setReturnLoading(true);
     try {
       const res = await fetch((API_BASE_URL + "/sales/return"), {
@@ -223,19 +257,34 @@ export default function Stock({ type }) {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ sale_id: returnBillNo })
+        body: JSON.stringify({ 
+          sale_id: returnBillNo,
+          items_to_return: finalItems.map(i => ({
+            product_id: i.product_id,
+            name: i.product_name || i.name,
+            qty: parseFloat(i.return_qty),
+            rate: parseFloat(i.rate)
+          })),
+          vehicle_id: returnVehicleId,
+          delivery_charges: returnFare,
+          refund_amount: "0",
+          refund_method: "Cash"
+        })
       });
       const data = await res.json();
       if (res.ok) {
         setShowReturnModal(false);
         setReturnBillNo("");
+        setBillData(null);
+        setReturnItems([]);
+        setReturnVehicleId("");
+        setReturnFare("0");
         fetchData();
-        alert("Stock successfully returned to inventory!");
+        alert("Stock successfully returned and recorded!");
       } else {
         alert(data.error || "Failed to process return");
       }
     } catch (err) {
-      console.error(err);
       alert("Error processing return");
     } finally {
       setReturnLoading(false);
@@ -646,41 +695,126 @@ export default function Stock({ type }) {
       )}
       {/* Sale Return Modal */}
       {showReturnModal && (
-        <div className="modal-overlay" onClick={() => setShowReturnModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+        <div className="modal-overlay" onClick={() => { setShowReturnModal(false); setBillData(null); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: billData ? '700px' : '400px'}}>
             <div className="modal-header">
               <div className="header-info">
                 <ArrowDownCircle size={24} color="#f43f5e" />
                 <h3>Process Sale Return</h3>
               </div>
-              <button className="modal-close" onClick={() => setShowReturnModal(false)}><X size={20} /></button>
+              <button className="modal-close" onClick={() => { setShowReturnModal(false); setBillData(null); }}><X size={20} /></button>
             </div>
-            <form onSubmit={handleSaleReturn} className="custom-form p-fluid" style={{padding: '20px'}}>
-              <div className="field mb-4">
-                <label className="block mb-2 font-bold" style={{color: '#475569'}}>Bill Number (Sale ID) *</label>
-                <div className="p-inputgroup">
-                  <span className="p-inputgroup-addon"><Hash size={18} /></span>
-                  <input 
-                    type="number" 
-                    required 
-                    value={returnBillNo} 
-                    placeholder="Enter Bill Number e.g. 101"
-                    className="p-inputtext p-component"
-                    onChange={e => setReturnBillNo(e.target.value)} 
-                  />
+            
+            {!billData ? (
+              <form onSubmit={handleFetchBill} className="custom-form p-fluid" style={{padding: '20px'}}>
+                <div className="field mb-4">
+                  <label className="block mb-2 font-bold" style={{color: '#475569'}}>Enter Bill Number (Sale ID) *</label>
+                  <div className="p-inputgroup" style={{display:'flex', border:'1px solid #cbd5e1', borderRadius:'8px', overflow:'hidden'}}>
+                    <span className="p-inputgroup-addon" style={{background:'#f1f5f9', padding:'10px', display:'flex', alignItems:'center'}}><Hash size={18} /></span>
+                    <input 
+                      type="number" 
+                      required 
+                      value={returnBillNo} 
+                      placeholder="e.g. 105"
+                      style={{flex:1, padding:'10px', border:'none', outline:'none'}}
+                      onChange={e => setReturnBillNo(e.target.value)} 
+                    />
+                  </div>
                 </div>
-                <p style={{fontSize: '0.75rem', color: '#64748b', marginTop: '8px'}}>
-                  Note: This will return ALL items from this bill back to stock and adjust the customer balance.
-                </p>
-              </div>
+                <div className="flex justify-content-end gap-2" style={{display:'flex', justifyContent:'flex-end', gap:'10px'}}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowReturnModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-primary" style={{background: '#3b82f6'}} disabled={returnLoading}>
+                    {returnLoading ? "Searching..." : "Find Bill"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleSaleReturn} className="custom-form" style={{padding: '20px'}}>
+                <div style={{background:'#eff6ff', border:'1px solid #bfdbfe', padding:'12px', borderRadius:'8px', marginBottom:'20px', display:'flex', justifyContent:'space-between'}}>
+                  <div>
+                    <div style={{fontSize:'0.8rem', color:'#1e40af', fontWeight:600}}>CUSTOMER</div>
+                    <div style={{fontWeight:800, color:'#1e3a8a'}}>{billData.customer_name}</div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:'0.8rem', color:'#1e40af', fontWeight:600}}>TOTAL BILLED</div>
+                    <div style={{fontWeight:800, color:'#1e3a8a'}}>Rs. {parseFloat(billData.net_amount || 0).toLocaleString()}</div>
+                  </div>
+                </div>
 
-              <div className="flex justify-content-end gap-2">
-                <button type="button" className="btn-secondary" onClick={() => setShowReturnModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary" style={{background: '#f43f5e'}} disabled={returnLoading}>
-                  {returnLoading ? "Processing..." : "Return to Stock"}
-                </button>
-              </div>
-            </form>
+                <div style={{maxHeight:'300px', overflowY:'auto', marginBottom:'20px', border:'1px solid #e2e8f0', borderRadius:'8px'}}>
+                  <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem'}}>
+                    <thead style={{background:'#f8fafc', position:'sticky', top:0}}>
+                      <tr>
+                        <th style={{textAlign:'left', padding:'10px', borderBottom:'1px solid #e2e8f0'}}>Product</th>
+                        <th style={{textAlign:'center', padding:'10px', borderBottom:'1px solid #e2e8f0'}}>Sold Qty</th>
+                        <th style={{textAlign:'center', padding:'10px', borderBottom:'1px solid #e2e8f0'}}>Return Qty</th>
+                        <th style={{textAlign:'center', padding:'10px', borderBottom:'1px solid #e2e8f0'}}>Return Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {returnItems.map((item, idx) => (
+                        <tr key={item.id || idx} style={{borderBottom:'1px solid #f1f5f9'}}>
+                          <td style={{padding:'10px', fontWeight:600}}>{item.product_name || item.name}</td>
+                          <td style={{padding:'10px', textAlign:'center', color:'#64748b'}}>{item.qty}</td>
+                          <td style={{padding:'10px'}}>
+                            <input type="number" step="0.01" max={item.qty} min="0"
+                              value={item.return_qty}
+                              onChange={(e) => {
+                                const next = [...returnItems];
+                                next[idx].return_qty = e.target.value;
+                                setReturnItems(next);
+                              }}
+                              style={{width:'80px', padding:'6px', borderRadius:'4px', border:'1px solid #cbd5e1', textAlign:'center'}} />
+                          </td>
+                          <td style={{padding:'10px'}}>
+                            <input type="number" step="0.01" min="0"
+                              value={item.rate}
+                              onChange={(e) => {
+                                const next = [...returnItems];
+                                next[idx].rate = e.target.value;
+                                setReturnItems(next);
+                              }}
+                              style={{width:'100px', padding:'6px', borderRadius:'4px', border:'1px solid #cbd5e1', textAlign:'center'}} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="form-grid" style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'15px', marginBottom:'20px'}}>
+                  <div className="form-group">
+                    <label style={{fontWeight:600, marginBottom:'5px', display:'block'}}>Return Vehicle (Optional)</label>
+                    <select 
+                      value={returnVehicleId} 
+                      onChange={(e) => setReturnVehicleId(e.target.value)}
+                      style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1'}}
+                    >
+                      <option value="">-- No Vehicle --</option>
+                      {vehicles.map(v => (
+                        <option key={v.id} value={v.id}>{v.vehicle_number} ({v.driver_name})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label style={{fontWeight:600, marginBottom:'5px', display:'block'}}>Return Delivery Fare (Karya)</label>
+                    <input type="number" step="0.01"
+                      value={returnFare}
+                      onChange={(e) => setReturnFare(e.target.value)}
+                      style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1'}}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-content-end gap-2" style={{display:'flex', justifyContent:'flex-end', gap:'10px', paddingTop:'15px', borderTop:'1px solid #e2e8f0'}}>
+                  <button type="button" className="btn-secondary" onClick={() => setBillData(null)}>Back</button>
+                  <button type="submit" className="btn-primary" style={{background: '#f43f5e'}} disabled={returnLoading}>
+                    {returnLoading ? "Processing..." : "Confirm Return"}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
