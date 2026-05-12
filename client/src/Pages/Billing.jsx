@@ -63,7 +63,7 @@ export default function Billing({ type }) {
   const [refundMethod, setRefundMethod] = useState("Cash");
   const [showReturnSlip, setShowReturnSlip] = useState(false);
   const [lastReturnSlipData, setLastReturnSlipData] = useState(null);
-  const [returnVehicleType, setReturnVehicleType] = useState("External");
+  const [returnVehicleType, setReturnVehicleType] = useState("Rent");
   const [returnVehicleId, setReturnVehicleId] = useState("");
   const [returnDeliveryCharges, setReturnDeliveryCharges] = useState(0);
   const [bankDigits, setBankDigits] = useState("");
@@ -1566,7 +1566,7 @@ export default function Billing({ type }) {
                     <div className="flex justify-content-between align-items-center mb-2">
                       <label className="font-bold text-xs">Return Vehicle</label>
                       <div className="flex gap-1" style={{background: '#dbeafe', padding: '2px', borderRadius: '4px'}}>
-                        <button type="button" onClick={() => { setReturnVehicleType('External'); setReturnVehicleId(''); }} className={`p-1 px-2 border-round text-xs border-none cursor-pointer ${returnVehicleType === 'External' ? 'bg-white shadow-1 font-bold text-blue-700' : 'bg-transparent text-blue-500'}`}>Rent</button>
+                        <button type="button" onClick={() => { setReturnVehicleType('Rent'); setReturnVehicleId(''); }} className={`p-1 px-2 border-round text-xs border-none cursor-pointer ${returnVehicleType === 'Rent' ? 'bg-white shadow-1 font-bold text-blue-700' : 'bg-transparent text-blue-500'}`}>Rent</button>
                         <button type="button" onClick={() => { setReturnVehicleType('Personal'); setReturnVehicleId(''); }} className={`p-1 px-2 border-round text-xs border-none cursor-pointer ${returnVehicleType === 'Personal' ? 'bg-white shadow-1 font-bold text-blue-700' : 'bg-transparent text-blue-500'}`}>Personal</button>
                       </div>
                     </div>
