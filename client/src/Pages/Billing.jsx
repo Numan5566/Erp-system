@@ -116,7 +116,7 @@ export default function Billing({ type }) {
     const yesterdayStr = yesterday.toLocaleDateString('en-CA');
 
     return sales.filter(s => {
-      const saleDateStr = s.created_at ? s.created_at.split('T')[0] : '';
+      const saleDateStr = s.created_at ? new Date(s.created_at).toLocaleDateString('en-CA') : '';
       if (salesDateFilter === "Today") {
         return saleDateStr === todayStr;
       }

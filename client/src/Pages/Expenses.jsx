@@ -166,7 +166,7 @@ export default function Expenses({ type }) {
     
     let matchDate = true;
     const todayStr = new Date().toLocaleDateString('en-CA');
-    const recDateStr = r.expense_date ? r.expense_date.split('T')[0] : '';
+    const recDateStr = r.expense_date ? new Date(r.expense_date).toLocaleDateString('en-CA') : '';
     
     if (dateFilter === "Today") {
       matchDate = recDateStr === todayStr;
