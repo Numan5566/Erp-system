@@ -471,6 +471,8 @@ export default function Billing({ type }) {
         const prevBal = selectedCustomer ? parseFloat(selectedCustomer.balance) : 0;
         const finalBal = prevBal + balance;
         
+        const vhObj = vehicles.find(v => String(v.id) === String(saleData.vehicle_id));
+        
         setReceiptData({
           saleId: result.saleId,
           date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
@@ -478,7 +480,7 @@ export default function Billing({ type }) {
           customerPhone: saleData.customer_phone || '',
           customerAddress: saleData.customer_address || '',
           vehicleType: saleData.vehicle_type || '',
-          vehicleId: saleData.vehicle_id || '',
+          vehicleId: vhObj ? vhObj.vehicle_number : (saleData.vehicle_id || ''),
           selectedLabourGroup: selectedLabourGroup,
           items: [...cart],
           subtotal: subtotal,
@@ -1032,6 +1034,7 @@ export default function Billing({ type }) {
                     label: 'Print Receipt', 
                     icon: 'pi pi-print', 
                     command: () => {
+                      const vhObj = vehicles.find(v => String(v.id) === String(s.vehicle_id));
                       setReceiptData({
                         saleId: s.id,
                         date: new Date(s.created_at).toLocaleString(),
@@ -1039,7 +1042,7 @@ export default function Billing({ type }) {
                         customerPhone: s.customer_phone || '',
                         customerAddress: s.customer_address || '',
                         vehicleType: s.vehicle_type || '',
-                        vehicleId: s.vehicle_id || '',
+                        vehicleId: vhObj ? vhObj.vehicle_number : (s.vehicle_id || ''),
                         items: typeof s.items === 'string' ? JSON.parse(s.items) : (s.items || []),
                         subtotal: s.total_amount,
                         discount: s.discount,
