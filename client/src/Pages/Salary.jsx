@@ -436,7 +436,11 @@ export default function Salary({ type }) {
         <div className="modal-overlay" onClick={() => setShowPayModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '450px'}}>
             <div className="modal-header">
-              <h3>Record Payment Log</h3>
+              <h3>
+                  {payForm.transaction_type === 'Salary' ? 'Disburse Monthly Salary' : 
+                   payForm.transaction_type === 'Advance Given' ? 'Give Advance Payment' : 
+                   'Receive / Adjust Advance'}
+              </h3>
               <button className="modal-close" onClick={() => setShowPayModal(false)}><X size={20} /></button>
             </div>
             <form onSubmit={handleSalaryPayment} className="custom-form">
@@ -444,13 +448,14 @@ export default function Salary({ type }) {
                 <div className="form-group" style={{marginBottom:'12px'}}>
                     <label>Transaction Category</label>
                     <select 
-                        style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'#f8fafc'}}
+                        style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'#f8fafc', fontWeight:600}}
                         value={payForm.transaction_type} 
                         onChange={(e) => setPayForm({...payForm, transaction_type: e.target.value})}
                     >
                         <option value="Salary">Monthly Salary Payout</option>
                         <option value="Advance Given">Give Advance Salary (+)</option>
-                        <option value="Advance Returned">Advance Salary Returned (-)</option>
+                        <option value="Advance Returned">Receive Advance / Return (-)</option>
+                        <option value="Deduct from Advance">Deduct From Advance (-)</option>
                     </select>
                 </div>
 
@@ -464,6 +469,20 @@ export default function Salary({ type }) {
                         {records.map(r => <option key={r.id} value={r.id}>{r.employee_name} ({r.designation})</option>)}
                     </select>
                 </div>
+
+                {/* Show real-time status card if an employee is chosen */}
+                {payForm.staff_id && (
+                   <div style={{background: '#f0f9ff', padding: '10px 15px', borderRadius: '8px', border: '1px solid #bae6fd', marginBottom: '15px', fontSize: '0.85rem'}}>
+                       <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
+                           <span style={{color:'#0369a1'}}>Standard Monthly Salary:</span>
+                           <strong style={{color:'#0c4a6e'}}>Rs. {parseFloat(records.find(r => String(r.id) === String(payForm.staff_id))?.amount || 0).toLocaleString()}</strong>
+                       </div>
+                       <div style={{display:'flex', justifyContent:'space-between'}}>
+                           <span style={{color:'#b91c1c'}}>Current Unpaid Advance:</span>
+                           <strong style={{color:'#991b1b'}}>Rs. {parseFloat(records.find(r => String(r.id) === String(payForm.staff_id))?.advance_salary || 0).toLocaleString()}</strong>
+                       </div>
+                   </div>
+                )}
 
                 {payForm.transaction_type === 'Salary' && (
                     <div className="form-group" style={{marginBottom:'12px'}}>
@@ -480,14 +499,15 @@ export default function Salary({ type }) {
                     </div>
                 )}
 
+                {/* For "Deduct from Advance", we don't technically consume cash/bank from counter, but let's let user decide method or set "Internal" */}
                 <div className="form-group" style={{marginBottom:'12px'}}>
-                    <label>Payment Method</label>
+                    <label>Payment Method / Source</label>
                     <select 
                         style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1'}}
                         required value={payForm.payment_type} onChange={(e) => setPayForm({...payForm, payment_type: e.target.value})}
                     >
                         <option value="Cash">Cash Account</option>
-                        {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
+                        {banks.map(b => (
                             <option key={b.id} value={`Bank - ${b.bank_name}`}>{b.bank_name} ({b.account_title})</option>
                         ))}
                     </select>
@@ -500,25 +520,26 @@ export default function Salary({ type }) {
                     <label>Amount (Rs.) *</label>
                     <div className="input-wrapper">
                         <Banknote size={18} />
-                        <input type="number" required value={payForm.amount} placeholder="0" onChange={(e) => setPayForm({...payForm, amount: e.target.value})} />
+                        <input type="number" required value={payForm.amount} placeholder="Enter amount" onChange={(e) => setPayForm({...payForm, amount: e.target.value})} />
                     </div>
                 </div>
 
                 <div className="form-group" style={{marginBottom:'15px'}}>
-                    <label>Short Note</label>
-                    <input type="text" placeholder="Any comment..." style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1'}} value={payForm.notes} onChange={(e) => setPayForm({...payForm, notes: e.target.value})} />
+                    <label>Short Note / Description</label>
+                    <input type="text" placeholder="Transaction details..." style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1'}} value={payForm.notes} onChange={(e) => setPayForm({...payForm, notes: e.target.value})} />
                 </div>
 
                 <div className="form-actions">
                     <button type="button" className="btn-secondary" onClick={() => setShowPayModal(false)}>Cancel</button>
                     <button type="submit" className="btn-primary" disabled={loading} style={{background: '#10b981', borderColor:'#10b981'}}>
-                        {loading ? "Posting..." : "Confirm Payment"}
+                        {loading ? "Processing..." : "Confirm Transaction"}
                     </button>
                 </div>
             </form>
           </div>
         </div>
       )}
+
 
       {/* Ledger Modal */}
       {showLedgerModal && selectedStaff && (
