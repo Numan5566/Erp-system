@@ -4,6 +4,22 @@ async function syncDatabaseSchema() {
   console.log('🔄 Starting exhaustive DB self-healing migration...');
   
   const queries = [
+    // --- 0. SALARY PAYMENTS (Crucial Missing Engine) ---
+    `CREATE TABLE IF NOT EXISTS salary_payments (
+      id SERIAL PRIMARY KEY,
+      staff_id INTEGER REFERENCES salary(id) ON DELETE CASCADE,
+      employee_name VARCHAR(255),
+      amount DECIMAL(15, 2) NOT NULL,
+      payment_type VARCHAR(100) DEFAULT 'Cash',
+      transaction_type VARCHAR(50) DEFAULT 'Salary',
+      month VARCHAR(50),
+      payment_date DATE DEFAULT CURRENT_DATE,
+      notes TEXT,
+      module_type VARCHAR(100),
+      user_id INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );`,
+
     // --- 1. PRODUCTS ---
     `ALTER TABLE products ADD COLUMN IF NOT EXISTS brand VARCHAR(255);`,
     `ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price DECIMAL(12, 2) DEFAULT 0;`,
