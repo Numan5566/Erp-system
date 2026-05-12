@@ -36,7 +36,6 @@ router.post('/', auth, async (req, res) => {
     
     const finalAmount = salary_amount || amount || 0;
     const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
-    // month is required NOT NULL — derive from payment_date or use current month
     const month = payment_date 
       ? new Date(payment_date).toLocaleString('default', { month: 'long', year: 'numeric' }) 
       : new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -80,13 +79,46 @@ router.put('/:id', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// New endpoint to fetch combined payments history for staff ledger
 router.get('/ledger/:name', auth, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM salary WHERE employee_name = $1 ORDER BY created_at DESC',
+      'SELECT * FROM salary_payments WHERE employee_name = $1 ORDER BY created_at DESC',
       [req.params.name]
     );
     res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Process Payment Endpoint
+router.post('/pay', auth, async (req, res) => {
+  try {
+    const { 
+      staff_id, employee_name, amount, payment_type, 
+      transaction_type, month, payment_date, notes, module_type 
+    } = req.body;
+    
+    const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
+    const targetMonth = month || new Date(payment_date || new Date()).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    // Insert payment into log
+    const payRes = await pool.query(
+      `INSERT INTO salary_payments 
+      (staff_id, employee_name, amount, payment_type, transaction_type, month, payment_date, notes, module_type, user_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [staff_id, employee_name, amount, payment_type || 'Cash', transaction_type || 'Salary', targetMonth, payment_date || 'NOW()', notes, finalModule, req.user.id]
+    );
+
+    // Update staff record advance balance if this is an Advance interaction
+    if (staff_id) {
+      if (transaction_type === 'Advance Given') {
+        await pool.query('UPDATE salary SET advance_salary = COALESCE(advance_salary, 0) + $1 WHERE id = $2', [amount, staff_id]);
+      } else if (transaction_type === 'Advance Returned' || transaction_type === 'Deduct from Advance') {
+        await pool.query('UPDATE salary SET advance_salary = COALESCE(advance_salary, 0) - $1 WHERE id = $2', [amount, staff_id]);
+      }
+    }
+
+    res.json({ success: true, record: payRes.rows[0] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -98,3 +130,4 @@ router.delete('/:id', auth, async (req, res) => {
 });
 
 module.exports = router;
+

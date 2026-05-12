@@ -75,12 +75,19 @@ router.get('/balances', auth, async (req, res) => {
       }
     });
 
-    // 5. Fetch salaries
-    let salariesQ = 'SELECT amount FROM salary WHERE module_type = $1';
+    // 5. Fetch actual salaries paid from salary_payments
+    let salariesQ = 'SELECT amount, payment_type FROM salary_payments WHERE module_type = $1';
     const salariesRes = await pool.query(salariesQ, [targetModule]);
     salariesRes.rows.forEach(s => {
-      balances['Cash'] -= parseFloat(s.amount) || 0;
+      let method = s.payment_type || 'Cash';
+      let cleanMethod = method.replace('Bank - ', '');
+      if (cleanMethod === 'Cash Account' || cleanMethod.toLowerCase() === 'cash') {
+        cleanMethod = 'Cash';
+      }
+      if (!balances[cleanMethod]) balances[cleanMethod] = 0;
+      balances[cleanMethod] -= parseFloat(s.amount) || 0;
     });
+
 
     // 6. Fetch rents
     let rentsQ = 'SELECT amount FROM rent WHERE module_type = $1';
@@ -238,6 +245,17 @@ router.get('/balance/:method', auth, async (req, res) => {
       const poolRes = await pool.query(supQ, supParams);
       supPaid = parseFloat(poolRes.rows[0].sum || 0);
     }
+
+    // 3b. Salary outflows
+    let salQ = "SELECT SUM(amount) FROM salary_payments WHERE payment_type LIKE $1 AND module_type = $2";
+    let salParams = [searchPattern, finalModule];
+    if (!isAdminUser) {
+      salQ += " AND user_id = $3";
+      salParams.push(userId);
+    }
+    const salSum = await pool.query(salQ, salParams);
+    const totalSalaryPaid = parseFloat(salSum.rows[0].sum || 0);
+
     
     let openingBal = 0;
     if (method === 'Cash') {
@@ -261,7 +279,8 @@ router.get('/balance/:method', auth, async (req, res) => {
     }
     
     const balance = (parseFloat(salesSum.rows[0].sum || 0) + openingBal) - 
-                    (parseFloat(expSum.rows[0].sum || 0) + supPaid);
+                    (parseFloat(expSum.rows[0].sum || 0) + supPaid + totalSalaryPaid);
+
                     
     res.json({ balance });
   } catch (err) {

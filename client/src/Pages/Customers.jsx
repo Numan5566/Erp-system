@@ -4,7 +4,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_AP
 import React, { useState, useEffect, useContext, useMemo } from "react";
 import { 
   Users as UsersIcon, Plus, Pencil, Trash2, X, Search, Phone, Mail, 
-  MapPin, ChevronLeft, CreditCard, Banknote, UserPlus, Info, FileText
+  MapPin, ChevronLeft, CreditCard, Banknote, UserPlus, Info, FileText, Printer
 } from "lucide-react";
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
@@ -61,6 +61,11 @@ export default function Customers({ type }) {
   const [paymentType, setPaymentType] = useState("Cash");
   const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedBank, setSelectedBank] = useState("");
+  
+  // Receipt Generator 
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receiptData, setReceiptData] = useState(null);
+
   const [ledgerFrom, setLedgerFrom] = useState("");
   const [ledgerTo, setLedgerTo] = useState("");
   const [ledgerFilter, setLedgerFilter] = useState("all");
@@ -217,7 +222,7 @@ export default function Customers({ type }) {
 
     setLoading(true);
     try {
-      await fetch((API_BASE_URL + "/sales/payment"), {
+      const res = await fetch((API_BASE_URL + "/sales/payment"), {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -231,11 +236,25 @@ export default function Customers({ type }) {
           module_type: activeTab
         }),
       });
-      setShowPaymentModal(false);
-      fetchRecords();
-      if (showLedgerModal) {
-        openLedger(selectedCustomer); // refresh ledger
+      const resData = await res.json();
+      if (res.ok && resData.success) {
+        setShowPaymentModal(false);
+        setReceiptData({
+            id: resData.recordId || "N/A",
+            customer_name: selectedCustomer.name,
+            amount: parseFloat(paymentAmount),
+            payment_type: finalPaymentType,
+            payment_date: new Date().toISOString()
+        });
+        setShowReceipt(true);
+        fetchRecords();
+        if (showLedgerModal) {
+          openLedger(selectedCustomer); // refresh ledger
+        }
+      } else {
+        alert("Payment failed!");
       }
+
     } catch (err) {
       console.error("Payment failed", err);
     }
@@ -783,7 +802,59 @@ export default function Customers({ type }) {
           </div>
         </div>
       )}
+      {/* Print Receipt Modal System-wide styled bill */}
+      {showReceipt && receiptData && (
+          <div className="modal-overlay receipt-preview-overlay" style={{zIndex: 1000}} onClick={() => setShowReceipt(false)}>
+              <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '450px', borderRadius: '0', padding:'0', border:'none'}}>
+                  <div className="modal-header no-print" style={{padding:'15px', borderBottom:'1px solid #eee'}}>
+                      <h3>📋 Payment Voucher</h3>
+                      <div style={{display:'flex', gap:'10px'}}>
+                        <button onClick={() => window.print()} style={{background:'#10b981', color:'white', border:'none', padding:'8px 15px', borderRadius:'4px', cursor:'pointer', fontWeight:600, display:'flex', alignItems:'center', gap:'5px'}}><Printer size={16}/> Print Bill</button>
+                        <button className="modal-close" onClick={() => setShowReceipt(false)}><X size={20} /></button>
+                      </div>
+                  </div>
+                  
+                  <div className="print-bill-box" style={{background:'white', padding:'25px', width:'100%', color:'black', fontFamily: 'monospace'}}>
+                        <div style={{textAlign:'center', borderBottom:'2px dashed #333', paddingBottom:'15px', marginBottom:'20px'}}>
+                            <h2 style={{margin:'0', fontSize:'1.4rem', fontWeight:'bold', letterSpacing:'1px'}}>DATA WALEY ERP</h2>
+                            <p style={{margin:'5px 0', fontSize:'0.9rem'}}>Building Tomorrow Today</p>
+                            <h3 style={{marginTop:'15px', background:'#333', color:'#fff', padding:'4px 0', fontSize:'0.9rem'}}>RECEIPT VOUCHER</h3>
+                        </div>
+                        
+                        <div style={{fontSize:'0.9rem', marginBottom:'20px', display:'flex', flexDirection:'column', gap:'6px'}}>
+                            <div style={{display:'flex', justifyContent:'space-between'}}><span>Reciept #:</span><strong>PYM-{receiptData.id}</strong></div>
+                            <div style={{display:'flex', justifyContent:'space-between'}}><span>Dated:</span><strong>{new Date(receiptData.payment_date).toLocaleDateString()}</strong></div>
+                            <div style={{display:'flex', justifyContent:'space-between'}}><span>Method:</span><strong>{receiptData.payment_type}</strong></div>
+                        </div>
+
+                        <div style={{borderTop:'1px solid #333', borderBottom:'1px solid #333', padding:'12px 0', marginBottom:'20px'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'8px'}}>
+                                <span>Received From:</span><strong>{receiptData.customer_name}</strong>
+                            </div>
+                            <div style={{display:'flex', justifyContent:'space-between'}}>
+                                <span>Reason:</span><strong>Customer Account Payment</strong>
+                            </div>
+                        </div>
+
+                        <div style={{textAlign:'right', padding:'10px 0', borderBottom:'2px dashed #333', marginBottom:'40px'}}>
+                            <span style={{fontSize:'1.1rem'}}>TOTAL AMOUNT</span>
+                            <h1 style={{margin:'5px 0 0 0', fontSize:'2rem', fontWeight:'bold'}}>Rs. {parseFloat(receiptData.amount).toLocaleString()}</h1>
+                        </div>
+
+                        <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem'}}>
+                            <div style={{width:'45%', borderTop:'1px solid #000', textAlign:'center', paddingTop:'5px'}}>Customer Signature</div>
+                            <div style={{width:'45%', borderTop:'1px solid #000', textAlign:'center', paddingTop:'5px'}}>Admin Sign</div>
+                        </div>
+
+                        <div style={{marginTop:'30px', textAlign:'center', fontSize:'0.75rem', fontStyle:'italic', color:'#666'}}>
+                            Electronically generated on {new Date().toLocaleString()}
+                        </div>
+                  </div>
+              </div>
+          </div>
+      )}
 
     </div>
+
   );
 }
