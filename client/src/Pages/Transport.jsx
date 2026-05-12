@@ -46,6 +46,8 @@ export default function Transport({ type }) {
   const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedBank, setSelectedBank] = useState("");
   const [liveBalances, setLiveBalances] = useState({});
+  const [showLessModal, setShowLessModal] = useState(false);
+  const [lessForm, setLessForm] = useState({ amount: "", notes: "Adjustment/Deduction" });
 
   useEffect(() => {
     if (showPaymentModal) {
@@ -109,6 +111,23 @@ export default function Transport({ type }) {
         module_type: activeCounter
       });
       setShowPaymentModal(false);
+      fetchRecords();
+    } catch (err) { console.error(err); }
+    setLoading(false);
+  };
+
+  const handleLessPayment = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.post(`/transport/payment`, {
+        vehicle_id: selectedVehicle.id,
+        paid_amount: lessForm.amount,
+        notes: lessForm.notes || 'Deduction Applied',
+        payment_type: 'Deduction',
+        module_type: activeCounter
+      });
+      setShowLessModal(false);
       fetchRecords();
     } catch (err) { console.error(err); }
     setLoading(false);
@@ -277,7 +296,10 @@ export default function Transport({ type }) {
                       onDelete={() => handleDelete(rec.id)} 
                       extraItems={[
                         { label: 'View Ledger', icon: 'pi pi-book', command: () => openLedger(rec) },
-                        ...(activeTab === 'Rent' ? [{ label: 'Make Payment', icon: 'pi pi-money-bill', command: () => openPayment(rec) }] : [])
+                        ...(activeTab === 'Rent' ? [
+                          { label: 'Make Payment', icon: 'pi pi-money-bill', command: () => openPayment(rec) },
+                          { label: 'Less Payment', icon: 'pi pi-minus-circle', command: () => { setSelectedVehicle(rec); setLessForm({ amount: '', notes: 'Adjustment/Deduction' }); setShowLessModal(true); } }
+                        ] : [])
                       ]}
                     />
                 </td>
@@ -544,6 +566,49 @@ export default function Transport({ type }) {
                 <button type="button" className="btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" style={{background: '#10b981', borderColor: '#10b981'}} disabled={loading || (parseFloat(paymentForm.amount || 0) > (liveBalances[paymentSource === "Bank" ? selectedBank : "Cash"] || 0))}>
                   {loading ? "Processing..." : "Confirm Payment"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {showLessModal && selectedVehicle && (
+        <div className="modal-overlay" onClick={() => setShowLessModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3>Record Deduction from {selectedVehicle.vehicle_number}</h3>
+              <button className="modal-close" onClick={() => setShowLessModal(false)}><X size={20} /></button>
+            </div>
+            
+            <form onSubmit={handleLessPayment} className="custom-form">
+              <div style={{background: '#f1f5f9', padding: '12px', borderRadius: '8px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between'}}>
+                <span style={{fontWeight: 600, color: '#475569'}}>Current Balance:</span>
+                <span style={{fontWeight: 700, color: '#475569'}}>Rs. {parseFloat(selectedVehicle.total_earnings || 0).toLocaleString()}</span>
+              </div>
+
+              <div className="form-group" style={{marginBottom: '15px'}}>
+                <label>Amount to Deduct (Rs.) *</label>
+                <div className="input-wrapper">
+                  <Tag size={18} />
+                  <input type="number" step="0.01" required value={lessForm.amount} placeholder="e.g. 1500"
+                    onChange={(e) => setLessForm({ ...lessForm, amount: e.target.value })} />
+                </div>
+              </div>
+              
+              <div className="form-group" style={{marginBottom: '20px'}}>
+                <label>Reason / Description</label>
+                <div className="input-wrapper">
+                  <FileText size={18} />
+                  <input type="text" value={lessForm.notes} placeholder="e.g. Diesel Deduction" required
+                    onChange={(e) => setLessForm({ ...lessForm, notes: e.target.value })} />
+                </div>
+                <small style={{color: '#64748b', marginTop: '5px', display:'block'}}>* This records a deduction that lowers the vehicle balance without taking money from Cash/Bank.</small>
+              </div>
+
+              <div className="form-actions" style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                <button type="button" className="btn-secondary" onClick={() => setShowLessModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" style={{background: '#f97316', borderColor: '#f97316'}} disabled={loading}>
+                  {loading ? "Processing..." : "Apply Deduction"}
                 </button>
               </div>
             </form>

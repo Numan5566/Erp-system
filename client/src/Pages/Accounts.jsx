@@ -538,6 +538,8 @@ export default function Accounts() {
     }, { 'Cash': 0 });
 
     const res = rawList.reduce((acc, s) => {
+      if (s.payment_type === 'Deduction') return acc;
+      if (s.payment_type === 'Deduction') return acc;
       const method = s.payment_type || 'Cash';
       let cleanMethod = method.replace('Bank - ', '').trim();
       
