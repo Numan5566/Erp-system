@@ -517,7 +517,7 @@ export default function Accounts() {
   }, [latestCloseout]);
 
   const paymentSummary = useMemo(() => {
-    const resSummary = [
+    const rawList = [
       ...filteredSales, 
       ...filteredInvestments.map(i => ({ ...i, isIncome: true, payment_type: 'Cash' })),
       ...filteredCloseouts.map(e => ({ ...e, isExpense: true })),
@@ -530,61 +530,51 @@ export default function Accounts() {
       ...filteredSalaries.map(s => ({ ...s, isExpense: true, payment_type: 'Cash' })),
       ...filteredRents.map(r => ({ ...r, isExpense: true, payment_type: 'Cash' })),
       ...filteredOtherExpenses.map(o => ({ ...o, isExpense: true, payment_type: o.payment_method }))
-    ].sort((a, b) => new Date(a.created_at || a.expense_date || a.purchase_date || a.date) - new Date(b.created_at || b.expense_date || b.purchase_date || b.date))
-    .reduce((acc, s) => {
+    ].sort((a, b) => new Date(a.created_at || a.expense_date || a.purchase_date || a.date) - new Date(b.created_at || b.expense_date || b.purchase_date || b.date));
+
+    const initial = filteredAccounts.filter(b => b.module_type !== 'Admin Recipient').reduce((acc, b) => {
+      acc[b.id] = parseFloat(b.opening_balance) || 0;
+      return acc;
+    }, { 'Cash': 0 });
+
+    const res = rawList.reduce((acc, s) => {
       const method = s.payment_type || 'Cash';
       let cleanMethod = method.replace('Bank - ', '').trim();
-      if (cleanMethod === 'Cash Account' || cleanMethod.toLowerCase() === 'cash') {
-        cleanMethod = 'Cash';
+      
+      const isCash = cleanMethod.toLowerCase() === 'cash' || cleanMethod === 'Cash Account';
+      let targetKey = 'UNMATCHED_GHOST';
+      
+      if (isCash) {
+         targetKey = 'Cash';
+      } else {
+         const match = filteredAccounts.find(b => {
+             const digits = b.account_number ? b.account_number.slice(-4) : '';
+             const cl = cleanMethod.toLowerCase();
+             if (digits && cl.includes(digits)) return true;
+             const bl = b.bank_name.toLowerCase();
+             return cl.includes(bl) || bl.includes(cl);
+         });
+         if (match) targetKey = match.id;
       }
       
-      // FIX: Match dirty dynamic names back to visual bank cards
-      if (cleanMethod !== 'Cash') {
-        const cLower = cleanMethod.toLowerCase();
-        const matchedBank = filteredAccounts.find(b => {
-           const bLower = b.bank_name.toLowerCase();
-           return cLower.includes(bLower) || bLower.includes(cLower);
-        });
-        if (matchedBank) {
-          let fixN = matchedBank.bank_name.replace(' Account', '');
-          if (fixN.toLowerCase() === 'cash') fixN = 'Cash';
-          cleanMethod = fixN;
-        }
-      }
-      
-      const amount = getTransactionAmount(s);
-      
-      if (!acc[cleanMethod]) acc[cleanMethod] = 0;
+      const amt = getTransactionAmount(s);
+      if (!acc[targetKey]) acc[targetKey] = 0;
       
       if (s.isExpense) {
-        acc[cleanMethod] -= amount;
-        if (acc[cleanMethod] < 0) {
-          acc[cleanMethod] = 0;
-        }
+         acc[targetKey] -= amt;
+         if (targetKey === 'Cash' && acc[targetKey] < 0) acc[targetKey] = 0; 
       } else {
-        acc[cleanMethod] += amount;
+         acc[targetKey] += amt;
       }
       return acc;
-    }, filteredAccounts.filter(b => b.module_type !== 'Admin Recipient').reduce((acc, b) => {
-      let name = b.bank_name.replace(' Account', '');
-      if (name.toLowerCase() === 'cash') name = 'Cash';
-      if (!acc[name]) acc[name] = 0;
-      acc[name] += parseFloat(b.opening_balance) || 0;
-      return acc;
-    }, { 'Cash': 0 }));
+    }, initial);
 
-    console.log("=== Accounts Debug ===");
-    console.log("activeTab:", activeTab);
-    console.log("filteredGeneralExpenses:", filteredGeneralExpenses);
-    console.log("calculated summary:", resSummary);
-    return resSummary;
+    return res;
   }, [filteredSales, filteredInvestments, filteredCloseouts, filteredSupplierPayments, filteredGeneralExpenses, filteredSalaries, filteredRents, filteredOtherExpenses, filteredAccounts]);
 
 
   const totalCash = paymentSummary['Cash'] || 0;
-  const totalBank = Object.entries(paymentSummary)
-    .filter(([k]) => k !== 'Cash')
-    .reduce((sum, [, v]) => sum + v, 0);
+  const totalBank = filteredAccounts.filter(acc => !acc.isCash && acc.module_type !== 'Admin Recipient').reduce((sum, acc) => sum + Math.max(0, paymentSummary[acc.id] || 0), 0);
 
   const totalAdminReceived = useMemo(() => {
     const isToday = (dateStr) => {
@@ -670,7 +660,19 @@ export default function Accounts() {
           return (s.customer_name === 'Received Galla Handover' || s.customer_name === 'Sent Admin Payment') && s.notes?.includes(selectedLedgerAccount.bank_name) && s.notes?.includes(selectedLedgerAccount.account_number);
         }
 
-        let accountMatch = isAccCash ? method === 'Cash' : method === selectedLedgerAccount.bank_name;
+        let accountMatch = false;
+        if (isAccCash) {
+          accountMatch = (method === 'Cash');
+        } else {
+          const cleanM = method.toLowerCase().trim();
+          const accDigits = selectedLedgerAccount.account_number ? selectedLedgerAccount.account_number.slice(-4) : '';
+          if (accDigits && cleanM.includes(accDigits)) {
+             accountMatch = true;
+          } else {
+             const targetB = selectedLedgerAccount.bank_name.toLowerCase();
+             accountMatch = cleanM.includes(targetB) || targetB.includes(cleanM);
+          }
+        }
         
         if (!accountMatch) return false;
   
@@ -789,7 +791,15 @@ export default function Accounts() {
         return (s.customer_name === 'Received Galla Handover' || s.customer_name === 'Sent Admin Payment') && s.notes?.includes(acc.bank_name) && s.notes?.includes(acc.account_number);
       }
       const payType = (s.payment_type || 'Cash').replace('Bank - ', '');
-      return isCash ? (payType === 'Cash' || payType === 'Cash Account') : payType === acc.bank_name;
+      const cleanPT = payType.toLowerCase().trim();
+      if (isCash) {
+         return cleanPT === 'cash' || cleanPT === 'cash account';
+      } else {
+         const accDig = acc.account_number ? acc.account_number.slice(-4) : '';
+         if (accDig && cleanPT.includes(accDig)) return true;
+         const bLower = acc.bank_name.toLowerCase();
+         return cleanPT.includes(bLower) || bLower.includes(cleanPT);
+      }
     }).sort((a, b) => new Date(b.created_at || b.purchase_date || b.date) - new Date(a.created_at || a.purchase_date || a.date));
 
     return accountTransactions.slice(0, 3);
@@ -959,9 +969,7 @@ export default function Accounts() {
           marginBottom: '35px'
         }}>
           {displayAccounts.map(acc => {
-            const cleanName = acc.bank_name.replace(' Account', '');
-            const summaryKey = Object.keys(paymentSummary).find(k => k.toLowerCase() === cleanName.toLowerCase() || k.toLowerCase() === acc.bank_name.toLowerCase());
-            let bal = summaryKey ? paymentSummary[summaryKey] : 0;
+            let bal = acc.isCash ? (paymentSummary['Cash'] || 0) : (paymentSummary[acc.id] || 0);
             
             if (acc.module_type === 'Admin Recipient') {
               bal = getAdminBankBalance(acc);
@@ -1092,9 +1100,7 @@ export default function Accounts() {
             <div style={{fontWeight: 700, color: '#64748b'}}>Rs. {parseFloat(acc.opening_balance || 0).toLocaleString()}</div>
           )} sortable />
           <Column header="Current Bal." body={acc => {
-            const cleanName = acc.bank_name.replace(' Account', '');
-            const summaryKey = Object.keys(paymentSummary).find(k => k.toLowerCase() === cleanName.toLowerCase() || k.toLowerCase() === acc.bank_name.toLowerCase());
-            let bal = summaryKey ? paymentSummary[summaryKey] : 0;
+            let bal = acc.isCash ? (paymentSummary['Cash'] || 0) : (paymentSummary[acc.id] || 0);
             if (acc.module_type === 'Admin Recipient') {
               bal = getAdminBankBalance(acc);
             } else if (bal < 0) {
