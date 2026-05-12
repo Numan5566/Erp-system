@@ -507,9 +507,10 @@ export default function Salary({ type }) {
                         required value={payForm.payment_type} onChange={(e) => setPayForm({...payForm, payment_type: e.target.value})}
                     >
                         <option value="Cash">Cash Account</option>
-                        {banks.map(b => (
-                            <option key={b.id} value={`Bank - ${b.bank_name}`}>{b.bank_name} ({b.account_title})</option>
-                        ))}
+                        {banks.map(b => {
+                            const digits = b.account_number ? b.account_number.slice(-4) : '';
+                            return <option key={b.id} value={`Bank - ${b.bank_name} ${digits ? `(****${digits})` : ''}`}>{b.bank_name} ({b.account_title})</option>;
+                        })}
                     </select>
                     <div style={{fontSize:'0.8rem', color: '#15803d', marginTop:'4px', fontWeight:600}}>
                         Current Balance: Rs. {getSelectedMethodBalance().toLocaleString()}

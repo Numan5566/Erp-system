@@ -777,7 +777,7 @@ export default function Customers({ type }) {
                     <option value="">-- Select Admin Bank --</option>
                     {bankAccounts.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => {
                       const digits = b.account_number ? b.account_number.slice(-4) : '';
-                      return <option key={b.id} value={b.bank_name}>{b.bank_name} {digits ? `(****${digits})` : ''}</option>;
+                      return <option key={b.id} value={`${b.bank_name} ${digits ? `(****${digits})` : ''}`}>{b.bank_name} {digits ? `(****${digits})` : ''}</option>;
                     })}
                   </select>
                 </div>

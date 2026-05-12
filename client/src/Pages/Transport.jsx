@@ -517,9 +517,10 @@ export default function Transport({ type }) {
                     required
                   >
                     <option value="">-- Choose Account --</option>
-                    {bankAccounts.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
-                      <option key={b.id} value={b.bank_name}>{b.bank_name} - {b.account_number}</option>
-                    ))}
+                    {bankAccounts.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => {
+                      const digits = b.account_number ? b.account_number.slice(-4) : '';
+                      return <option key={b.id} value={`${b.bank_name} ${digits ? `(****${digits})` : ''}`}>{b.bank_name} - {b.account_number}</option>;
+                    })}
                   </select>
                 </div>
               )}

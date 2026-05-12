@@ -467,9 +467,10 @@ export default function Expenses({ type }) {
                         onChange={(e) => setForm({...form, bank_name: e.target.value})}
                       >
                         <option value="">Choose Bank...</option>
-                        {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
-                          <option key={b.id} value={b.bank_name}>{b.bank_name}</option>
-                        ))}
+                        {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => {
+                          const digits = b.account_number ? b.account_number.slice(-4) : '';
+                          return <option key={b.id} value={`${b.bank_name} ${digits ? `(****${digits})` : ''}`}>{b.bank_name} {digits ? `(****${digits})` : ''}</option>;
+                        })}
                       </select>
                     </div>
                   </div>
@@ -544,9 +545,10 @@ export default function Expenses({ type }) {
                     required
                   >
                     <option value="">-- Choose Account --</option>
-                    {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
-                      <option key={b.id} value={b.bank_name}>{b.bank_name} - {b.account_number}</option>
-                    ))}
+                    {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => {
+                      const digits = b.account_number ? b.account_number.slice(-4) : '';
+                      return <option key={b.id} value={`${b.bank_name} ${digits ? `(****${digits})` : ''}`}>{b.bank_name} - {b.account_number}</option>;
+                    })}
                   </select>
                 </div>
               )}

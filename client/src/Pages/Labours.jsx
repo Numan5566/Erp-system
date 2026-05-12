@@ -632,9 +632,10 @@ export default function Labours({ type }) {
                      required
                    >
                      <option value="Cash">Cash Account (Main Counter)</option>
-                     {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
-                       <option key={b.id} value={`Bank - ${b.bank_name}`}>{b.bank_name} - {b.account_title}</option>
-                     ))}
+                     {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => {
+                       const digits = b.account_number ? b.account_number.slice(-4) : '';
+                       return <option key={b.id} value={`Bank - ${b.bank_name} ${digits ? `(****${digits})` : ''}`}>{b.bank_name} - {b.account_title}</option>;
+                     })}
                    </select>
                  </div>
                </div>
@@ -758,9 +759,10 @@ export default function Labours({ type }) {
                     required
                   >
                     <option value="Cash">Cash Account (Main Counter)</option>
-                    {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => (
-                      <option key={b.id} value={`Bank - ${b.bank_name}`}>{b.bank_name} - {b.account_title}</option>
-                    ))}
+                    {banks.filter(b => !b.bank_name.toLowerCase().includes('cash')).map(b => {
+                      const digits = b.account_number ? b.account_number.slice(-4) : '';
+                      return <option key={b.id} value={`Bank - ${b.bank_name} ${digits ? `(****${digits})` : ''}`}>{b.bank_name} - {b.account_title}</option>;
+                    })}
                   </select>
                 </div>
               </div>
