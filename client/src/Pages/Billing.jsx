@@ -63,6 +63,9 @@ export default function Billing({ type }) {
   const [refundMethod, setRefundMethod] = useState("Cash");
   const [showReturnSlip, setShowReturnSlip] = useState(false);
   const [lastReturnSlipData, setLastReturnSlipData] = useState(null);
+  const [returnVehicleType, setReturnVehicleType] = useState("External");
+  const [returnVehicleId, setReturnVehicleId] = useState("");
+  const [returnDeliveryCharges, setReturnDeliveryCharges] = useState(0);
   const [bankDigits, setBankDigits] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -347,7 +350,10 @@ export default function Billing({ type }) {
             .filter(i => i.selected)
             .map(i => ({ ...i, qty: i.return_qty })),
           refund_amount: refundAmount,
-          refund_method: refundMethod
+          refund_method: refundMethod,
+          vehicle_id: returnVehicleId,
+          vehicle_type: returnVehicleType,
+          delivery_charges: returnDeliveryCharges
         })
       });
       const data = await res.json();
@@ -363,6 +369,8 @@ export default function Billing({ type }) {
         setShowReturnModal(false);
         setShowReturnSlip(true);
         setReturnBillNo("");
+        setReturnVehicleId("");
+        setReturnDeliveryCharges(0);
         fetchData();
         alert("Stock successfully returned to inventory!");
       } else {
@@ -1531,11 +1539,58 @@ export default function Billing({ type }) {
                                 style={{width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1', textAlign: 'right'}}
                               />
                             </td>
-                            <td className="p-2 text-right">Rs.{item.rate}</td>
+                            <td className="p-2 text-right">
+                              <input 
+                                type="number" 
+                                step="0.01"
+                                value={item.rate}
+                                onChange={e => {
+                                  const updated = [...selectedItemsToReturn];
+                                  updated[idx].rate = parseFloat(e.target.value) || 0;
+                                  setSelectedItemsToReturn(updated);
+                                }}
+                                style={{width: '70px', padding: '4px', borderRadius: '4px', border: '1px solid #cbd5e1', textAlign: 'right'}}
+                              />
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                  </div>
+
+                  {/* Vehicle Return Log */}
+                  <div className="vehicle-summary mb-3 p-2" style={{background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe'}}>
+                    <div className="flex justify-content-between align-items-center mb-2">
+                      <label className="font-bold text-xs">Return Vehicle</label>
+                      <div className="flex gap-1" style={{background: '#dbeafe', padding: '2px', borderRadius: '4px'}}>
+                        <button type="button" onClick={() => { setReturnVehicleType('External'); setReturnVehicleId(''); }} className={`p-1 px-2 border-round text-xs border-none cursor-pointer ${returnVehicleType === 'External' ? 'bg-white shadow-1 font-bold text-blue-700' : 'bg-transparent text-blue-500'}`}>Rent</button>
+                        <button type="button" onClick={() => { setReturnVehicleType('Personal'); setReturnVehicleId(''); }} className={`p-1 px-2 border-round text-xs border-none cursor-pointer ${returnVehicleType === 'Personal' ? 'bg-white shadow-1 font-bold text-blue-700' : 'bg-transparent text-blue-500'}`}>Personal</button>
+                      </div>
+                    </div>
+                    <div className="grid">
+                      <div className="col-7">
+                        <Dropdown 
+                          value={returnVehicleId} 
+                          options={vehicles.filter(v => v.ownership_type === returnVehicleType).map(v => ({
+                            label: `${v.vehicle_number} (${v.driver_name})`,
+                            value: v.id
+                          }))}
+                          onChange={e => setReturnVehicleId(e.value)}
+                          className="p-inputtext-sm w-full"
+                          placeholder="Optional Vehicle"
+                          showClear
+                        />
+                      </div>
+                      <div className="col-5">
+                        <InputText 
+                          type="number" 
+                          value={returnDeliveryCharges} 
+                          onChange={e => setReturnDeliveryCharges(parseFloat(e.target.value) || 0)}
+                          className="p-inputtext-sm w-full"
+                          placeholder="Karya"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Refund Details */}
