@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { 
   Truck, Plus, X, Search, 
-  User, Hash, Phone, CreditCard, Tag
+  User, Hash, Phone, CreditCard, Tag, FileText
 } from "lucide-react";
 import { AuthContext } from "../context/AuthContext";
 import ActionMenu from '../components/ActionMenu';
