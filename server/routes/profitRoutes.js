@@ -163,9 +163,9 @@ router.get('/detail/:counter', auth, async (req, res) => {
 
     // Investments
     const investRes = await pool.query(
-      `SELECT id, investment_name as title, amount, investment_date as date FROM investments WHERE module_type = $1
-       ${from ? `AND investment_date >= $2` : ''} ${to ? `AND investment_date <= $${from ? 3 : 2}` : ''}
-       ORDER BY investment_date DESC LIMIT 30`,
+      `SELECT id, title, amount, date, investor FROM investment WHERE module_type = $1
+       ${from ? `AND date >= $2` : ''} ${to ? `AND date <= $${from ? 3 : 2}` : ''}
+       ORDER BY date DESC LIMIT 30`,
       [c, ...(from ? [from] : []), ...(to ? [to] : [])]
     );
 
