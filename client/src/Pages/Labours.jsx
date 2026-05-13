@@ -1,7 +1,7 @@
 // DYNAMIC API PATCH
 const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
 
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import { Users, FolderGit2, Contact, Coins, Plus, Search, Edit, Trash2, X, Phone, Hash, CreditCard, ChevronLeft, ArrowUpCircle, ArrowDownCircle, ClipboardList } from "lucide-react";
 import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
@@ -40,6 +40,10 @@ export default function Labours({ type }) {
   // Global payment modal states
   const [showGlobalPayModal, setShowGlobalPayModal] = useState(false);
   const [globalPayForm, setGlobalPayForm] = useState({ group_name: "", bill_id: "", amount: "", notes: "", payment_type: "Cash" });
+
+  const [ledgerFilter, setLedgerFilter] = useState("all");
+  const [ledgerFrom, setLedgerFrom] = useState("");
+  const [ledgerTo, setLedgerTo] = useState("");
 
   useEffect(() => {
     if (type) {
@@ -277,6 +281,28 @@ export default function Labours({ type }) {
     }
   };
 
+  const applyLedgerFilter = (filterKey) => {
+    setLedgerFilter(filterKey);
+    const today = new Date();
+    if (filterKey === 'all') {
+      setLedgerFrom(""); setLedgerTo("");
+    } else if (filterKey === 'today') {
+      const t = today.toLocaleDateString('en-CA');
+      setLedgerFrom(t); setLedgerTo(t);
+    } else if (filterKey === 'yesterday') {
+      const y = new Date(); y.setDate(today.getDate() - 1);
+      const yt = y.toLocaleDateString('en-CA');
+      setLedgerFrom(yt); setLedgerTo(yt);
+    } else if (filterKey === 'week') {
+      const weekAgo = new Date(); weekAgo.setDate(today.getDate() - 7);
+      setLedgerFrom(weekAgo.toLocaleDateString('en-CA'));
+      setLedgerTo(today.toLocaleDateString('en-CA'));
+    } else if (filterKey === 'month') {
+      setLedgerFrom(new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA'));
+      setLedgerTo(today.toLocaleDateString('en-CA'));
+    }
+  };
+
   // Extract unique groups list
   const existingGroups = [...new Set(labours.map(l => l.group_name))];
 
@@ -293,231 +319,6 @@ export default function Labours({ type }) {
     return {
       name: group,
       workersCount: workers.length,
-      balance,
-      history
-    };
-  });
-
-  const selectedGroupDetails = groupsStats.find(g => g.name === selectedGroup);
-  const selectedGroupLabours = labours.filter(l => l.group_name === selectedGroup);
-
-  // Stats Calculations
-  const totalLabours = labours.length;
-  const totalOutstandingWages = groupsStats.reduce((sum, g) => sum + (g.balance > 0 ? g.balance : 0), 0);
-  const getSelectedPaymentBalance = () => {
-    if (payForm.payment_type === 'Cash') return liveBalances['Cash'] || 0;
-    const cleanBank = payForm.payment_type.replace('Bank - ', '');
-    return liveBalances[cleanBank] || 0;
-  };
-  const cashAvailable = getSelectedPaymentBalance();
-  const isWagePayInsufficient = parseFloat(payForm.amount || 0) > cashAvailable;
-
-  const getSelectedGlobalPaymentBalance = () => {
-    if (globalPayForm.payment_type === 'Cash') return liveBalances['Cash'] || 0;
-    const cleanBank = globalPayForm.payment_type.replace('Bank - ', '');
-    return liveBalances[cleanBank] || 0;
-  };
-  const globalCashAvailable = getSelectedGlobalPaymentBalance();
-  const isGlobalWagePayInsufficient = parseFloat(globalPayForm.amount || 0) > globalCashAvailable;
-
-  // If Admin and no counter selected, show selection screen
-  if (user?.role === 'admin' && !activeTab && !type) {
-    return (
-      <div className="admin-selection-container">
-        <h2>Select Counter</h2>
-        <p>Choose which counter's labour management you want to view</p>
-        <div className="selection-grid">
-          <div className="selection-card wholesale" onClick={() => setActiveTab('Wholesale')}>
-            <div className="icon-box">🧱</div>
-            <h3>Wholesale</h3>
-            <span>Main Warehouse</span>
-          </div>
-          <div className="selection-card retail1" onClick={() => setActiveTab('Retail 1')}>
-            <div className="icon-box">🏗️</div>
-            <h3>Retail 1</h3>
-            <span>Counter A</span>
-          </div>
-          <div className="selection-card retail2" onClick={() => setActiveTab('Retail 2')}>
-            <div className="icon-box">🔲</div>
-            <h3>Retail 2</h3>
-            <span>Counter B</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="module-page">
-      <div className="module-header">
-        <div className="module-title">
-          {selectedGroup && (
-            <button className="btn-icon back-btn" onClick={() => setSelectedGroup(null)} style={{marginRight: '15px', background: '#f1f5f9', border: 'none', padding: '8px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center'}}>
-              <ChevronLeft size={20} />
-            </button>
-          )}
-          <div className="module-icon expense-icon" style={{background: '#e0f2fe', color: '#0284c7'}}><Users size={28} /></div>
-          <div>
-            <h1>{selectedGroup ? `Group: ${selectedGroup}` : 'Labour Tracking & Groups'}</h1>
-            <p>{selectedGroup ? `Managing operations and wage ledger for ${selectedGroup}` : 'Organize labor, record group loading/unloading work, and pay wages'}</p>
-          </div>
-        </div>
-
-        {user?.role === 'admin' && !user?.module_type && !type && (
-          <div className="counter-switcher">
-            <button className={activeTab === 'Wholesale' ? 'active' : ''} onClick={() => setActiveTab('Wholesale')}>Wholesale</button>
-            <button className={activeTab === 'Retail 1' ? 'active' : ''} onClick={() => setActiveTab('Retail 1')}>Retail 1</button>
-            <button className={activeTab === 'Retail 2' ? 'active' : ''} onClick={() => setActiveTab('Retail 2')}>Retail 2</button>
-          </div>
-        )}
-
-        <div style={{display: 'flex', gap: '10px'}}>
-          {!selectedGroup && (
-            <button className="btn-primary" style={{background: '#10b981', borderColor: '#10b981', display: 'flex', alignItems: 'center', gap: '6px'}} onClick={() => { setGlobalPayForm({ group_name: "", bill_id: "", amount: "", notes: "", payment_type: "Cash" }); setShowGlobalPayModal(true); }}>
-              <Coins size={18} /> Send Labour Payment
-            </button>
-          )}
-          <button className="btn-primary" style={{display: 'flex', alignItems: 'center', gap: '6px'}} onClick={() => { setForm(emptyForm); setEditId(null); setIsNewGroup(false); setShowModal(true); }}>
-            <Plus size={18} /> Add New Labour
-          </button>
-        </div>
-      </div>
-
-      {/* Top Stats Cards */}
-      <div className="stats-grid-pos">
-        <div className="pos-stat-card">
-          <div className="icon blue"><Users size={24} /></div>
-          <div className="info">
-            <span className="label">Total Labours</span>
-            <span className="value">{totalLabours} Workers</span>
-          </div>
-        </div>
-        <div className="pos-stat-card">
-          <div className="icon orange"><FolderGit2 size={24} /></div>
-          <div className="info">
-            <span className="label">Active Groups</span>
-            <span className="value">{groupsStats.length} Teams</span>
-          </div>
-        </div>
-        <div className="pos-stat-card">
-          <div className="icon red"><Coins size={24} /></div>
-          <div className="info">
-            <span className="label">Outstanding Payable</span>
-            <span className="value">Rs. {totalOutstandingWages.toLocaleString()}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Layout */}
-      {!selectedGroup ? (
-        // 1. Group Cards Grid View
-        <div>
-          <h2 style={{fontSize: '1.4rem', color: '#1e293b', marginBottom: '15px', fontWeight: 700}}>Labour Groups & Teams</h2>
-          <div className="selection-grid" style={{gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px', display: 'grid'}}>
-            {groupsStats.length === 0 ? (
-              <div style={{gridColumn: '1/-1', textAlign: 'center', padding: '40px', background: 'white', borderRadius: '12px', border: '1px solid #cbd5e1', color: '#64748b'}}>
-                No labor groups found. Click "Add New Labour" and create a group to start!
-              </div>
-            ) : (
-              groupsStats.map(g => (
-                <div key={g.name} className="selection-card" onClick={() => setSelectedGroup(g.name)} style={{padding: '24px', borderRadius: '12px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.02)', transition: 'all 0.2s ease'}}>
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                    <div style={{background: '#f0f9ff', padding: '10px', borderRadius: '8px', color: '#0369a1', display: 'flex', alignItems: 'center'}}><Users size={24} /></div>
-                    <span style={{background: g.balance > 0 ? '#fef2f2' : '#f0fdf4', color: g.balance > 0 ? '#ef4444' : '#15803d', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 600}}>
-                      {g.balance > 0 ? `Payable: Rs. ${g.balance.toLocaleString()}` : 'Cleared'}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 style={{fontSize: '1.25rem', color: '#1e293b', fontWeight: 700, margin: 0}}>{g.name}</h3>
-                    <p style={{color: '#64748b', fontSize: '0.9rem', margin: '5px 0 0 0'}}>{g.workersCount} Workers registered</p>
-                  </div>
-                  <div style={{borderTop: '1px solid #f1f5f9', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b'}}>
-                    <span>Outstanding Wages:</span>
-                    <strong style={{color: g.balance > 0 ? '#ef4444' : '#10b981'}}>Rs. {g.balance.toLocaleString()}</strong>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      ) : (
-        // 2. Group Detail Screen
-        <div style={{display: 'flex', flexDirection: 'column', gap: '30px'}}>
-          {/* Action buttons inside detail */}
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #cbd5e1', gap: '15px'}}>
-            <div>
-              <h2 style={{margin: 0, fontSize: '1.35rem', color: '#1e293b', fontWeight: 700}}>{selectedGroup} Overview</h2>
-              <p style={{margin: '5px 0 0 0', color: '#ef4444', fontWeight: 600}}>Outstanding Payable: Rs. {(selectedGroupDetails?.balance || 0).toLocaleString()}</p>
-            </div>
-            <div style={{display: 'flex', gap: '10px'}}>
-              <button className="btn-primary" onClick={() => setShowWorkModal(true)} style={{background: '#0f766e', borderColor: '#0f766e', display: 'flex', alignItems: 'center', gap: '8px'}}>
-                <ClipboardList size={18} /> Record Work Entry
-              </button>
-              {(selectedGroupDetails?.balance || 0) > 0 && (
-                <button className="btn-primary" onClick={() => setShowPayModal(true)} style={{background: '#10b981', borderColor: '#10b981', display: 'flex', alignItems: 'center', gap: '8px'}}>
-                  <Coins size={18} /> Pay Wages
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Group Labours List */}
-          <div style={{background: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #cbd5e1'}}>
-            <h3 style={{fontSize: '1.15rem', color: '#1e293b', fontWeight: 700, marginBottom: '15px'}}>Registered Labours in {selectedGroup}</h3>
-            <table className="module-table">
-              <thead>
-                <tr>
-                  <th>Labour Name</th>
-                  <th>CNIC Number</th>
-                  <th>Contact Number</th>
-                  <th style={{textAlign: 'center'}}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedGroupLabours.length === 0 ? (
-                  <tr><td colSpan="4" className="empty-msg">No labors found inside this group.</td></tr>
-                ) : (
-                  selectedGroupLabours.map(l => (
-                    <tr key={l.id}>
-                      <td style={{fontWeight: 600, color: '#1e293b'}}>{l.name}</td>
-                      <td>{l.cnic || "N/A"}</td>
-                      <td>{l.contact || "N/A"}</td>
-                      <td style={{textAlign: 'center'}}>
-                        <ActionMenu 
-                          onEdit={() => handleEdit(l)} 
-                          onDelete={() => handleDelete(l.id)} 
-                        />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Group Wage & Work History Ledger */}
-          <div style={{background: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #cbd5e1'}}>
-            <h3 style={{fontSize: '1.15rem', color: '#1e293b', fontWeight: 700, marginBottom: '15px'}}>{selectedGroup} Activity Ledger</h3>
-            <table className="module-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Description</th>
-                  <th>Work Status</th>
-                  <th>Amount Earned (+)</th>
-                  <th>Amount Paid (-)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedGroupDetails?.history.length === 0 ? (
-                  <tr><td colSpan="5" className="empty-msg">No work entries or wage dispatches logged for this group.</td></tr>
-                ) : (
-                  selectedGroupDetails?.history.map(h => (
-                    <tr key={h.id}>
-                      <td>{new Date(h.created_at).toLocaleDateString()}</td>
-                      <td style={{fontWeight: 600}}>{h.description}</td>
-                      <td>
-                        <span style={{background: h.status === 'Paid' ? '#e6f4ea' : '#fce8e6', color: h.status === 'Paid' ? '#137333' : '#c5221f', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 600}}>
                           {h.status}
                         </span>
                       </td>

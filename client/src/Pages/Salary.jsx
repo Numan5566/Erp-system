@@ -1,7 +1,7 @@
 // DYNAMIC API PATCH
 const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
 
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import { 
   Users, Plus, Pencil, Trash2, X, Search, 
   CreditCard, Calendar, UserCheck, Banknote, Briefcase, Tag, Info, CircleDollarSign, Printer, ArrowRight
@@ -40,6 +40,9 @@ export default function Salary({ type }) {
   const [showModal, setShowModal] = useState(false);
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [ledgerData, setLedgerData] = useState([]);
+  const [ledgerFilter, setLedgerFilter] = useState("all");
+  const [ledgerFrom, setLedgerFrom] = useState("");
+  const [ledgerTo, setLedgerTo] = useState("");
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -267,6 +270,39 @@ export default function Salary({ type }) {
     } catch (err) { console.error(err); }
     setLoading(false);
   };
+
+  const applyLedgerFilter = (filterKey) => {
+    setLedgerFilter(filterKey);
+    const today = new Date();
+    if (filterKey === 'all') {
+      setLedgerFrom(""); setLedgerTo("");
+    } else if (filterKey === 'today') {
+      const t = today.toLocaleDateString('en-CA');
+      setLedgerFrom(t); setLedgerTo(t);
+    } else if (filterKey === 'yesterday') {
+      const y = new Date(); y.setDate(today.getDate() - 1);
+      const yt = y.toLocaleDateString('en-CA');
+      setLedgerFrom(yt); setLedgerTo(yt);
+    } else if (filterKey === 'week') {
+      const weekAgo = new Date(); weekAgo.setDate(today.getDate() - 7);
+      setLedgerFrom(weekAgo.toLocaleDateString('en-CA'));
+      setLedgerTo(today.toLocaleDateString('en-CA'));
+    } else if (filterKey === 'month') {
+      setLedgerFrom(new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA'));
+      setLedgerTo(today.toLocaleDateString('en-CA'));
+    }
+  };
+
+  const filteredLedgerData = useMemo(() => {
+    let arr = Array.isArray(ledgerData) ? ledgerData : [];
+    if (ledgerFilter === 'all') return arr;
+    if (ledgerFilter === 'custom' && (!ledgerFrom || !ledgerTo)) return arr;
+    return arr.filter(row => {
+      if(!row.payment_date) return false;
+      const rowDateStr = new Date(row.payment_date).toLocaleDateString('en-CA');
+      return rowDateStr >= ledgerFrom && rowDateStr <= ledgerTo;
+    });
+  }, [ledgerData, ledgerFilter, ledgerFrom, ledgerTo]);
 
   const openPaymentModal = (staff = null, type = "Salary") => {
     setPayForm({
@@ -711,6 +747,36 @@ export default function Salary({ type }) {
                     </div>
                 </div>
 
+                {/* Date Filter Bar */}
+                <div className="profit-filter-bar no-print" style={{marginBottom: '20px', padding: '10px', background: '#f8fafc', borderRadius: '8px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
+                  <span className="filter-label" style={{fontWeight: 600, color: '#64748b'}}>📅 Period:</span>
+                  {[
+                    { key:'all',   label:'All Time' },
+                    { key:'today', label:'Today' },
+                    { key:'yesterday', label:'Yesterday' },
+                    { key:'week',  label:'7 Days' },
+                    { key:'month', label:'Month' },
+                    { key:'custom',label:'Custom' },
+                  ].map(f => (
+                    <button key={f.key} onClick={() => applyLedgerFilter(f.key)}
+                      className={`filter-btn ${ledgerFilter === f.key ? 'active' : ''}`}
+                      style={{
+                        padding: '4px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.85rem',
+                        background: ledgerFilter === f.key ? '#3b82f6' : 'white',
+                        color: ledgerFilter === f.key ? 'white' : '#64748b', cursor: 'pointer'
+                      }}>
+                      {f.label}
+                    </button>
+                  ))}
+                  {ledgerFilter === 'custom' && (
+                    <div className="custom-date-row" style={{display: 'inline-flex', alignItems: 'center', gap: '8px'}}>
+                      <input type="date" value={ledgerFrom} onChange={e => setLedgerFrom(e.target.value)} style={{padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1'}} />
+                      <span className="sep">→</span>
+                      <input type="date" value={ledgerTo} onChange={e => setLedgerTo(e.target.value)} style={{padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1'}} />
+                    </div>
+                  )}
+                </div>
+
                 <div className="module-table-container" style={{maxHeight: '350px', overflowY: 'auto'}}>
                     <table className="module-table">
                     <thead>
@@ -723,8 +789,8 @@ export default function Salary({ type }) {
                         </tr>
                     </thead>
                     <tbody>
-                        {ledgerData.length === 0 ? (<tr><td colSpan="5" className="empty-msg">No payment logs recorded yet.</td></tr>) : (
-                        ledgerData.map((row) => (
+                        {filteredLedgerData.length === 0 ? (<tr><td colSpan="5" className="empty-msg">No payment logs found for this period.</td></tr>) : (
+                        filteredLedgerData.map((row) => (
                             <tr key={row.id}>
                             <td>{new Date(row.payment_date).toLocaleDateString()}</td>
                             <td style={{fontWeight:600}}>{row.transaction_type}</td>

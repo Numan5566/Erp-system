@@ -1,5 +1,5 @@
 /* eslint-disable */
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import { 
   Truck, Plus, X, Search, 
   User, Hash, Phone, CreditCard, Tag, FileText
@@ -36,6 +36,9 @@ export default function Transport({ type }) {
   const [showModal, setShowModal] = useState(false);
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [ledgerData, setLedgerData] = useState([]);
+  const [ledgerFilter, setLedgerFilter] = useState("all");
+  const [ledgerFrom, setLedgerFrom] = useState("");
+  const [ledgerTo, setLedgerTo] = useState("");
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -190,6 +193,39 @@ export default function Transport({ type }) {
     }
     setLoading(false);
   };
+
+  const applyLedgerFilter = (filterKey) => {
+    setLedgerFilter(filterKey);
+    const today = new Date();
+    if (filterKey === 'all') {
+      setLedgerFrom(""); setLedgerTo("");
+    } else if (filterKey === 'today') {
+      const t = today.toLocaleDateString('en-CA');
+      setLedgerFrom(t); setLedgerTo(t);
+    } else if (filterKey === 'yesterday') {
+      const y = new Date(); y.setDate(today.getDate() - 1);
+      const yt = y.toLocaleDateString('en-CA');
+      setLedgerFrom(yt); setLedgerTo(yt);
+    } else if (filterKey === 'week') {
+      const weekAgo = new Date(); weekAgo.setDate(today.getDate() - 7);
+      setLedgerFrom(weekAgo.toLocaleDateString('en-CA'));
+      setLedgerTo(today.toLocaleDateString('en-CA'));
+    } else if (filterKey === 'month') {
+      setLedgerFrom(new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA'));
+      setLedgerTo(today.toLocaleDateString('en-CA'));
+    }
+  };
+
+  const filteredLedgerData = useMemo(() => {
+    let arr = Array.isArray(ledgerData) ? ledgerData : [];
+    if (ledgerFilter === 'all') return arr;
+    if (ledgerFilter === 'custom' && (!ledgerFrom || !ledgerTo)) return arr;
+    return arr.filter(row => {
+      if(!row.date) return false;
+      const rowDateStr = new Date(row.date).toLocaleDateString('en-CA');
+      return rowDateStr >= ledgerFrom && rowDateStr <= ledgerTo;
+    });
+  }, [ledgerData, ledgerFilter, ledgerFrom, ledgerTo]);
 
   const handleDelete = async (id) => {
     try {
@@ -396,6 +432,36 @@ export default function Transport({ type }) {
               </div>
             </div>
 
+            {/* Date Filter Bar */}
+            <div className="profit-filter-bar no-print" style={{margin: '20px', padding: '10px', background: '#f8fafc', borderRadius: '8px', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
+              <span className="filter-label" style={{fontWeight: 600, color: '#64748b'}}>📅 Period:</span>
+              {[
+                { key:'all',   label:'All Time' },
+                { key:'today', label:'Today' },
+                { key:'yesterday', label:'Yesterday' },
+                { key:'week',  label:'7 Days' },
+                { key:'month', label:'Month' },
+                { key:'custom',label:'Custom' },
+              ].map(f => (
+                <button key={f.key} onClick={() => applyLedgerFilter(f.key)}
+                  className={`filter-btn ${ledgerFilter === f.key ? 'active' : ''}`}
+                  style={{
+                    padding: '4px 12px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.85rem',
+                    background: ledgerFilter === f.key ? '#3b82f6' : 'white',
+                    color: ledgerFilter === f.key ? 'white' : '#64748b', cursor: 'pointer'
+                  }}>
+                  {f.label}
+                </button>
+              ))}
+              {ledgerFilter === 'custom' && (
+                <div className="custom-date-row" style={{display: 'inline-flex', alignItems: 'center', gap: '8px'}}>
+                  <input type="date" value={ledgerFrom} onChange={e => setLedgerFrom(e.target.value)} style={{padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1'}} />
+                  <span className="sep">→</span>
+                  <input type="date" value={ledgerTo} onChange={e => setLedgerTo(e.target.value)} style={{padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1'}} />
+                </div>
+              )}
+            </div>
+
             <div className="ledger-report print-only" style={{padding: '20px', color: 'black'}}>
               <div style={{textAlign: 'center', marginBottom: '20px', borderBottom: '2px solid #000', paddingBottom: '10px'}}>
                 <h2 style={{margin: 0}}>DATA WALEY CEMENT DEALER</h2>
@@ -417,7 +483,7 @@ export default function Transport({ type }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {(Array.isArray(ledgerData) ? ledgerData : []).map((row, idx) => (
+                  {filteredLedgerData.map((row, idx) => (
                     <tr key={idx}>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.date ? new Date(row.date).toLocaleDateString() : 'N/A'}</td>
                       <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.party_name || 'N/A'}</td>
@@ -428,23 +494,26 @@ export default function Transport({ type }) {
                 </tbody>
                 <tfoot>
                    <tr style={{fontWeight: 700}}>
-                     <td colSpan="2" style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Total Earnings:</td>
-                     <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Rs. {parseFloat(selectedVehicle.total_earnings || 0).toLocaleString()}</td>
-                     <td style={{border: '1px solid #cbd5e1', padding: '8px'}}></td>
+                     <td colSpan="2" style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Total Earnings (Filtered):</td>
+                     <td colSpan="2" style={{border: '1px solid #cbd5e1', padding: '8px', color: '#15803d'}}>
+                        Rs. {filteredLedgerData.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0).toLocaleString()}
+                     </td>
                    </tr>
                 </tfoot>
               </table>
             </div>
 
             <div className="detail-body no-print" style={{padding: '24px'}}>
-              <div className="stats-mini-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '24px' }}>
-                <div className="stat-item" style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Trips</div>
-                  <div style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 700 }}>{ledgerData.length} Trips</div>
+              <div className="ledger-mini-stats" style={{ display: 'flex', gap: '20px', padding: '0 20px', marginBottom: '20px' }}>
+                <div style={{ flex: 1, padding: '15px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Records</div>
+                  <div style={{ fontSize: '1.25rem', color: '#0f172a', fontWeight: 700 }}>{filteredLedgerData.length} Trips</div>
                 </div>
-                <div className="stat-item" style={{ background: '#f0f9ff', padding: '16px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Total Revenue</div>
-                  <div style={{ fontSize: '1.25rem', color: '#0369a1', fontWeight: 700 }}>Rs. {parseFloat(selectedVehicle.total_earnings || 0).toLocaleString()}</div>
+                <div style={{ flex: 1, padding: '15px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 600, textTransform: 'uppercase' }}>Filtered Earnings</div>
+                  <div style={{ fontSize: '1.25rem', color: '#15803d', fontWeight: 700 }}>
+                    Rs. {filteredLedgerData.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0).toLocaleString()}
+                  </div>
                 </div>
               </div>
 
@@ -459,11 +528,11 @@ export default function Transport({ type }) {
                       <th>Payment</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {(!Array.isArray(ledgerData) || ledgerData.length === 0) ? (
-                      <tr><td colSpan="5" className="empty-msg">No trip history found for this vehicle.</td></tr>
+                  <tbody className="list-body">
+                    {(!Array.isArray(filteredLedgerData) || filteredLedgerData.length === 0) ? (
+                      <tr><td colSpan="5" style={{padding: '20px', textAlign: 'center', color: '#64748b'}}>No records found for this vehicle.</td></tr>
                     ) : (
-                      ledgerData.map((row, idx) => (
+                      filteredLedgerData.map((row, idx) => (
                         <tr key={idx}>
                           <td>{row.date ? new Date(row.date).toLocaleDateString() : 'N/A'}</td>
                           <td>

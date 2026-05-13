@@ -185,6 +185,10 @@ export default function Customers({ type }) {
     if (filterKey === 'today') {
       from = today.toLocaleDateString('en-CA');
       to = from;
+    } else if (filterKey === 'yesterday') {
+      const yest = new Date(); yest.setDate(today.getDate() - 1);
+      from = yest.toLocaleDateString('en-CA');
+      to = from;
     } else if (filterKey === 'week') {
       const weekAgo = new Date();
       weekAgo.setDate(today.getDate() - 7);
@@ -631,6 +635,7 @@ export default function Customers({ type }) {
                 {[
                   { key:'all',   label:'All Time' },
                   { key:'today', label:'Today' },
+                  { key:'yesterday', label:'Yesterday' },
                   { key:'week',  label:'7 Days' },
                   { key:'month', label:'Month' },
                   { key:'custom',label:'Custom' },

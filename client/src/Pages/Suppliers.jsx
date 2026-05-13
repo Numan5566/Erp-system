@@ -237,6 +237,10 @@ export default function Suppliers({ type }) {
     } else if (filterKey === 'today') {
       const t = today.toLocaleDateString('en-CA');
       setLedgerFrom(t); setLedgerTo(t);
+    } else if (filterKey === 'yesterday') {
+      const y = new Date(); y.setDate(today.getDate() - 1);
+      const yt = y.toLocaleDateString('en-CA');
+      setLedgerFrom(yt); setLedgerTo(yt);
     } else if (filterKey === 'week') {
       const weekAgo = new Date(); weekAgo.setDate(today.getDate() - 7);
       setLedgerFrom(weekAgo.toLocaleDateString('en-CA'));
@@ -699,6 +703,7 @@ export default function Suppliers({ type }) {
                 {[
                   { key:'all',   label:'All History' },
                   { key:'today', label:'Today' },
+                  { key:'yesterday', label:'Yesterday' },
                   { key:'week',  label:'Last 7 Days' },
                   { key:'month', label:'This Month' },
                   { key:'custom',label:'Custom Range' },
