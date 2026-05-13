@@ -111,7 +111,10 @@ async function syncDatabaseSchema() {
     `CREATE INDEX IF NOT EXISTS idx_investments_module_type ON investments(module_type);`,
     `CREATE INDEX IF NOT EXISTS idx_investments_date ON investments(investment_date);`,
     `CREATE INDEX IF NOT EXISTS idx_customers_module_type ON customers(module_type);`,
-    `CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);`
+    `CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);`,
+    
+    // --- 10. REPAIR NEGATIVE ADVANCE SALARIES ---
+    `UPDATE salary SET advance_salary = ABS(advance_salary) WHERE advance_salary < 0;`
   ];
 
   let totalExecuted = 0;

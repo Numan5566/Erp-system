@@ -45,7 +45,7 @@ router.post('/', auth, async (req, res) => {
       (employee_name, designation, cnic, amount, advance_salary, joining_date, payment_date, month, status, notes, user_id, module_type) 
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
       [
-        employee_name, designation, cnic, finalAmount, advance_salary || 0, 
+        employee_name, designation, cnic, finalAmount, Math.abs(parseFloat(advance_salary || 0)), 
         joining_date, payment_date, month, status || 'Paid', notes, req.user.id, finalModule
       ]
     );
@@ -71,7 +71,7 @@ router.put('/:id', auth, async (req, res) => {
         joining_date=$6, payment_date=$7, month=$8, status=$9, notes=$10 
       WHERE id=$11 AND (user_id=$12 OR $13) RETURNING *`,
       [
-        employee_name, designation, cnic, finalAmount, advance_salary, 
+        employee_name, designation, cnic, finalAmount, Math.abs(parseFloat(advance_salary || 0)),
         joining_date, payment_date, month, status, notes, req.params.id, req.user.id, isAdmin(req)
       ]
     );
