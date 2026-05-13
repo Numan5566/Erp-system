@@ -2,7 +2,7 @@
 const API_BASE_URL = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'https://erp-backend-3rf8.onrender.com/api';
 
 import React, { useState, useEffect, useContext, useMemo } from "react";
-import { Users, FolderGit2, Contact, Coins, Plus, Search, Edit, Trash2, X, Phone, Hash, CreditCard, ChevronLeft, ArrowUpCircle, ArrowDownCircle, ClipboardList } from "lucide-react";
+import { Users, FolderGit2, Contact, Coins, Plus, Search, Edit, Trash2, X, Phone, Hash, CreditCard, ChevronLeft, ArrowUpCircle, ArrowDownCircle, ClipboardList, Printer } from "lucide-react";
 import ActionMenu from '../components/ActionMenu';
 import { AuthContext } from "../context/AuthContext";
 import "../Styles/ModulePages.scss";
@@ -533,10 +533,15 @@ export default function Labours({ type }) {
             </table>
           </div>
 
-          {/* Group Wage & Work History Ledger */}
+           {/* Group Wage & Work History Ledger */}
           <div style={{background: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #cbd5e1'}}>
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: '15px', flexWrap:'wrap', gap:'15px'}}>
-               <h3 style={{fontSize: '1.15rem', color: '#1e293b', fontWeight: 700, margin: 0}}>{selectedGroup} Activity Ledger</h3>
+               <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                 <h3 style={{fontSize: '1.15rem', color: '#1e293b', fontWeight: 700, margin: 0}}>{selectedGroup} Activity Ledger</h3>
+                 <button className="btn-secondary no-print" onClick={() => window.print()} style={{padding: '6px 12px', display:'flex', alignItems:'center', gap:'6px'}}>
+                   <Printer size={16} /> Print Ledger
+                 </button>
+               </div>
                
                {/* Date Filter Bar */}
                <div className="profit-filter-bar no-print" style={{padding: '6px 10px', background: '#f8fafc', borderRadius: '8px', display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap'}}>
@@ -569,6 +574,64 @@ export default function Labours({ type }) {
                </div>
             </div>
 
+            {/* Print Only Header */}
+            <div className="ledger-report print-only" style={{padding: '20px', color: 'black'}}>
+              <div style={{textAlign: 'center', marginBottom: '20px', borderBottom: '2px solid #000', paddingBottom: '10px'}}>
+                <h2 style={{margin: 0}}>DATA WALEY CEMENT DEALER</h2>
+                <p style={{margin: '5px 0'}}>Labour Group Ledger Report</p>
+                <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '15px', fontSize: '14px'}}>
+                  <span><strong>Labour Group:</strong> {selectedGroup}</span>
+                  <span><strong>Workers:</strong> {selectedGroupDetails?.workersCount || 0}</span>
+                  <span><strong>Date:</strong> {new Date().toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              <table style={{width: '100%', borderCollapse: 'collapse', marginTop: '10px'}}>
+                <thead>
+                  <tr style={{background: '#f1f5f9'}}>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Date</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Description</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Work Status</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Amount Earned (+)</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Amount Paid (-)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredGroupHistory.length === 0 ? (
+                    <tr><td colSpan="5" style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'center'}}>No work entries or wage dispatches logged for this period.</td></tr>
+                  ) : (
+                    filteredGroupHistory.map(h => (
+                      <tr key={h.id}>
+                        <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(h.created_at).toLocaleDateString()}</td>
+                        <td style={{border: '1px solid #cbd5e1', padding: '8px', fontWeight: 600}}>{h.description}</td>
+                        <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{h.status}</td>
+                        <td style={{border: '1px solid #cbd5e1', padding: '8px', color: '#c5221f', fontWeight: 700}}>{h.status === 'Unpaid' ? `Rs. ${parseFloat(h.amount).toLocaleString()}` : '—'}</td>
+                        <td style={{border: '1px solid #cbd5e1', padding: '8px', color: '#137333', fontWeight: 700}}>{h.status === 'Paid' ? `Rs. ${parseFloat(h.amount).toLocaleString()}` : '—'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+
+              <div style={{marginTop: '30px', borderTop: '1px solid #000', paddingTop: '10px', display: 'flex', justifyContent: 'flex-end'}}>
+                <div style={{width: '300px'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '8px'}}>
+                    <strong>Total Earned:</strong>
+                    <span>Rs. {filteredGroupHistory.filter(h => h.status === 'Unpaid').reduce((sum, h) => sum + parseFloat(h.amount || 0), 0).toLocaleString()}</span>
+                  </div>
+                  <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '8px'}}>
+                    <strong>Total Paid:</strong>
+                    <span>Rs. {filteredGroupHistory.filter(h => h.status === 'Paid').reduce((sum, h) => sum + parseFloat(h.amount || 0), 0).toLocaleString()}</span>
+                  </div>
+                  <div style={{display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #000', paddingTop: '8px'}}>
+                    <strong>Period Balance:</strong>
+                    <strong>Rs. {(filteredGroupHistory.filter(h => h.status === 'Unpaid').reduce((sum, h) => sum + parseFloat(h.amount || 0), 0) - filteredGroupHistory.filter(h => h.status === 'Paid').reduce((sum, h) => sum + parseFloat(h.amount || 0), 0)).toLocaleString()}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="no-print">
             <table className="module-table">
               <thead>
                 <tr>
@@ -599,6 +662,7 @@ export default function Labours({ type }) {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}

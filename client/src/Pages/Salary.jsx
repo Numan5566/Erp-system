@@ -732,10 +732,68 @@ export default function Salary({ type }) {
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', width: '95%' }}>
             <div className="modal-header no-print">
               <div style={{display:'flex', alignItems:'center', gap:'12px'}}><Users size={24} color="#3b82f6" /><h3>{selectedStaff.employee_name} Payment Log</h3></div>
-              <button className="modal-close" onClick={() => setShowLedgerModal(false)}><X size={20} /></button>
+              <div style={{display:'flex', gap:'10px'}}>
+                <button className="btn-secondary" onClick={() => window.print()} style={{padding: '6px 12px', display:'flex', alignItems:'center', gap:'6px'}}>
+                  <Printer size={16} /> Print Ledger
+                </button>
+                <button className="modal-close" onClick={() => setShowLedgerModal(false)}><X size={20} /></button>
+              </div>
             </div>
 
-            <div className="detail-body" style={{padding: '20px'}}>
+            {/* Print Only Ledger Report */}
+            <div className="ledger-report print-only" style={{padding: '20px', color: 'black'}}>
+              <div style={{textAlign: 'center', marginBottom: '20px', borderBottom: '2px solid #000', paddingBottom: '10px'}}>
+                <h2 style={{margin: 0}}>DATA WALEY CEMENT DEALER</h2>
+                <p style={{margin: '5px 0'}}>Employee Salary Ledger Report</p>
+                <div style={{display: 'flex', justifyContent: 'space-between', marginTop: '15px', fontSize: '14px'}}>
+                  <span><strong>Employee:</strong> {selectedStaff.employee_name}</span>
+                  <span><strong>Base Salary:</strong> Rs. {parseFloat(selectedStaff.amount).toLocaleString()}</span>
+                  <span><strong>Date:</strong> {new Date().toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              <table style={{width: '100%', borderCollapse: 'collapse', marginTop: '10px'}}>
+                <thead>
+                  <tr style={{background: '#f1f5f9'}}>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Date</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Type</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Method</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left'}}>Month</th>
+                    <th style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLedgerData.map(row => (
+                    <tr key={row.id}>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.payment_date).toLocaleDateString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.transaction_type}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.payment_type}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.month || '-'}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>Rs. {parseFloat(row.amount).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div style={{marginTop: '30px', borderTop: '1px solid #000', paddingTop: '10px', display: 'flex', justifyContent: 'flex-end'}}>
+                <div style={{width: '300px'}}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '8px'}}>
+                    <strong>Total Given/Paid:</strong>
+                    <span>Rs. {filteredLedgerData.filter(r => r.transaction_type==='Salary' || r.transaction_type==='Advance Given').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+                  </div>
+                  <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '8px'}}>
+                    <strong>Total Returned/Deducted:</strong>
+                    <span>Rs. {filteredLedgerData.filter(r => r.transaction_type==='Advance Returned').reduce((sum, r) => sum + parseFloat(r.amount), 0).toLocaleString()}</span>
+                  </div>
+                  <div style={{display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #000', paddingTop: '8px'}}>
+                    <strong>Outstanding Advance:</strong>
+                    <strong>Rs. {parseFloat(selectedStaff.advance_salary || 0).toLocaleString()}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="detail-body no-print" style={{padding: '20px'}}>
                 <div className="stats-mini-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: '20px' }}>
                     <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '10px', border: '1px solid #dcfce7' }}>
                         <div style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 600 }}>Total Base Salary</div>
