@@ -358,12 +358,15 @@ export default function Billing({ type }) {
       });
       const data = await res.json();
       if (res.ok) {
+        const activeVeh = vehicles.find(v => String(v.id) === String(returnVehicleId));
         setLastReturnSlipData({
           sale_id: returnBillNo,
           customer_name: returnSaleDetails?.customer_name || "N/A",
           items_to_return: selectedItemsToReturn.filter(i => i.selected),
           refund_amount: refundAmount,
           refund_method: refundMethod,
+          vehicle_number: activeVeh ? activeVeh.vehicle_number : "",
+          delivery_charges: returnDeliveryCharges,
           date: new Date().toLocaleString()
         });
         setShowReturnModal(false);
@@ -1673,6 +1676,8 @@ export default function Billing({ type }) {
             <div style={{fontSize: '0.8rem', marginBottom: '10px'}}>
               <p><strong>Original Bill:</strong> #SAL-{lastReturnSlipData.sale_id}</p>
               <p><strong>Customer:</strong> {lastReturnSlipData.customer_name}</p>
+              {lastReturnSlipData.vehicle_number && <p><strong>Vehicle No:</strong> {lastReturnSlipData.vehicle_number}</p>}
+              {lastReturnSlipData.delivery_charges > 0 && <p><strong>Return Karya:</strong> Rs.{lastReturnSlipData.delivery_charges.toLocaleString()}</p>}
             </div>
 
             <table style={{width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', marginBottom: '10px'}}>

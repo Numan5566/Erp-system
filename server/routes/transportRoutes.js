@@ -85,9 +85,11 @@ router.get('/ledger/:id', auth, async (req, res) => {
   try {
     const vId = req.params.id;
     
-    // 1. Trips from Sales (Outward)
+    // 1. Trips from Sales (Outward / Returns)
     const salesTrips = await pool.query(
-      `SELECT id, customer_name as party_name, delivery_charges as amount, created_at as date, 'Outward (Sale)' as trip_type, payment_type
+      `SELECT id, customer_name as party_name, delivery_charges as amount, created_at as date, 
+              CASE WHEN status = 'Returned' THEN 'Inward (Return)' ELSE 'Outward (Sale)' END as trip_type, 
+              payment_type
        FROM sales WHERE vehicle_id = $1`, [vId]
     );
 

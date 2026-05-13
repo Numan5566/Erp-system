@@ -404,6 +404,14 @@ router.post('/return', auth, async (req, res) => {
     const sId = parseInt(sale_id);
     if (isNaN(sId)) throw new Error('Invalid Bill Number');
 
+    // 1. Get sale details
+    const saleRes = await client.query('SELECT * FROM sales WHERE id = $1', [sId]);
+    if (saleRes.rows.length === 0) throw new Error('Sale not found');
+    const sale = saleRes.rows[0];
+
+    // Check if already fully returned
+    if (sale.status === 'Returned') throw new Error('This bill has already been fully returned');
+
     // 0. Balance Check
     const refAmt = parseFloat(refund_amount || 0);
     if (refAmt > 0) {
@@ -443,14 +451,6 @@ router.post('/return', auth, async (req, res) => {
         throw new Error(`Insufficient Balance in ${method}. Available: Rs. ${currentBalance.toLocaleString()}`);
       }
     }
-
-    // 1. Get sale details
-    const saleRes = await client.query('SELECT * FROM sales WHERE id = $1', [sId]);
-    if (saleRes.rows.length === 0) throw new Error('Sale not found');
-    const sale = saleRes.rows[0];
-
-    // Check if already fully returned
-    if (sale.status === 'Returned') throw new Error('This bill has already been fully returned');
 
     // 2. Identify items to return
     let items;
