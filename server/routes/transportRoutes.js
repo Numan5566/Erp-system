@@ -13,13 +13,8 @@ router.get('/', auth, async (req, res) => {
     let params = [];
     let conditions = [];
 
-    if (isAdmin(req)) {
-      if (type) {
-        params.push(type);
-        conditions.push(`module_type = $${params.length}`);
-      }
-    } else {
-      params.push(req.user.module_type || 'Retail 1');
+    if (type) {
+      params.push(type);
       conditions.push(`module_type = $${params.length}`);
     }
 
