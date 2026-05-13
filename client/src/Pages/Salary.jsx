@@ -430,8 +430,8 @@ export default function Salary({ type }) {
                       onEdit={null}
                       onDelete={null}
                       extraItems={[
-                        { label: 'Send Advance', icon: 'pi pi-arrow-right', command: () => openPaymentModal(r, 'Advance Given') },
-                        { label: 'Receive Advance', icon: 'pi pi-arrow-left', command: () => openPaymentModal(r, 'Advance Returned') },
+                        { label: 'Give Advance (Employee ko Dena)', icon: 'pi pi-arrow-right', command: () => openPaymentModal(r, 'Advance Given') },
+                        { label: 'Advance Return (Wapas Lena / Deduct)', icon: 'pi pi-arrow-left', command: () => openPaymentModal(r, 'Advance Returned') },
                         { label: 'View Payment Ledger', icon: 'pi pi-book', command: () => openLedger(r) }
                       ]}
                     />
@@ -501,8 +501,8 @@ export default function Salary({ type }) {
             <div className="modal-header">
               <h3>
                   {payForm.transaction_type === 'Salary' ? '💸 Disburse Monthly Salary' : 
-                   payForm.transaction_type === 'Advance Given' ? '📤 Send Advance (Give)' : 
-                   '📥 Receive Advance'}
+                   payForm.transaction_type === 'Advance Given' ? '📤 Give Advance to Employee (Dena)' : 
+                   '📥 Return / Deduct Advance (Wapas Lena)'}
               </h3>
               <button className="modal-close" onClick={() => setShowPayModal(false)}><X size={20} /></button>
             </div>
