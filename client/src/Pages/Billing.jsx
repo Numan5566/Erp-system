@@ -1585,6 +1585,7 @@ export default function Billing({ type }) {
                           className="p-inputtext-sm w-full"
                           placeholder="Optional Vehicle"
                           showClear
+                          appendTo="self"
                         />
                       </div>
                       <div className="col-5">
@@ -1625,6 +1626,7 @@ export default function Billing({ type }) {
                           options={['Cash', ...bankAccounts.filter(b => b.bank_name.toLowerCase() !== 'cash').map(b => b.bank_name)]} 
                           onChange={e => setRefundMethod(e.value)}
                           className="p-inputtext-sm w-full"
+                          appendTo="self"
                         />
                       </div>
                     </div>
