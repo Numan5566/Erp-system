@@ -53,11 +53,14 @@ export default function Salary({ type }) {
     employee_name: "",
     amount: "",
     transaction_type: "Salary", // Salary, Advance Given, Advance Returned
+    advance_return_type: "Direct Cash", // "Direct Cash" or "Salary Deduction"
     month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
+    deduction_month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
     payment_date: new Date().toLocaleDateString('en-CA'),
     payment_type: "Cash",
     notes: ""
   });
+  const [activeDeductions, setActiveDeductions] = useState([]);
   
   // Receipt Modal
   const [showReceipt, setShowReceipt] = useState(false);
@@ -111,6 +114,34 @@ export default function Salary({ type }) {
     }
   }, [showPayModal]);
 
+  // Automatically fetch pending scheduled deductions for selected month to calculate net salary dynamically
+  useEffect(() => {
+    const fetchDeductions = async () => {
+      if (payForm.transaction_type === 'Salary' && payForm.staff_id && payForm.month) {
+        try {
+          const res = await fetch(`${API}/deductions/pending/${payForm.staff_id}?month=${payForm.month}`, {
+            headers: { "Authorization": `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setActiveDeductions(data);
+            
+            // Recalculate recommended net salary
+            const staff = records.find(r => String(r.id) === String(payForm.staff_id));
+            const baseSalary = parseFloat(staff?.amount || 0);
+            const totalScheduledCuts = data.reduce((sum, d) => sum + parseFloat(d.amount), 0);
+            const calculatedNet = Math.max(0, baseSalary - totalScheduledCuts);
+            
+            setPayForm(prev => ({ ...prev, amount: calculatedNet.toString() }));
+          }
+        } catch (err) { console.error(err); }
+      } else {
+        setActiveDeductions([]);
+      }
+    };
+    fetchDeductions();
+  }, [payForm.staff_id, payForm.month, payForm.transaction_type, records]);
+
   const getSelectedMethodBalance = () => {
     const method = payForm.payment_type;
     if (method === 'Cash') return liveBalances['Cash'] || 0;
@@ -147,7 +178,37 @@ export default function Salary({ type }) {
     const balance = getSelectedMethodBalance();
     const amount = parseFloat(payForm.amount);
     
-    // Outflow verification (Giving salary or advance consumes money)
+    // 💎 1. SCHEDULER FLOW: Handle salary deduction commitment without affecting actual cash now
+    if (payForm.transaction_type === 'Advance Returned' && payForm.advance_return_type === 'Salary Deduction') {
+        setLoading(true);
+        try {
+          const res = await fetch(`${API}/deductions`, {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ 
+              staff_id: payForm.staff_id, 
+              amount: amount, 
+              target_month: payForm.deduction_month, 
+              notes: payForm.notes || 'Advance deduction' 
+            }),
+          });
+          const responseData = await res.json();
+          if (res.ok && responseData.success) {
+            alert(`✅ Advance deduction of Rs. ${amount.toLocaleString()} successfully scheduled for the ${payForm.deduction_month} salary payment cycle!`);
+            setShowPayModal(false);
+            fetchRecords();
+          } else {
+            alert("Failed to register deduction.");
+          }
+        } catch (err) { console.error(err); }
+        setLoading(false);
+        return;
+    }
+
+    // 💎 2. DIRECT CASH FLOW: Execute payment immediately
     if (payForm.transaction_type !== 'Advance Returned') {
         if (amount > balance) {
             alert("Insufficient balance in selected account!");
@@ -213,7 +274,9 @@ export default function Salary({ type }) {
         employee_name: staff ? staff.employee_name : "",
         amount: staff ? (type === 'Salary' ? staff.amount : "") : "",
         transaction_type: type,
+        advance_return_type: "Direct Cash",
         month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
+        deduction_month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
         payment_date: new Date().toLocaleDateString('en-CA'),
         payment_type: "Cash",
         notes: ""
@@ -364,11 +427,11 @@ export default function Salary({ type }) {
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <ActionMenu
-                      onEdit={user?.role === 'admin' ? () => openEdit(r) : null}
-                      onDelete={user?.role === 'admin' ? () => handleDelete(r.id) : null}
+                      onEdit={null}
+                      onDelete={null}
                       extraItems={[
-                        { label: 'Pay Monthly Salary', icon: 'pi pi-money-bill', command: () => openPaymentModal(r, 'Salary') },
-                        { label: 'Give Advance', icon: 'pi pi-arrow-up', command: () => openPaymentModal(r, 'Advance Given') },
+                        { label: 'Send Advance', icon: 'pi pi-arrow-right', command: () => openPaymentModal(r, 'Advance Given') },
+                        { label: 'Receive Advance', icon: 'pi pi-arrow-left', command: () => openPaymentModal(r, 'Advance Returned') },
                         { label: 'View Payment Ledger', icon: 'pi pi-book', command: () => openLedger(r) }
                       ]}
                     />
@@ -434,106 +497,191 @@ export default function Salary({ type }) {
       {/* Modal: Salary & Advance Payment */}
       {showPayModal && (
         <div className="modal-overlay" onClick={() => setShowPayModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '450px'}}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '480px'}}>
             <div className="modal-header">
               <h3>
-                  {payForm.transaction_type === 'Salary' ? 'Disburse Monthly Salary' : 
-                   payForm.transaction_type === 'Advance Given' ? 'Give Advance Payment' : 
-                   'Receive / Adjust Advance'}
+                  {payForm.transaction_type === 'Salary' ? '💸 Disburse Monthly Salary' : 
+                   payForm.transaction_type === 'Advance Given' ? '📤 Send Advance (Give)' : 
+                   '📥 Receive Advance'}
               </h3>
               <button className="modal-close" onClick={() => setShowPayModal(false)}><X size={20} /></button>
             </div>
             <form onSubmit={handleSalaryPayment} className="custom-form">
                 
-                <div className="form-group" style={{marginBottom:'12px'}}>
-                    <label>Transaction Category</label>
-                    <select 
-                        style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'#f8fafc', fontWeight:600}}
-                        value={payForm.transaction_type} 
-                        onChange={(e) => setPayForm({...payForm, transaction_type: e.target.value})}
-                    >
-                        <option value="Salary">Monthly Salary Payout</option>
-                        <option value="Advance Given">Give Advance Salary (+)</option>
-                        <option value="Advance Returned">Receive Advance / Return (-)</option>
-                        <option value="Deduct from Advance">Deduct From Advance (-)</option>
-                    </select>
+                {/* Select Employee Field - MUST BE READ-ONLY TEXT IF ROW SELECTED */}
+                <div className="form-group" style={{marginBottom:'15px'}}>
+                    <label>Employee Name</label>
+                    {payForm.staff_id && records.some(r => String(r.id) === String(payForm.staff_id)) ? (
+                        <div style={{width:'100%', padding:'12px 15px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'#f1f5f9', color:'#475569', fontWeight:700, fontSize:'0.95rem', display:'flex', alignItems:'center', gap:'8px'}}>
+                             <UserCheck size={16}/> {payForm.employee_name}
+                        </div>
+                    ) : (
+                        <select 
+                            style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1'}}
+                            required value={payForm.staff_id} onChange={onPayFormStaffSelect}
+                        >
+                            <option value="">-- Choose Staff Member --</option>
+                            {records.map(r => <option key={r.id} value={r.id}>{r.employee_name} ({r.designation})</option>)}
+                        </select>
+                    )}
                 </div>
 
-                <div className="form-group" style={{marginBottom:'12px'}}>
-                    <label>Select Employee *</label>
-                    <select 
-                        style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1'}}
-                        required value={payForm.staff_id} onChange={onPayFormStaffSelect}
-                    >
-                        <option value="">-- Choose Staff Member --</option>
-                        {records.map(r => <option key={r.id} value={r.id}>{r.employee_name} ({r.designation})</option>)}
-                    </select>
-                </div>
-
-                {/* Show real-time status card if an employee is chosen */}
+                {/* Live outstanding information block */}
                 {payForm.staff_id && (
-                   <div style={{background: '#f0f9ff', padding: '10px 15px', borderRadius: '8px', border: '1px solid #bae6fd', marginBottom: '15px', fontSize: '0.85rem'}}>
+                   <div style={{background: '#f8fafc', padding: '12px 15px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '15px', fontSize: '0.85rem'}}>
                        <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
-                           <span style={{color:'#0369a1'}}>Standard Monthly Salary:</span>
-                           <strong style={{color:'#0c4a6e'}}>Rs. {parseFloat(records.find(r => String(r.id) === String(payForm.staff_id))?.amount || 0).toLocaleString()}</strong>
+                           <span style={{color:'#64748b'}}>Standard Monthly Salary:</span>
+                           <strong style={{color:'#0f172a'}}>Rs. {parseFloat(records.find(r => String(r.id) === String(payForm.staff_id))?.amount || 0).toLocaleString()}</strong>
                        </div>
                        <div style={{display:'flex', justifyContent:'space-between'}}>
-                           <span style={{color:'#b91c1c'}}>Current Unpaid Advance:</span>
-                           <strong style={{color:'#991b1b'}}>Rs. {parseFloat(records.find(r => String(r.id) === String(payForm.staff_id))?.advance_salary || 0).toLocaleString()}</strong>
+                           <span style={{color:'#ef4444'}}>Current Active Advance Balance:</span>
+                           <strong style={{color:'#b91c1c', fontWeight:700}}>Rs. {parseFloat(records.find(r => String(r.id) === String(payForm.staff_id))?.advance_salary || 0).toLocaleString()}</strong>
                        </div>
                    </div>
                 )}
 
+                {/* TRANSACTION CONDITIONAL FIELD BUNDLES */}
+
+                {/* CASE A: Disbursing Monthly Salary */}
                 {payForm.transaction_type === 'Salary' && (
-                    <div className="form-group" style={{marginBottom:'12px'}}>
-                        <label>For Salary Month *</label>
-                        <select style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1'}} 
-                            value={payForm.month} onChange={(e) => setPayForm({...payForm, month: e.target.value})}>
-                            {Array.from({ length: 12 }).map((_, i) => {
-                                const d = new Date();
-                                d.setMonth(d.getMonth() - i);
-                                const label = d.toLocaleString('default', { month: 'long', year: 'numeric' });
-                                return <option key={label} value={label}>{label}</option>;
+                    <>
+                        <div className="form-group" style={{marginBottom:'15px'}}>
+                            <label>Select Target Month *</label>
+                            <select style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1'}} 
+                                value={payForm.month} onChange={(e) => setPayForm({...payForm, month: e.target.value})}>
+                                {Array.from({ length: 12 }).map((_, i) => {
+                                    const d = new Date();
+                                    d.setMonth(d.getMonth() - i);
+                                    const label = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                                    return <option key={label} value={label}>{label}</option>;
+                                })}
+                            </select>
+                        </div>
+
+                        {/* 🛡️ HIGH VISIBILITY DEDUCTION ENGINE BOX */}
+                        {activeDeductions.length > 0 && (
+                            <div style={{background: '#fffbeb', border:'1.5px dashed #f59e0b', padding:'15px', borderRadius:'8px', marginBottom:'20px', fontSize:'0.88rem'}}>
+                                <div style={{display:'flex', alignItems:'center', gap:'6px', color:'#d97706', fontWeight:700, marginBottom:'8px'}}>
+                                    <Info size={16}/> PRE-SCHEDULED ADVANCE DEDUCTION DETECTED!
+                                </div>
+                                <div style={{display:'flex', flexDirection:'column', gap:'5px'}}>
+                                    <div style={{display:'flex', justifyContent:'space-between', color:'#4b5563'}}>
+                                        <span>Base Pay rate:</span><span>Rs. {parseFloat(records.find(r => String(r.id) === String(payForm.staff_id))?.amount || 0).toLocaleString()}</span>
+                                    </div>
+                                    {activeDeductions.map((dec, di) => (
+                                        <div key={di} style={{display:'flex', justifyContent:'space-between', color:'#dc2626', fontWeight:600}}>
+                                            <span>(-) Deducted Advance Cut ({dec.notes || 'Adjust'}):</span>
+                                            <span>Rs. {parseFloat(dec.amount).toLocaleString()}</span>
+                                        </div>
+                                    ))}
+                                    <div style={{borderTop:'1px solid #fcd34d', marginTop:'5px', paddingTop:'5px', display:'flex', justifyContent:'space-between', fontWeight:800, color:'#166534', fontSize:'1rem'}}>
+                                        <span>Net Cash Payable:</span>
+                                        <span>Rs. {Math.max(0, parseFloat(records.find(r => String(r.id) === String(payForm.staff_id))?.amount || 0) - activeDeductions.reduce((sum, d) => sum + parseFloat(d.amount), 0)).toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {/* CASE B: Receiving Advance (Offers direct return vs schedule deduction) */}
+                {payForm.transaction_type === 'Advance Returned' && (
+                    <>
+                        <div className="form-group" style={{marginBottom:'15px'}}>
+                            <label>Receive Mode Type *</label>
+                            <select 
+                                style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #3b82f6', background:'#eff6ff', fontWeight:700, color:'#1d4ed8'}}
+                                value={payForm.advance_return_type}
+                                onChange={(e) => setPayForm({...payForm, advance_return_type: e.target.value})}
+                            >
+                                <option value="Direct Cash">📥 Direct Cash / Bank Return</option>
+                                <option value="Salary Deduction">📅 Deduct from Future Monthly Salary</option>
+                            </select>
+                        </div>
+
+                        {payForm.advance_return_type === 'Salary Deduction' && (
+                            <div className="form-group" style={{marginBottom:'15px'}}>
+                                <label>Target Monthly Salary to Deduct *</label>
+                                <select 
+                                    style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1', background:'#fafafa'}} 
+                                    value={payForm.deduction_month} 
+                                    onChange={(e) => setPayForm({...payForm, deduction_month: e.target.value})}
+                                >
+                                    {Array.from({ length: 6 }).map((_, i) => {
+                                        const d = new Date();
+                                        d.setMonth(d.getMonth() + i); // Allow scheduling current and future months
+                                        const label = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+                                        return <option key={label} value={label}>{label}</option>;
+                                    })}
+                                </select>
+                                <p style={{fontSize:'0.75rem', color:'#64748b', marginTop:'4px'}}>✨ When paying salary for {payForm.deduction_month}, this amount will automatically be cut.</p>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {/* Cash/Bank Source selector (HIDDEN ONLY IF scheduling a future deduction) */}
+                {!(payForm.transaction_type === 'Advance Returned' && payForm.advance_return_type === 'Salary Deduction') && (
+                    <div className="form-group" style={{marginBottom:'15px'}}>
+                        <label>{payForm.transaction_type === 'Advance Returned' ? 'Destination Account (Receive to)' : 'Source Account (Pay from)'}</label>
+                        <select 
+                            style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1'}}
+                            required value={payForm.payment_type} onChange={(e) => setPayForm({...payForm, payment_type: e.target.value})}
+                        >
+                            <option value="Cash">Cash Account</option>
+                            {banks.map(b => {
+                                const digits = b.account_number ? b.account_number.slice(-4) : '';
+                                return <option key={b.id} value={`Bank - ${b.bank_name} ${digits ? `(****${digits})` : ''}`}>{b.bank_name} ({b.account_title})</option>;
                             })}
                         </select>
+                        <div style={{fontSize:'0.8rem', color: '#15803d', marginTop:'4px', fontWeight:600}}>
+                            Current Available Balance: Rs. {getSelectedMethodBalance().toLocaleString()}
+                        </div>
                     </div>
                 )}
 
-                {/* For "Deduct from Advance", we don't technically consume cash/bank from counter, but let's let user decide method or set "Internal" */}
-                <div className="form-group" style={{marginBottom:'12px'}}>
-                    <label>Payment Method / Source</label>
-                    <select 
-                        style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1'}}
-                        required value={payForm.payment_type} onChange={(e) => setPayForm({...payForm, payment_type: e.target.value})}
-                    >
-                        <option value="Cash">Cash Account</option>
-                        {banks.map(b => {
-                            const digits = b.account_number ? b.account_number.slice(-4) : '';
-                            return <option key={b.id} value={`Bank - ${b.bank_name} ${digits ? `(****${digits})` : ''}`}>{b.bank_name} ({b.account_title})</option>;
-                        })}
-                    </select>
-                    <div style={{fontSize:'0.8rem', color: '#15803d', marginTop:'4px', fontWeight:600}}>
-                        Current Balance: Rs. {getSelectedMethodBalance().toLocaleString()}
-                    </div>
-                </div>
-
-                <div className="form-group" style={{marginBottom:'12px'}}>
-                    <label>Amount (Rs.) *</label>
+                {/* Amount input */}
+                <div className="form-group" style={{marginBottom:'15px'}}>
+                    <label>
+                        {payForm.transaction_type === 'Salary' ? 'Payout Amount (Rs.) *' : 
+                         payForm.transaction_type === 'Advance Given' ? 'Advance Amount to Send (Rs.) *' : 
+                         'Advance Amount (Rs.) *'}
+                    </label>
                     <div className="input-wrapper">
                         <Banknote size={18} />
-                        <input type="number" required value={payForm.amount} placeholder="Enter amount" onChange={(e) => setPayForm({...payForm, amount: e.target.value})} />
+                        <input 
+                            type="number" 
+                            required 
+                            value={payForm.amount} 
+                            placeholder="Enter amount in Rs." 
+                            onChange={(e) => setPayForm({...payForm, amount: e.target.value})} 
+                        />
                     </div>
                 </div>
 
-                <div className="form-group" style={{marginBottom:'15px'}}>
-                    <label>Short Note / Description</label>
-                    <input type="text" placeholder="Transaction details..." style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid #cbd5e1'}} value={payForm.notes} onChange={(e) => setPayForm({...payForm, notes: e.target.value})} />
+                {/* Description Notes */}
+                <div className="form-group" style={{marginBottom:'20px'}}>
+                    <label>Short Description / Memo</label>
+                    <input 
+                        type="text" 
+                        placeholder="Enter any comments or tracking details..." 
+                        style={{width:'100%', padding:'12px', borderRadius:'8px', border:'1px solid #cbd5e1'}} 
+                        value={payForm.notes} 
+                        onChange={(e) => setPayForm({...payForm, notes: e.target.value})} 
+                    />
                 </div>
 
-                <div className="form-actions">
-                    <button type="button" className="btn-secondary" onClick={() => setShowPayModal(false)}>Cancel</button>
-                    <button type="submit" className="btn-primary" disabled={loading} style={{background: '#10b981', borderColor:'#10b981'}}>
-                        {loading ? "Processing..." : "Confirm Transaction"}
+                <div className="form-actions" style={{marginTop:'25px'}}>
+                    <button type="button" className="btn-secondary" onClick={() => setShowPayModal(false)} style={{padding:'12px'}}>Cancel</button>
+                    <button type="submit" className="btn-primary" disabled={loading} style={{
+                        background: payForm.transaction_type === 'Advance Given' ? '#ef4444' : '#10b981', 
+                        borderColor: payForm.transaction_type === 'Advance Given' ? '#ef4444' : '#10b981',
+                        padding:'12px'
+                    }}>
+                        {loading ? "Processing..." : 
+                         payForm.transaction_type === 'Advance Given' ? 'Confirm Send Advance' :
+                         payForm.transaction_type === 'Advance Returned' && payForm.advance_return_type === 'Salary Deduction' ? 'Schedule Salary Cut' :
+                         'Confirm Transaction'}
                     </button>
                 </div>
             </form>

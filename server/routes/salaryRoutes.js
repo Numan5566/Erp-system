@@ -90,6 +90,34 @@ router.get('/ledger/:name', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Get pending deductions for an employee
+router.get('/deductions/pending/:staffId', auth, async (req, res) => {
+  try {
+    const { month } = req.query;
+    let query = 'SELECT * FROM salary_deductions WHERE staff_id = $1 AND is_applied = FALSE';
+    let params = [req.params.staffId];
+    if (month) {
+      query += ' AND target_month = $2';
+      params.push(month);
+    }
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Add scheduled deduction for advance
+router.post('/deductions', auth, async (req, res) => {
+  try {
+    const { staff_id, amount, target_month, notes } = req.body;
+    const result = await pool.query(
+      `INSERT INTO salary_deductions (staff_id, amount, target_month, notes) 
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [staff_id, amount, target_month, notes]
+    );
+    res.json({ success: true, record: result.rows[0] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Process Payment Endpoint
 router.post('/pay', auth, async (req, res) => {
   try {
@@ -115,6 +143,32 @@ router.post('/pay', auth, async (req, res) => {
         await pool.query('UPDATE salary SET advance_salary = COALESCE(advance_salary, 0) + $1 WHERE id = $2', [amount, staff_id]);
       } else if (transaction_type === 'Advance Returned' || transaction_type === 'Deduct from Advance') {
         await pool.query('UPDATE salary SET advance_salary = COALESCE(advance_salary, 0) - $1 WHERE id = $2', [amount, staff_id]);
+      } else if (transaction_type === 'Salary') {
+        // 🛡️ AUTOMATIC DEDUCTION ENGINE
+        // Fetch scheduled cuts for this month that aren't applied yet!
+        const deductionsRes = await pool.query(
+          'SELECT * FROM salary_deductions WHERE staff_id = $1 AND target_month = $2 AND is_applied = FALSE',
+          [staff_id, targetMonth]
+        );
+        if (deductionsRes.rows.length > 0) {
+          const totalDeduction = deductionsRes.rows.reduce((sum, r) => sum + parseFloat(r.amount), 0);
+          
+          // 1. Mark scheduled entries as applied
+          await pool.query(
+            'UPDATE salary_deductions SET is_applied = TRUE WHERE staff_id = $1 AND target_month = $2',
+            [staff_id, targetMonth]
+          );
+          // 2. Relieve employee's outstanding advance debt by this amount!
+          await pool.query('UPDATE salary SET advance_salary = COALESCE(advance_salary, 0) - $1 WHERE id = $2', [totalDeduction, staff_id]);
+          
+          // 3. Log internal non-cash adjustment entry to preserve financial ledger traces
+          await pool.query(
+            `INSERT INTO salary_payments 
+            (staff_id, employee_name, amount, payment_type, transaction_type, month, payment_date, notes, module_type, user_id)
+            VALUES ($1, $2, $3, 'Internal System Adjustment', 'Deduct from Advance', $4, NOW(), $5, $6, $7)`,
+            [staff_id, employee_name, totalDeduction, targetMonth, `Auto-deducted scheduled advance from ${targetMonth} Salary Payout`, finalModule, req.user.id]
+          );
+        }
       }
     }
 
