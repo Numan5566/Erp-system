@@ -580,9 +580,26 @@ export default function Suppliers({ type }) {
           ? (parseFloat(firstVisibleRow.running_balance || 0) - (parseFloat(firstVisibleRow.total_amount || 0) - parseFloat(firstVisibleRow.paid_amount || 0))) 
           : ledgerOpeningBalance;
 
+        // Construct visual rows array passed to DataTable
+        const datatableRows = [
+          {
+            id: 'opening',
+            isOpening: true,
+            purchase_date: null,
+            product_name: null,
+            vehicle_number: null,
+            quantity: null,
+            rate: null,
+            paid_amount: 0,
+            total_amount: 0,
+            running_balance: periodOpeningBal
+          },
+          ...sortedLedgerData
+        ];
+
         return (
         <div className="modal-overlay" onClick={() => setShowLedgerModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1050px', width: '95%' }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1150px', width: '98%' }}>
             <div className="modal-header no-print">
               <div className="header-info" style={{display:'flex', alignItems:'center', gap:'12px'}}>
                 <FileText size={24} color="#3b82f6" />
@@ -622,7 +639,6 @@ export default function Suppliers({ type }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Opening Balance Row in Print */}
                   <tr style={{background: '#f8fafc', fontStyle: 'italic'}}>
                     <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>—</td>
                     <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>Opening</td>
@@ -632,31 +648,28 @@ export default function Suppliers({ type }) {
                     </td>
                   </tr>
                   
-                  {sortedLedgerData.map((row, index) => {
-                    const isAdj = !row.product_name;
-                    return (
-                      <tr key={row.id}>
-                        <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{index + 1}</td>
-                        <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.purchase_date).toLocaleDateString()}</td>
-                        <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>
-                          {row.product_name ? `${row.brand || ''} ${row.product_name}` : (row.vehicle_number || row.payment_type || 'Manual Entry')}
-                        </td>
-                        <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.product_name ? (row.vehicle_number || '—') : 'N/A'}</td>
-                        <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>
-                          {row.product_name ? `${row.quantity} ${row.unit}` : '—'}
-                        </td>
-                        <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right', color: 'green'}}>
-                          {parseFloat(row.paid_amount) > 0 ? parseFloat(row.paid_amount).toLocaleString() : '—'}
-                        </td>
-                        <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right', color: 'red'}}>
-                          {parseFloat(row.total_amount) > 0 ? parseFloat(row.total_amount).toLocaleString() : '—'}
-                        </td>
-                        <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right', fontWeight: 'bold'}}>
-                          Rs. {Math.abs(parseFloat(row.running_balance || 0)).toLocaleString()} {parseFloat(row.running_balance || 0) > 0 ? 'Dr' : 'Cr'}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {sortedLedgerData.map((row, index) => (
+                    <tr key={row.id}>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{index + 1}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{new Date(row.purchase_date).toLocaleDateString()}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>
+                        {row.product_name ? `${row.brand || ''} ${row.product_name}` : (row.vehicle_number || row.payment_type || 'Manual Entry')}
+                      </td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px'}}>{row.product_name ? (row.vehicle_number || '—') : 'N/A'}</td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right'}}>
+                        {row.product_name ? `${row.quantity} ${row.unit}` : '—'}
+                      </td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right', color: 'green'}}>
+                        {parseFloat(row.paid_amount) > 0 ? parseFloat(row.paid_amount).toLocaleString() : '—'}
+                      </td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right', color: 'red'}}>
+                        {parseFloat(row.total_amount) > 0 ? parseFloat(row.total_amount).toLocaleString() : '—'}
+                      </td>
+                      <td style={{border: '1px solid #cbd5e1', padding: '8px', textAlign: 'right', fontWeight: 'bold'}}>
+                        Rs. {Math.abs(parseFloat(row.running_balance || 0)).toLocaleString()} {parseFloat(row.running_balance || 0) > 0 ? 'Dr' : 'Cr'}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
                 <tfoot>
                   <tr style={{background: '#f8fafc', fontWeight: 'bold'}}>
@@ -737,118 +750,135 @@ export default function Suppliers({ type }) {
               {loading ? (
                 <div style={{textAlign: 'center', padding: '40px', color: '#64748b'}}>Loading ledger data...</div>
               ) : (
-                <div className="module-table-container" style={{maxHeight: '350px', overflowY: 'auto', borderRadius: '10px', border: '1px solid #e2e8f0'}}>
-                  <table className="module-table" style={{width: '100%', borderCollapse: 'collapse'}}>
-                    <thead style={{position: 'sticky', top: 0, background: '#f8fafc', zIndex: 2, borderBottom: '2px solid #cbd5e1'}}>
-                      <tr>
-                        <th style={{width: '40px', textAlign:'center'}}>S.No</th>
-                        <th style={{width: '100px'}}>Date</th>
-                        <th>Product / Memo</th>
-                        <th style={{width: '120px'}}>Vehicle</th>
-                        <th style={{width: '110px'}}>Qty</th>
-                        <th style={{width: '90px'}}>Rate</th>
-                        <th style={{width: '110px', textAlign: 'right', color: '#16a34a'}}>Debit (-)</th>
-                        <th style={{width: '110px', textAlign: 'right', color: '#ef4444'}}>Credit (+)</th>
-                        <th style={{width: '130px', textAlign: 'right'}}>Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* 1. Opening Balance Row */}
-                      <tr style={{background: '#fafafa', fontStyle: 'italic', color: '#64748b'}}>
-                        <td style={{textAlign: 'center', borderBottom: '1px solid #f1f5f9'}}>—</td>
-                        <td style={{borderBottom: '1px solid #f1f5f9'}}>Opening</td>
-                        <td colSpan="6" style={{borderBottom: '1px solid #f1f5f9', fontWeight: 500, paddingLeft: '12px'}}>Opening balance brought forward</td>
-                        <td style={{borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontWeight: 700, color: '#475569'}}>
-                          Rs. {Math.abs(periodOpeningBal).toLocaleString()}
-                        </td>
-                      </tr>
-
-                      {sortedLedgerData.length === 0 ? (
-                        <tr><td colSpan="9" className="empty-msg" style={{padding: '24px', textAlign: 'center'}}>No transaction records found in this period.</td></tr>
-                      ) : (
-                        sortedLedgerData.map((row, index) => {
-                          const isAdjustment = !row.product_name;
+                <div style={{background: 'white', borderRadius: '10px', border: '1px solid #e2e8f0', overflow: 'hidden'}}>
+                  <DataTable 
+                    value={datatableRows} 
+                    scrollable 
+                    scrollHeight="380px" 
+                    className="p-datatable-sm card-table"
+                    stripedRows 
+                    responsiveLayout="scroll"
+                    rowHover
+                    style={{fontSize: '0.9rem'}}
+                    emptyMessage="No records found in this period."
+                  >
+                    <Column 
+                      header="S.No" 
+                      body={(row, options) => row.isOpening ? '—' : options.rowIndex} 
+                      style={{ width: '60px', textAlign: 'center' }} 
+                    />
+                    <Column 
+                      header="Date" 
+                      body={row => {
+                        if (row.isOpening) return <span style={{fontStyle:'italic', color:'#64748b'}}>Opening</span>;
+                        return (
+                          <div>
+                            <div style={{fontWeight:500}}>{new Date(row.purchase_date).toLocaleDateString()}</div>
+                            <small style={{color:'#94a3b8'}}>{new Date(row.purchase_date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</small>
+                          </div>
+                        );
+                      }} 
+                      style={{ width: '110px' }} 
+                    />
+                    <Column 
+                      header="Product / Memo" 
+                      body={row => {
+                        if (row.isOpening) return <span style={{fontStyle:'italic', color:'#64748b', fontWeight:500}}>Opening balance brought forward</span>;
+                        if (row.product_name) return <strong style={{color:'#1e293b'}}>{row.brand || ''} {row.product_name}</strong>;
+                        return <strong style={{color:'#0284c7', fontSize:'0.85rem'}}><ClipboardList size={13} style={{display:'inline', verticalAlign:'middle', marginRight:'4px'}}/>{row.vehicle_number || row.payment_type || 'Manual Adjustment'}</strong>;
+                      }} 
+                    />
+                    <Column 
+                      header="Vehicle" 
+                      body={row => {
+                        if (row.isOpening) return null;
+                        if (row.product_name) return <span style={{display:'inline-flex', alignItems:'center', gap:'4px', fontSize:'0.85rem', color:'#475569'}}><Truck size={12}/>{row.vehicle_number || '—'}</span>;
+                        return <span style={{color:'#cbd5e1'}}>N/A</span>;
+                      }} 
+                      style={{ width: '110px' }}
+                    />
+                    <Column 
+                      header="Qty" 
+                      body={row => {
+                        if (row.isOpening) return null;
+                        if (row.product_name && parseFloat(row.total_amount) > 0) {
                           return (
-                            <tr key={row.id} style={{borderBottom: '1px solid #f1f5f9'}}>
-                              <td style={{fontWeight: '700', color: '#94a3b8', textAlign: 'center'}}>{index + 1}</td>
-                              <td style={{fontSize: '0.85rem', color: '#475569'}}>
-                                {new Date(row.purchase_date).toLocaleDateString()}
-                                <br/><small style={{color:'#94a3b8'}}>{new Date(row.purchase_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</small>
-                              </td>
-                              <td>
-                                {row.product_name ? (
-                                  <strong style={{color: '#1e293b'}}>{row.brand || ''} {row.product_name}</strong>
-                                ) : (
-                                  <strong style={{color: '#0284c7'}}><ClipboardList size={12} style={{display: 'inline', marginRight:'4px'}}/> {row.vehicle_number || row.payment_type || 'Manual Entry'}</strong>
-                                )}
-                              </td>
-                              <td style={{fontSize: '0.85rem', color: '#475569'}}>
-                                {row.product_name ? (
-                                  <span style={{display:'inline-flex', alignItems:'center', gap:'4px'}}><Truck size={12}/> {row.vehicle_number || '—'}</span>
-                                ) : (
-                                  <span style={{color: '#cbd5e1'}}>N/A</span>
-                                )}
-                              </td>
-                              <td style={{padding: '12px 8px'}}>
-                                {row.product_name && parseFloat(row.total_amount) > 0 ? (
-                                  <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
-                                    {user?.role === 'admin' ? (
-                                      <input 
-                                        type="number" 
-                                        defaultValue={row.quantity} 
-                                        style={{width: '55px', padding: '2px 4px', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px'}}
-                                        onBlur={(e) => {
-                                          if (e.target.value !== String(row.quantity)) handleEntryUpdate(row.id, e.target.value, row.rate);
-                                        }}
-                                      />
-                                    ) : <span>{row.quantity}</span>}
-                                    <small style={{color: '#64748b'}}>{row.unit}</small>
-                                  </div>
-                                ) : <span style={{color: '#cbd5e1'}}>—</span>}
-                              </td>
-                              <td>
-                                {row.product_name && parseFloat(row.total_amount) > 0 ? (
-                                  user?.role === 'admin' ? (
-                                    <input 
-                                      type="number" 
-                                      defaultValue={row.rate} 
-                                      style={{width: '65px', padding: '2px 4px', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px'}}
-                                      onBlur={(e) => {
-                                        if (e.target.value !== String(row.rate)) handleEntryUpdate(row.id, row.quantity, e.target.value);
-                                      }}
-                                    />
-                                  ) : <span>Rs. {row.rate}</span>
-                                ) : <span style={{color: '#cbd5e1'}}>—</span>}
-                              </td>
-                              <td style={{textAlign: 'right', fontWeight: '600', color: '#16a34a'}}>
-                                {parseFloat(row.paid_amount) > 0 ? `Rs. ${parseFloat(row.paid_amount).toLocaleString()}` : '—'}
-                              </td>
-                              <td style={{textAlign: 'right', fontWeight: '600', color: '#ef4444'}}>
-                                {parseFloat(row.total_amount) > 0 ? `Rs. ${parseFloat(row.total_amount).toLocaleString()}` : '—'}
-                              </td>
-                              <td style={{textAlign: 'right', fontWeight: '750', color: parseFloat(row.running_balance) > 0 ? '#e11d48' : '#16a34a'}}>
-                                Rs. {Math.abs(parseFloat(row.running_balance || 0)).toLocaleString()}
-                                <small style={{marginLeft: '4px', fontWeight: 'normal', fontSize: '0.65rem'}}>
-                                  {parseFloat(row.running_balance) > 0 ? 'Dr' : 'Cr'}
-                                </small>
-                              </td>
-                            </tr>
+                            <div style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                              {user?.role === 'admin' ? (
+                                <input 
+                                  type="number" 
+                                  defaultValue={row.quantity} 
+                                  style={{width: '50px', padding: '2px 4px', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px'}}
+                                  onBlur={(e) => { if (e.target.value !== String(row.quantity)) handleEntryUpdate(row.id, e.target.value, row.rate); }}
+                                  onClick={(e)=>e.stopPropagation()}
+                                />
+                              ) : <span>{row.quantity}</span>}
+                              <small style={{color: '#64748b'}}>{row.unit}</small>
+                            </div>
                           );
-                        })
-                      )}
-                    </tbody>
-                    <tfoot style={{position: 'sticky', bottom: 0, background: '#f8fafc', borderTop: '2px solid #cbd5e1', zIndex: 2}}>
-                      <tr style={{fontWeight: 'bold'}}>
-                        <td colSpan="6" style={{textAlign: 'right', padding: '10px'}}>Totals For Filtered Period:</td>
-                        <td style={{textAlign: 'right', color: '#16a34a'}}>Rs. {sortedLedgerData.reduce((sum, r) => sum + parseFloat(r.paid_amount || 0), 0).toLocaleString()}</td>
-                        <td style={{textAlign: 'right', color: '#ef4444'}}>Rs. {sortedLedgerData.reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0).toLocaleString()}</td>
-                        <td style={{textAlign: 'right', fontSize: '1.05rem', color: parseFloat(selectedSupplier.balance) > 0 ? '#e11d48' : '#16a34a'}}>
-                          Rs. {Math.abs(parseFloat(selectedSupplier.balance)).toLocaleString()}
-                          <small style={{display:'block', fontSize:'0.65rem', fontWeight:'normal'}}>({parseFloat(selectedSupplier.balance) > 0 ? 'Live Payable' : 'Live Advance'})</small>
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                        }
+                        return <span style={{color: '#cbd5e1'}}>—</span>;
+                      }} 
+                      style={{ width: '100px' }}
+                    />
+                    <Column 
+                      header="Rate" 
+                      body={row => {
+                        if (row.isOpening) return null;
+                        if (row.product_name && parseFloat(row.total_amount) > 0) {
+                          return user?.role === 'admin' ? (
+                            <input 
+                              type="number" 
+                              defaultValue={row.rate} 
+                              style={{width: '60px', padding: '2px 4px', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px'}}
+                              onBlur={(e) => { if (e.target.value !== String(row.rate)) handleEntryUpdate(row.id, row.quantity, e.target.value); }}
+                              onClick={(e)=>e.stopPropagation()}
+                            />
+                          ) : <span>Rs. {row.rate}</span>;
+                        }
+                        return <span style={{color: '#cbd5e1'}}>—</span>;
+                      }}
+                      footer="Period Totals:"
+                      footerStyle={{ textAlign: 'right', fontWeight: 'bold', color: '#475569' }}
+                      style={{ width: '90px' }}
+                    />
+                    <Column 
+                      header="Debit (-)" 
+                      body={row => (!row.isOpening && parseFloat(row.paid_amount) > 0) ? <span style={{fontWeight: '600', color: '#16a34a'}}>Rs. {parseFloat(row.paid_amount).toLocaleString()}</span> : <span style={{color:'#cbd5e1'}}>—</span>}
+                      footer={`Rs. ${sortedLedgerData.reduce((sum, r) => sum + parseFloat(r.paid_amount || 0), 0).toLocaleString()}`}
+                      footerStyle={{ textAlign: 'right', fontWeight: '700', color: '#16a34a' }}
+                      style={{ textAlign: 'right', width: '120px' }}
+                    />
+                    <Column 
+                      header="Credit (+)" 
+                      body={row => (!row.isOpening && parseFloat(row.total_amount) > 0) ? <span style={{fontWeight: '600', color: '#ef4444'}}>Rs. {parseFloat(row.total_amount).toLocaleString()}</span> : <span style={{color:'#cbd5e1'}}>—</span>}
+                      footer={`Rs. ${sortedLedgerData.reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0).toLocaleString()}`}
+                      footerStyle={{ textAlign: 'right', fontWeight: '700', color: '#ef4444' }}
+                      style={{ textAlign: 'right', width: '120px' }}
+                    />
+                    <Column 
+                      header="Balance" 
+                      body={row => {
+                        const b = parseFloat(row.running_balance || 0);
+                        return (
+                          <span style={{fontWeight: '800', color: b > 0 ? '#e11d48' : '#16a34a'}}>
+                            Rs. {Math.abs(b).toLocaleString()}
+                            <small style={{marginLeft: '4px', fontWeight: 'normal', fontSize: '0.65rem'}}>{b > 0 ? 'Dr' : 'Cr'}</small>
+                          </span>
+                        );
+                      }}
+                      footer={
+                        <div>
+                          <div style={{fontWeight:'800', fontSize:'0.95rem', color: parseFloat(selectedSupplier.balance) > 0 ? '#e11d48' : '#16a34a'}}>
+                            Rs. {Math.abs(parseFloat(selectedSupplier.balance)).toLocaleString()}
+                          </div>
+                          <small style={{fontSize:'0.6rem', fontWeight:'normal', color:'#64748b'}}>Live Balance</small>
+                        </div>
+                      }
+                      footerStyle={{ textAlign: 'right' }}
+                      style={{ textAlign: 'right', width: '150px' }}
+                    />
+                  </DataTable>
                 </div>
               )}
 
