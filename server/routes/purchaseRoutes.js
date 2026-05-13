@@ -182,6 +182,58 @@ router.post('/payment', auth, async (req, res) => {
   }
 });
 
+// Post Manual Ledger Adjustment (Debit or Credit)
+router.post('/adjustment', auth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { supplier_id, amount, notes, type, module_type } = req.body;
+    const amt = parseFloat(amount) || 0;
+    const finalModule = isAdmin(req) ? (module_type || 'Wholesale') : (req.user.module_type || 'Retail 1');
+    
+    let totalAmount = 0;
+    let paidAmount = 0;
+    let balanceImpact = 0;
+
+    if (type === 'Credit') {
+      // Credit Adjustment: Increases what we owe (Credit increases Liability).
+      totalAmount = amt;
+      paidAmount = 0;
+      balanceImpact = amt;
+    } else {
+      // Debit Adjustment: Decreases what we owe (like a payment).
+      totalAmount = 0;
+      paidAmount = amt;
+      balanceImpact = -amt;
+    }
+
+    const desc = `[${type} Adjustment] ${notes || ''}`;
+
+    // 1. Insert Adjustment into Purchases Table
+    const adjustRes = await client.query(
+      `INSERT INTO purchases 
+      (supplier_id, product_id, vehicle_number, quantity, rate, total_amount, paid_amount, balance_amount, module_type, user_id, payment_type) 
+      VALUES ($1, NULL, $2, 0, 0, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [supplier_id, desc, totalAmount, paidAmount, balanceImpact, finalModule, req.user.id, 'Manual Adjustment']
+    );
+
+    // 2. Update Supplier Running Balance
+    await client.query(
+      `UPDATE suppliers SET balance = balance + $1 WHERE id = $2`,
+      [balanceImpact, supplier_id]
+    );
+
+    await client.query('COMMIT');
+    res.json(adjustRes.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Supplier Adjustment Error:', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 // Update a specific purchase entry (from Ledger)
 router.post('/update-ledger-entry', auth, async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Only admins can edit ledger entries' });
