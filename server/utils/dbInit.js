@@ -20,6 +20,17 @@ async function syncDatabaseSchema() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );`,
 
+    // --- 0.1 SALARY DEDUCTIONS (Missing Deduction Engine) ---
+    `CREATE TABLE IF NOT EXISTS salary_deductions (
+      id SERIAL PRIMARY KEY,
+      staff_id INTEGER REFERENCES salary(id) ON DELETE CASCADE,
+      amount DECIMAL(15, 2) NOT NULL,
+      target_month VARCHAR(100) NOT NULL,
+      notes VARCHAR(255),
+      is_applied BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );`,
+
     // --- 1. PRODUCTS ---
     `ALTER TABLE products ADD COLUMN IF NOT EXISTS brand VARCHAR(255);`,
     `ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price DECIMAL(12, 2) DEFAULT 0;`,
